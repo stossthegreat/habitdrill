@@ -18,6 +18,7 @@ import { prisma } from "../utils/db";
 import { redis } from "../utils/redis";
 import { deepUserModel, LearnedUserModel, BehavioralFingerprint, ShameSensitivity, TriggerChain } from "../services/deep-user-model.service";
 import { memoryService } from "../services/memory.service";
+import { BatchLogger } from "../utils/batch-logger";
 
 // =============================================================================
 // TYPES
@@ -64,7 +65,7 @@ class PatternLearningWorker {
    * Call this from a scheduled job (e.g., 3am daily).
    */
   async processAllUsers(): Promise<{ processed: number; errors: number }> {
-    console.log("🧠 Pattern Learning Worker starting...");
+    const logger = new BatchLogger('PatternLearning');
     
     // Get users active in last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
@@ -78,33 +79,28 @@ class PatternLearningWorker {
       select: { id: true },
     });
     
-    console.log(`📊 Processing ${users.length} users...`);
-    
-    let processed = 0;
-    let errors = 0;
+    logger.info(`Processing ${users.length} active users`);
     
     for (const user of users) {
       try {
         const result = await this.processUser(user.id);
         if (result.success) {
-          processed++;
-          console.log(`✅ Processed ${user.id}: ${result.dataPointsProcessed} data points, updated: ${result.updatedFields.join(", ")}`);
+          logger.success(user.id);
         } else {
-          errors++;
-          console.error(`❌ Failed ${user.id}: ${result.error}`);
+          logger.error(user.id, result.error || 'Unknown error');
         }
       } catch (error) {
-        errors++;
-        console.error(`❌ Exception processing ${user.id}:`, error);
+        logger.error(user.id, error);
       }
       
       // Small delay to avoid overwhelming the database
       await this.sleep(100);
     }
     
-    console.log(`🧠 Pattern Learning Worker complete: ${processed} processed, ${errors} errors`);
+    logger.flush();
+    const stats = logger.getStats();
     
-    return { processed, errors };
+    return { processed: stats.succeeded, errors: stats.failed };
   }
   
   /**

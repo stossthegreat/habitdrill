@@ -99,6 +99,9 @@ JWT_SECRET="your_jwt_secret_here"
 # BullMQ
 BULLMQ_REDIS_URL="redis://localhost:6379"
 
+# Logging
+LOG_BATCH_SIZE=50  # Default: 50 (batch size for job scheduling logs)
+
 # Future-You Unified Engine
 FUTUREYOU_ENABLED=true  # Default: true (set to 'false' to disable)
 FUTUREYOU_AI_MODEL=gpt-5-mini

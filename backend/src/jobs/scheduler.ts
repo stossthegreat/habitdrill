@@ -11,6 +11,7 @@ import { notificationsService } from "../services/notifications.service";
 import { voiceService } from "../services/voice.service";
 import { nudgesService } from "../services/nudges.service";
 import { premiumService } from "../services/premium.service";
+import { BatchLogger } from "../utils/batch-logger";
 
 const QUEUE = "scheduler";
 export const schedulerQueue = new Queue(QUEUE, { connection: redis });
@@ -77,118 +78,143 @@ export async function bootstrapSchedulers() {
 // ─────────────────────────────────────────────
 
 async function ensureDailyBriefJobs() {
+  const logger = new BatchLogger('ensureDailyBriefJobs');
+  
   const users = await prisma.user.findMany({ select: { id: true, tz: true } });
+  logger.info(`Processing ${users.length} users`);
+  
   for (const u of users) {
-    const tz = u.tz || "Europe/London";
-    await schedulerQueue.add(
-      "daily-brief",
-      { userId: u.id },
-      {
-        repeat: { pattern: "0 7 * * *", tz },
-        jobId: `daily-brief:${u.id}`,
-        removeOnComplete: true,
-        removeOnFail: true,
-      }
-    );
+    try {
+      const tz = u.tz || "Europe/London";
+      await schedulerQueue.add(
+        "daily-brief",
+        { userId: u.id },
+        {
+          repeat: { pattern: "0 7 * * *", tz },
+          jobId: `daily-brief:${u.id}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+        }
+      );
+      logger.success(u.id);
+    } catch (err) {
+      logger.error(u.id, err);
+    }
   }
+  
+  logger.flush();
   return { ok: true, users: users.length };
 }
 
 async function ensureEveningDebriefJobs() {
+  const logger = new BatchLogger('ensureEveningDebriefJobs');
+  
   const users = await prisma.user.findMany({ select: { id: true, tz: true } });
+  logger.info(`Processing ${users.length} users`);
+  
   for (const u of users) {
-    const tz = u.tz || "Europe/London";
-    await schedulerQueue.add(
-      "evening-debrief",
-      { userId: u.id },
-      {
-        repeat: { pattern: "0 21 * * *", tz },
-        jobId: `evening-debrief:${u.id}`,
-        removeOnComplete: true,
-        removeOnFail: true,
-      }
-    );
+    try {
+      const tz = u.tz || "Europe/London";
+      await schedulerQueue.add(
+        "evening-debrief",
+        { userId: u.id },
+        {
+          repeat: { pattern: "0 21 * * *", tz },
+          jobId: `evening-debrief:${u.id}`,
+          removeOnComplete: true,
+          removeOnFail: true,
+        }
+      );
+      logger.success(u.id);
+    } catch (err) {
+      logger.error(u.id, err);
+    }
   }
+  
+  logger.flush();
   return { ok: true, users: users.length };
 }
 
 async function ensureNudgeJobs() {
-  console.log(`\n🔧 ensureNudgeJobs STARTING at ${new Date().toISOString()}`);
+  const logger = new BatchLogger('ensureNudgeJobs');
+  logger.info(`Starting at ${new Date().toISOString()}`);
   
   const users = await prisma.user.findMany({
     select: { id: true, tz: true, nudgesEnabled: true },
   });
   
-  console.log(`🔧 Found ${users.length} total users, filtering for nudgesEnabled...`);
+  logger.info(`Found ${users.length} total users`);
 
-  let enabledCount = 0;
   for (const u of users) {
-    if (!u.nudgesEnabled) continue;
-    enabledCount++;
-    
-    const tz = u.tz || "Europe/London";
-    console.log(`🔧 Processing user ${u.id} (tz: ${tz})`);
-
-    // Remove existing nudge jobs for this user to prevent duplicates
-    const jobIds = [
-      `nudge-morning:${u.id}`,
-      `nudge-afternoon:${u.id}`,
-      `nudge-evening:${u.id}`,
-    ];
-    
-    for (const jobId of jobIds) {
-      try {
-        const job = await schedulerQueue.getJob(jobId);
-        if (job) {
-          console.log(`🗑️ Removing existing job: ${jobId}`);
-          await job.remove();
-        }
-      } catch (err) {
-        // Job doesn't exist, that's fine
-      }
+    if (!u.nudgesEnabled) {
+      logger.skip(u.id, 'nudges disabled');
+      continue;
     }
+    
+    try {
+      const tz = u.tz || "Europe/London";
 
-    // Morning nudge (10am)
-    await schedulerQueue.add(
-      "nudge",
-      { userId: u.id, trigger: "morning_momentum" },
-      {
-        repeat: { pattern: "0 10 * * *", tz },
-        jobId: `nudge-morning:${u.id}`,
-        removeOnComplete: { count: 10 }, // Keep last 10 for debugging
-        removeOnFail: { count: 10 },
+      // Remove existing nudge jobs for this user to prevent duplicates
+      const jobIds = [
+        `nudge-morning:${u.id}`,
+        `nudge-afternoon:${u.id}`,
+        `nudge-evening:${u.id}`,
+      ];
+      
+      for (const jobId of jobIds) {
+        try {
+          const job = await schedulerQueue.getJob(jobId);
+          if (job) {
+            await job.remove();
+          }
+        } catch (err) {
+          // Job doesn't exist, that's fine
+        }
       }
-    );
-    console.log(`✅ Scheduled morning nudge for ${u.id}`);
 
-    // Afternoon nudge (2pm)
-    await schedulerQueue.add(
-      "nudge",
-      { userId: u.id, trigger: "afternoon_drift" },
-      {
-        repeat: { pattern: "0 14 * * *", tz },
-        jobId: `nudge-afternoon:${u.id}`,
-        removeOnComplete: { count: 10 },
-        removeOnFail: { count: 10 },
-      }
-    );
-    console.log(`✅ Scheduled afternoon nudge for ${u.id}`);
+      // Morning nudge (10am)
+      await schedulerQueue.add(
+        "nudge",
+        { userId: u.id, trigger: "morning_momentum" },
+        {
+          repeat: { pattern: "0 10 * * *", tz },
+          jobId: `nudge-morning:${u.id}`,
+          removeOnComplete: { count: 10 },
+          removeOnFail: { count: 10 },
+        }
+      );
 
-    // Evening nudge (6pm)
-    await schedulerQueue.add(
-      "nudge",
-      { userId: u.id, trigger: "evening_closeout" },
-      {
-        repeat: { pattern: "0 18 * * *", tz },
-        jobId: `nudge-evening:${u.id}`,
-        removeOnComplete: { count: 10 },
-        removeOnFail: { count: 10 },
-      }
-    );
-    console.log(`✅ Scheduled evening nudge for ${u.id}`);
+      // Afternoon nudge (2pm)
+      await schedulerQueue.add(
+        "nudge",
+        { userId: u.id, trigger: "afternoon_drift" },
+        {
+          repeat: { pattern: "0 14 * * *", tz },
+          jobId: `nudge-afternoon:${u.id}`,
+          removeOnComplete: { count: 10 },
+          removeOnFail: { count: 10 },
+        }
+      );
+
+      // Evening nudge (6pm)
+      await schedulerQueue.add(
+        "nudge",
+        { userId: u.id, trigger: "evening_closeout" },
+        {
+          repeat: { pattern: "0 18 * * *", tz },
+          jobId: `nudge-evening:${u.id}`,
+          removeOnComplete: { count: 10 },
+          removeOnFail: { count: 10 },
+        }
+      );
+      
+      logger.success(u.id);
+    } catch (err) {
+      logger.error(u.id, err);
+    }
   }
   
-  console.log(`🔧 ensureNudgeJobs COMPLETE: ${enabledCount} users with nudges enabled\n`);
+  logger.flush();
   return { ok: true, users: users.length };
 }
 
@@ -197,38 +223,40 @@ async function runDailyBrief(userId: string) {
   // TODO: Re-enable before production launch
   // const isPremium = await premiumService.isPremium(userId);
   // if (!isPremium) {
-  //   console.log(`⏭️ Skipping morning brief for free user: ${userId}`);
   //   return { ok: true, skipped: true, reason: "not_premium" };
   // }
 
-  // 🧠 AI OS v2: Use new coach engine with fallback to legacy
-  let text: string;
   try {
-    console.log(`🧠 [AI OS v2] Generating morning brief for ${userId}...`);
-    text = await aiServiceV2.generateMorningBrief(userId);
-    console.log(`✅ [AI OS v2] Morning brief generated successfully`);
+    // 🧠 AI OS v2: Use new coach engine with fallback to legacy
+    let text: string;
+    try {
+      text = await aiServiceV2.generateMorningBrief(userId);
+    } catch (err) {
+      console.warn(`⚠️ runDailyBrief AI OS v2 fallback for ${userId}:`, err instanceof Error ? err.message : err);
+      text = await aiService.generateMorningBrief(userId).catch(() => "Good morning.");
+    }
+
+    let audioUrl: string | null = null;
+    try {
+      audioUrl = await voiceService.ttsToUrl(userId, text, "future-you");
+    } catch {
+      audioUrl = null;
+    }
+
+    // Store as CoachMessage (kind = brief)
+    await coachMessageService.createMessage(userId, "brief", text, { audioUrl });
+
+    // Backwards compat event
+    await prisma.event.create({
+      data: { userId, type: "morning_brief", payload: { text, audioUrl } },
+    });
+
+    await notificationsService.send(userId, "Morning Brief", text.slice(0, 180));
+    return { ok: true };
   } catch (err) {
-    console.warn(`⚠️ [AI OS v2] Failed, falling back to legacy:`, err);
-    text = await aiService.generateMorningBrief(userId).catch(() => "Good morning.");
+    console.error(`❌ runDailyBrief failed for ${userId}:`, err);
+    throw err;
   }
-
-  let audioUrl: string | null = null;
-  try {
-    audioUrl = await voiceService.ttsToUrl(userId, text, "future-you");
-  } catch {
-    audioUrl = null;
-  }
-
-  // Store as CoachMessage (kind = brief)
-  await coachMessageService.createMessage(userId, "brief", text, { audioUrl });
-
-  // Backwards compat event
-  await prisma.event.create({
-    data: { userId, type: "morning_brief", payload: { text, audioUrl } },
-  });
-
-  await notificationsService.send(userId, "Morning Brief", text.slice(0, 180));
-  return { ok: true };
 }
 
 async function runEveningDebrief(userId: string) {
@@ -236,38 +264,40 @@ async function runEveningDebrief(userId: string) {
   // TODO: Re-enable before production launch
   // const isPremium = await premiumService.isPremium(userId);
   // if (!isPremium) {
-  //   console.log(`⏭️ Skipping evening debrief for free user: ${userId}`);
   //   return { ok: true, skipped: true, reason: "not_premium" };
   // }
 
-  // 🧠 AI OS v2: Use new coach engine with fallback to legacy
-  let text: string;
   try {
-    console.log(`🧠 [AI OS v2] Generating evening debrief for ${userId}...`);
-    text = await aiServiceV2.generateEveningDebrief(userId);
-    console.log(`✅ [AI OS v2] Evening debrief generated successfully`);
+    // 🧠 AI OS v2: Use new coach engine with fallback to legacy
+    let text: string;
+    try {
+      text = await aiServiceV2.generateEveningDebrief(userId);
+    } catch (err) {
+      console.warn(`⚠️ runEveningDebrief AI OS v2 fallback for ${userId}:`, err instanceof Error ? err.message : err);
+      text = await aiService.generateEveningDebrief(userId).catch(() => "Evening debrief.");
+    }
+
+    let audioUrl: string | null = null;
+    try {
+      audioUrl = await voiceService.ttsToUrl(userId, text, "future-you");
+    } catch {
+      audioUrl = null;
+    }
+
+    // Store as CoachMessage (kind = debrief)
+    await coachMessageService.createMessage(userId, "debrief", text, { audioUrl });
+
+    // Backwards compat event
+    await prisma.event.create({
+      data: { userId, type: "evening_debrief", payload: { text, audioUrl } },
+    });
+
+    await notificationsService.send(userId, "Evening Debrief", text.slice(0, 180));
+    return { ok: true };
   } catch (err) {
-    console.warn(`⚠️ [AI OS v2] Failed, falling back to legacy:`, err);
-    text = await aiService.generateEveningDebrief(userId).catch(() => "Evening debrief.");
+    console.error(`❌ runEveningDebrief failed for ${userId}:`, err);
+    throw err;
   }
-
-  let audioUrl: string | null = null;
-  try {
-    audioUrl = await voiceService.ttsToUrl(userId, text, "future-you");
-  } catch {
-    audioUrl = null;
-  }
-
-  // Store as CoachMessage (kind = debrief)
-  await coachMessageService.createMessage(userId, "debrief", text, { audioUrl });
-
-  // Backwards compat event
-  await prisma.event.create({
-    data: { userId, type: "evening_debrief", payload: { text, audioUrl } },
-  });
-
-  await notificationsService.send(userId, "Evening Debrief", text.slice(0, 180));
-  return { ok: true };
 }
 
 async function runNudge(userId: string, trigger: string) {
@@ -275,64 +305,52 @@ async function runNudge(userId: string, trigger: string) {
   // TEMP: Disabled for testing - re-enable before production launch
   // const isPremium = await premiumService.isPremium(userId);
   // if (!isPremium) {
-  //   console.log(`⏭️ Skipping nudge for free user: ${userId}`);
   //   return { ok: true, skipped: true, reason: "not_premium" };
   // }
 
-  const timestamp = new Date().toISOString();
-  console.log(`\n🔔 ================================`);
-  console.log(`🔔 runNudge CALLED`);
-  console.log(`🔔 Time: ${timestamp}`);
-  console.log(`🔔 User: ${userId}`);
-  console.log(`🔔 Trigger: ${trigger}`);
-  console.log(`🔔 ================================\n`);
-  
-  // ✅ ANTI-DUPLICATE CHECK: Don't send another nudge if one was just sent
-  const recentNudges = await prisma.coachMessage.findMany({
-    where: {
-      userId,
-      kind: "nudge",
-      createdAt: {
-        gte: new Date(Date.now() - 15 * 60 * 1000), // Last 15 minutes
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 1,
-  });
-
-  if (recentNudges.length > 0) {
-    console.log(`⚠️ DUPLICATE NUDGE PREVENTED - nudge sent ${Math.floor((Date.now() - recentNudges[0].createdAt.getTime()) / 1000 / 60)} minutes ago`);
-    return { ok: true, skipped: true, reason: "duplicate_prevention" };
-  }
-  
-  // 🧠 AI OS v2: Use new coach engine with fallback to legacy
-  let text: string;
   try {
-    console.log(`🧠 [AI OS v2] Generating nudge for ${userId} (trigger: ${trigger})...`);
-    text = await aiServiceV2.generateNudge(userId, trigger);
-    console.log(`✅ [AI OS v2] Nudge generated successfully`);
+    // ✅ ANTI-DUPLICATE CHECK: Don't send another nudge if one was just sent
+    const recentNudges = await prisma.coachMessage.findMany({
+      where: {
+        userId,
+        kind: "nudge",
+        createdAt: {
+          gte: new Date(Date.now() - 15 * 60 * 1000), // Last 15 minutes
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+
+    if (recentNudges.length > 0) {
+      const minutesAgo = Math.floor((Date.now() - recentNudges[0].createdAt.getTime()) / 1000 / 60);
+      return { ok: true, skipped: true, reason: "duplicate_prevention", minutesAgo };
+    }
+    
+    // 🧠 AI OS v2: Use new coach engine with fallback to legacy
+    let text: string;
+    try {
+      text = await aiServiceV2.generateNudge(userId, trigger);
+    } catch (err) {
+      console.warn(`⚠️ runNudge AI OS v2 fallback for ${userId}:`, err instanceof Error ? err.message : err);
+      text = await aiService.generateNudge(userId, trigger).catch(() => "Check in with yourself.");
+    }
+
+    // Store as CoachMessage (kind = nudge)
+    const msg = await coachMessageService.createMessage(userId, "nudge", text, { trigger });
+
+    // Backwards compat event
+    await prisma.event.create({
+      data: { userId, type: "nudge", payload: { text, trigger } },
+    });
+
+    await notificationsService.send(userId, "Nudge", text.slice(0, 180));
+    
+    return { ok: true, messageId: msg.id };
   } catch (err) {
-    console.warn(`⚠️ [AI OS v2] Failed, falling back to legacy:`, err);
-    text = await aiService.generateNudge(userId, trigger).catch(() => "Check in with yourself.");
+    console.error(`❌ runNudge failed for ${userId}:`, err);
+    throw err;
   }
-
-  console.log(`📝 Generated nudge text: "${text.substring(0, 80)}..."`);
-
-  // Store as CoachMessage (kind = nudge)
-  const msg = await coachMessageService.createMessage(userId, "nudge", text, { trigger });
-  console.log(`✅ CoachMessage created: ${msg.id}`);
-
-  // Backwards compat event
-  const event = await prisma.event.create({
-    data: { userId, type: "nudge", payload: { text, trigger } },
-  });
-  console.log(`✅ Event created: ${event.id}`);
-
-  await notificationsService.send(userId, "Nudge", text.slice(0, 180));
-  console.log(`✅ Notification sent`);
-  
-  console.log(`🔔 runNudge COMPLETED for ${userId}\n`);
-  return { ok: true };
 }
 
 async function autoNudgesHourly() {
@@ -371,28 +389,10 @@ async function autoNudgesHourly() {
  * WITHOUT THIS JOB, THE AI NEVER LEARNS USER PATTERNS.
  */
 async function runPatternLearning() {
-  console.log(`🧠 ================================`);
-  console.log(`🧠 PATTERN LEARNING RUN STARTING at ${new Date().toISOString()}`);
-  console.log(`🧠 ================================\n`);
-  console.log(`🧠 This job computes:`);
-  console.log(`   - Behavioral fingerprints (recovery style, challenge response)`);
-  console.log(`   - Shame sensitivity scores`);
-  console.log(`   - Trigger chains (sequences leading to slips)`);
-  console.log(`   - Commitment resolution`);
-  console.log(`   - Message effectiveness patterns\n`);
-  
   try {
     // Dynamic import to avoid circular dependencies
     const { patternLearningWorker } = await import("../workers/pattern-learning.worker");
-    console.log(`🧠 Pattern learning worker loaded, processing users...`);
     const result = await patternLearningWorker.processAllUsers();
-    
-    console.log(`\n🧠 ================================`);
-    console.log(`🧠 PATTERN LEARNING RUN COMPLETE`);
-    console.log(`🧠 Processed: ${result.processed} users`);
-    console.log(`🧠 Errors: ${result.errors}`);
-    console.log(`🧠 ================================\n`);
-    
     return result;
   } catch (err) {
     console.error(`❌ Pattern learning failed:`, err);
@@ -401,8 +401,10 @@ async function runPatternLearning() {
 }
 
 async function runWeeklyConsolidation() {
+  const logger = new BatchLogger('runWeeklyConsolidation');
+  
   const users = await prisma.user.findMany({ select: { id: true } });
-  console.log(`📅 Running weekly consolidation for ${users.length} users...`);
+  logger.info(`Processing ${users.length} users`);
 
   for (const u of users) {
     try {
@@ -424,12 +426,16 @@ async function runWeeklyConsolidation() {
             result.reflection.slice(0, 180)
           );
         }
+        logger.success(u.id);
+      } else {
+        logger.skip(u.id, 'no insights generated');
       }
     } catch (err) {
-      console.error(`Failed weekly consolidation for ${u.id}:`, err);
+      logger.error(u.id, err);
     }
   }
 
+  logger.flush();
   return { ok: true, processed: users.length };
 }
 
@@ -454,9 +460,11 @@ export function startWorker() {
   workerInstance = new Worker(
     QUEUE,
     async (job) => {
-      console.log(`\n🏭 WORKER processing job: ${job.name} [ID: ${job.id}] at ${new Date().toISOString()}`);
-      if (job.name === "nudge") {
-        console.log(`🏭 NUDGE JOB DATA:`, JSON.stringify(job.data));
+      // Only log non-nudge jobs or use minimal logging for nudges
+      const shouldLogDetails = job.name !== "nudge" && job.name !== "daily-brief" && job.name !== "evening-debrief";
+      
+      if (shouldLogDetails) {
+        console.log(`🏭 Processing: ${job.name} [${job.id}]`);
       }
       
       switch (job.name) {
@@ -471,18 +479,14 @@ export function startWorker() {
         case "evening-debrief":
           return runEveningDebrief(job.data.userId);
         case "nudge":
-          console.log(`🏭 WORKER calling runNudge for user ${job.data.userId} with trigger "${job.data.trigger}"`);
-          const result = await runNudge(job.data.userId, job.data.trigger);
-          console.log(`🏭 WORKER nudge complete for user ${job.data.userId}`);
-          return result;
+          return runNudge(job.data.userId, job.data.trigger);
         // REMOVED: auto-nudges-hourly case - no longer used
         case "weekly-consolidation":
           return runWeeklyConsolidation();
         case "pattern-learning":
-          console.log(`🧠 PATTERN LEARNING RUN - Worker executing scheduled job`);
-          console.log(`🧠 This is the nightly job that makes the AI smarter`);
+          console.log(`🧠 Pattern Learning starting...`);
           const patternResult = await runPatternLearning();
-          console.log(`🧠 PATTERN LEARNING RUN - Worker job complete: ${patternResult.processed} processed, ${patternResult.errors} errors`);
+          console.log(`🧠 Pattern Learning complete: ${patternResult.processed} processed, ${patternResult.errors} errors`);
           return patternResult;
         default:
           return;

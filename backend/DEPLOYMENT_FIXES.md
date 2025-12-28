@@ -85,6 +85,9 @@ S3_SECRET_KEY=your_s3_secret_key
 PORT=8080
 HOST=0.0.0.0
 NODE_ENV=production
+
+# Logging Configuration (Optional)
+LOG_BATCH_SIZE=50
 ```
 
 ### 2. Railway Services Required
