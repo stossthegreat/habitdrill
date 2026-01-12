@@ -24,14 +24,13 @@ export async function futureYouChatControllerV2(fastify: FastifyInstance) {
       console.log(`💬 Message: "${message?.substring(0, 100)}..."`);
       
       // 🔒 PAYWALL: Check premium status
-      // TEMP: Disabled for testing - re-enable before production launch
-      // const isPremium = await premiumService.isPremium(userId);
-      // if (!isPremium) {
-      //   return reply.code(402).send({ 
-      //     error: "Premium subscription required",
-      //     code: "PREMIUM_REQUIRED"
-      //   });
-      // }
+      const isPremium = await premiumService.isPremium(userId);
+      if (!isPremium) {
+        return reply.code(402).send({ 
+          error: "Premium subscription required",
+          code: "PREMIUM_REQUIRED"
+        });
+      }
       
       if (!message || typeof message !== "string") {
         console.error(`❌ No message provided in request body`);

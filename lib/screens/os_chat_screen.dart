@@ -136,17 +136,17 @@ class _OSChatScreenState extends ConsumerState<OSChatScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
-    // TEMP: Premium check DISABLED for testing - backend has no premium checks either
-    // final isPremium = await PremiumService.isPremium();
-    // if (!isPremium) {
-    //   if (mounted) {
-    //     showDialog(
-    //       context: context,
-    //       builder: (context) => const PaywallDialog(feature: 'AI Chat'),
-    //     );
-    //   }
-    //   return;
-    // }
+    // 🔒 PAYWALL: Check premium status before allowing AI chat
+    final isPremium = await PremiumService.isPremium();
+    if (!isPremium) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => const PaywallDialog(feature: 'AI Chat'),
+        );
+      }
+      return;
+    }
 
     // Add user message to timeline
     final userMessage = TimelineMessage(

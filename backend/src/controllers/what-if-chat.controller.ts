@@ -36,14 +36,13 @@ export async function whatIfChatController(fastify: FastifyInstance) {
       const { message, preset } = req.body;
 
       // 🔒 PAYWALL: Check premium status
-      // TEMP: Disabled for testing - re-enable before production launch
-      // const isPremium = await premiumService.isPremium(userId);
-      // if (!isPremium) {
-      //   return reply.code(402).send({ 
-      //     error: "Premium subscription required",
-      //     code: "PREMIUM_REQUIRED"
-      //   });
-      // }
+      const isPremium = await premiumService.isPremium(userId);
+      if (!isPremium) {
+        return reply.code(402).send({ 
+          error: "Premium subscription required",
+          code: "PREMIUM_REQUIRED"
+        });
+      }
 
       if (!message || typeof message !== "string") {
         return reply.code(400).send({ error: "Message required" });

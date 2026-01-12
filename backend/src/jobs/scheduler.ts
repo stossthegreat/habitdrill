@@ -219,12 +219,11 @@ async function ensureNudgeJobs() {
 }
 
 async function runDailyBrief(userId: string) {
-  // 🔒 PAYWALL: Temporarily disabled for testing
-  // TODO: Re-enable before production launch
-  // const isPremium = await premiumService.isPremium(userId);
-  // if (!isPremium) {
-  //   return { ok: true, skipped: true, reason: "not_premium" };
-  // }
+  // 🔒 PAYWALL: Check premium status
+  const isPremium = await premiumService.isPremium(userId);
+  if (!isPremium) {
+    return { ok: true, skipped: true, reason: "not_premium" };
+  }
 
   try {
     // 🧠 AI OS v2: Use new coach engine with fallback to legacy
@@ -260,12 +259,11 @@ async function runDailyBrief(userId: string) {
 }
 
 async function runEveningDebrief(userId: string) {
-  // 🔒 PAYWALL: Temporarily disabled for testing
-  // TODO: Re-enable before production launch
-  // const isPremium = await premiumService.isPremium(userId);
-  // if (!isPremium) {
-  //   return { ok: true, skipped: true, reason: "not_premium" };
-  // }
+  // 🔒 PAYWALL: Check premium status
+  const isPremium = await premiumService.isPremium(userId);
+  if (!isPremium) {
+    return { ok: true, skipped: true, reason: "not_premium" };
+  }
 
   try {
     // 🧠 AI OS v2: Use new coach engine with fallback to legacy
@@ -302,11 +300,10 @@ async function runEveningDebrief(userId: string) {
 
 async function runNudge(userId: string, trigger: string) {
   // 🔒 PAYWALL: Only send nudges to premium users
-  // TEMP: Disabled for testing - re-enable before production launch
-  // const isPremium = await premiumService.isPremium(userId);
-  // if (!isPremium) {
-  //   return { ok: true, skipped: true, reason: "not_premium" };
-  // }
+  const isPremium = await premiumService.isPremium(userId);
+  if (!isPremium) {
+    return { ok: true, skipped: true, reason: "not_premium" };
+  }
 
   try {
     // ✅ ANTI-DUPLICATE CHECK: Don't send another nudge if one was just sent
