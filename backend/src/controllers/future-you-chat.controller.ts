@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { futureYouChatService } from "../services/future-you-chat.service";
+import { premiumService } from "../services/premium.service";
 
 function getUserIdOr401(req: any) {
   // 🔥 SIMPLE AUTH: Accept user ID from multiple sources
