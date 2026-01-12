@@ -23,13 +23,16 @@ export async function futureYouChatControllerV2(fastify: FastifyInstance) {
       const { message } = req.body || {};
       console.log(`💬 Message: "${message?.substring(0, 100)}..."`);
       
-      // 🔒 PAYWALL: Check premium status
-      const isPremium = await premiumService.isPremium(userId);
-      if (!isPremium) {
-        return reply.code(402).send({ 
-          error: "Premium subscription required",
-          code: "PREMIUM_REQUIRED"
-        });
+      // 🔒 PAYWALL: Check premium status (unless FREE_AI_ENABLED=true)
+      const FREE_AI_ENABLED = (process.env.FREE_AI_ENABLED || "false").toLowerCase() === "true";
+      if (!FREE_AI_ENABLED) {
+        const isPremium = await premiumService.isPremium(userId);
+        if (!isPremium) {
+          return reply.code(402).send({ 
+            error: "Premium subscription required",
+            code: "PREMIUM_REQUIRED"
+          });
+        }
       }
       
       if (!message || typeof message !== "string") {

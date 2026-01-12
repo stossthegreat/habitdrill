@@ -20,6 +20,8 @@ const PRO_FEATURES_ENABLED =
   (process.env.PRO_FEATURES_ENABLED || "true").toLowerCase() === "true";
 const FREE_NOTIFICATIONS_ENABLED =
   (process.env.FREE_NOTIFICATIONS_ENABLED || "false").toLowerCase() === "true";
+const FREE_AI_ENABLED =
+  (process.env.FREE_AI_ENABLED || "false").toLowerCase() === "true";
 
 // Re-usable hourly repeat options (for ensure-* + auto-nudges-hourly)
 function repeatHourly(): JobsOptions {
@@ -219,10 +221,12 @@ async function ensureNudgeJobs() {
 }
 
 async function runDailyBrief(userId: string) {
-  // 🔒 PAYWALL: Check premium status
-  const isPremium = await premiumService.isPremium(userId);
-  if (!isPremium) {
-    return { ok: true, skipped: true, reason: "not_premium" };
+  // 🔒 PAYWALL: Check premium status (unless FREE_AI_ENABLED=true)
+  if (!FREE_AI_ENABLED) {
+    const isPremium = await premiumService.isPremium(userId);
+    if (!isPremium) {
+      return { ok: true, skipped: true, reason: "not_premium" };
+    }
   }
 
   try {
@@ -259,10 +263,12 @@ async function runDailyBrief(userId: string) {
 }
 
 async function runEveningDebrief(userId: string) {
-  // 🔒 PAYWALL: Check premium status
-  const isPremium = await premiumService.isPremium(userId);
-  if (!isPremium) {
-    return { ok: true, skipped: true, reason: "not_premium" };
+  // 🔒 PAYWALL: Check premium status (unless FREE_AI_ENABLED=true)
+  if (!FREE_AI_ENABLED) {
+    const isPremium = await premiumService.isPremium(userId);
+    if (!isPremium) {
+      return { ok: true, skipped: true, reason: "not_premium" };
+    }
   }
 
   try {
@@ -299,10 +305,12 @@ async function runEveningDebrief(userId: string) {
 }
 
 async function runNudge(userId: string, trigger: string) {
-  // 🔒 PAYWALL: Only send nudges to premium users
-  const isPremium = await premiumService.isPremium(userId);
-  if (!isPremium) {
-    return { ok: true, skipped: true, reason: "not_premium" };
+  // 🔒 PAYWALL: Only send nudges to premium users (unless FREE_AI_ENABLED=true)
+  if (!FREE_AI_ENABLED) {
+    const isPremium = await premiumService.isPremium(userId);
+    if (!isPremium) {
+      return { ok: true, skipped: true, reason: "not_premium" };
+    }
   }
 
   try {

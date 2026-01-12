@@ -35,13 +35,16 @@ export async function whatIfChatController(fastify: FastifyInstance) {
       const userId = getUserIdOr401(req);
       const { message, preset } = req.body;
 
-      // 🔒 PAYWALL: Check premium status
-      const isPremium = await premiumService.isPremium(userId);
-      if (!isPremium) {
-        return reply.code(402).send({ 
-          error: "Premium subscription required",
-          code: "PREMIUM_REQUIRED"
-        });
+      // 🔒 PAYWALL: Check premium status (unless FREE_AI_ENABLED=true)
+      const FREE_AI_ENABLED = (process.env.FREE_AI_ENABLED || "false").toLowerCase() === "true";
+      if (!FREE_AI_ENABLED) {
+        const isPremium = await premiumService.isPremium(userId);
+        if (!isPremium) {
+          return reply.code(402).send({ 
+            error: "Premium subscription required",
+            code: "PREMIUM_REQUIRED"
+          });
+        }
       }
 
       if (!message || typeof message !== "string") {
