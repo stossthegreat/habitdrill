@@ -852,7 +852,7 @@ class ApiClient {
     await syncIdentityToBackend();
     
     try {
-      // Use v2 endpoint (premium checks disabled for testing)
+      // Use v2 endpoint with premium checks
       final response = await _post('/api/v2/future-you/freeform', {'message': message});
       
       if (response.statusCode == 200) {
@@ -862,6 +862,9 @@ class ApiClient {
           'message': data['message'],
           'phase': 'observer', // v2 doesn't return phase, default to observer
         });
+      } else if (response.statusCode == 402) {
+        // Premium required
+        return ApiResponse.error('Premium subscription required');
       } else {
         return ApiResponse.error('Chat failed: ${response.statusCode}');
       }

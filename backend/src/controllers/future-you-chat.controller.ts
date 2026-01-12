@@ -34,6 +34,15 @@ export async function futureYouChatController(fastify: FastifyInstance) {
       const userId = getUserIdOr401(req);
       const { message } = req.body;
 
+      // 🔒 PAYWALL: Check premium status
+      const isPremium = await premiumService.isPremium(userId);
+      if (!isPremium) {
+        return reply.code(402).send({ 
+          error: "Premium subscription required",
+          code: "PREMIUM_REQUIRED"
+        });
+      }
+
       if (!message || typeof message !== "string") {
         return reply.code(400).send({ error: "Message required" });
       }
