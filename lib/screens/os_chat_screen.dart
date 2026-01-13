@@ -136,17 +136,8 @@ class _OSChatScreenState extends ConsumerState<OSChatScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
-    // 🔒 PAYWALL: Check premium status before allowing AI chat
-    final isPremium = await PremiumService.isPremium();
-    if (!isPremium) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => const PaywallDialog(feature: 'AI Chat'),
-        );
-      }
-      return;
-    }
+    // 🔒 PAYWALL: Let backend handle premium check, show paywall on 402 error
+    // Removed frontend premium check - backend will return 402 if not premium
 
     // Add user message to timeline
     final userMessage = TimelineMessage(
@@ -192,19 +183,21 @@ class _OSChatScreenState extends ConsumerState<OSChatScreen> {
 
         _scrollToBottom();
       } else {
-        // Check if it's a paywall error (should have been caught earlier, but just in case)
+        // Check if it's a paywall error
         if (response.error?.contains('Premium') == true || response.error?.contains('premium') == true) {
           if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                fullscreenDialog: true,
-                builder: (context) => const PremiumPaywallScreen(feature: 'AI Chat'),
-              ),
+            showDialog(
+              context: context,
+              builder: (context) => const PaywallDialog(feature: 'AI Chat'),
             );
           }
         } else {
           throw Exception(response.error ?? 'Unknown error');
         }
+        
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {

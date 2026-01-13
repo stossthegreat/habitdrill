@@ -328,19 +328,8 @@ class _WhatIfScreenState extends ConsumerState<WhatIfScreen> {
     final message = _chatInputController.text.trim();
     if (message.isEmpty) return;
 
-    // ✅ PAYWALL: Check premium status before allowing What-If engine
-    final isPremium = await PremiumService.isPremium();
-    if (!isPremium) {
-      if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (context) => const PremiumPaywallScreen(feature: 'What If Engine'),
-          ),
-        );
-      }
-      return;
-    }
+    // 🔒 PAYWALL: Let backend handle premium check, show paywall on 402 error
+    // Removed frontend premium check - backend will return 402 if not premium
 
     final userMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
