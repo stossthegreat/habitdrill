@@ -22,7 +22,10 @@ class PremiumPaywallScreen extends StatefulWidget {
 class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
   bool _isLoading = false;
   bool _isDeveloper = false;
-  int _selectedPlanIndex = 0; // 0 = monthly, 1 = annual
+  int _selectedPlanIndex = 1; // 0 = monthly, 1 = annual (default annual)
+  String _monthlyPrice = ''; // Loaded from store
+  String _annualPrice = '';  // Loaded from store
+  bool _pricesLoaded = false;
 
   @override
   void initState() {
@@ -36,6 +39,32 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
       setState(() {
         _isDeveloper = isDev;
       });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadPrices();
+  }
+
+  Future<void> _loadPrices() async {
+    try {
+      final products = await PaymentService.instance.getProducts();
+      for (final product in products) {
+        if (product.id == PaymentService.monthlySubscriptionId) {
+          _monthlyPrice = product.price;
+        } else if (product.id == PaymentService.annualSubscriptionId) {
+          _annualPrice = product.price;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _pricesLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load prices: $e');
     }
   }
 
@@ -175,12 +204,13 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
                             ),
                             
                             Text(
-                              'Auto-renews. Cancel anytime.',
+                              'Payment charged to your Google Play account. Auto-renews unless cancelled at least 24 hours before the end of the current period. Manage in Google Play > Subscriptions.',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.4),
-                                fontSize: 11,
+                                fontSize: 10,
+                                height: 1.4,
                               ),
-                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -399,6 +429,13 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
   }
 
   Widget _buildPlanSelector() {
+    final monthlyDisplay = _pricesLoaded && _monthlyPrice.isNotEmpty
+        ? _monthlyPrice
+        : '\$6.99';
+    final annualDisplay = _pricesLoaded && _annualPrice.isNotEmpty
+        ? _annualPrice
+        : '\$49.99';
+
     return Column(
       children: [
         Text(
@@ -416,7 +453,7 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
               child: _buildPlanOption(
                 index: 0,
                 title: 'Monthly',
-                price: '\$6.99',
+                price: monthlyDisplay,
                 period: '/mo',
                 badge: null,
               ),
@@ -426,12 +463,32 @@ class _PremiumPaywallScreenState extends State<PremiumPaywallScreen> {
               child: _buildPlanOption(
                 index: 1,
                 title: 'Annual',
-                price: '\$49.99',
+                price: annualDisplay,
                 period: '/yr',
-                badge: 'Save 40%',
+                badge: 'SAVE 40%',
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _selectedPlanIndex == 0
+              ? '$monthlyDisplay billed monthly. Auto-renews until cancelled.'
+              : '$annualDisplay billed annually. Auto-renews until cancelled.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Subscription is optional. Free features available without purchase.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.4),
+            fontSize: 10,
+          ),
         ),
       ],
     );

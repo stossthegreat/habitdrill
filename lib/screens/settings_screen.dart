@@ -699,7 +699,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ] else ...[
                       // Upgrade options for free users
                       _buildActionButton(
-                        'Upgrade to AI Companion - \$6.99/mo',
+                        'Upgrade to AI Companion',
                         LucideIcons.sparkles,
                         () => _showUpgradeDialog(),
                         isSecondary: false,

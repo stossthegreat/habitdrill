@@ -21,6 +21,9 @@ class PaywallDialog extends StatefulWidget {
 class _PaywallDialogState extends State<PaywallDialog> {
   bool _isLoading = false;
   bool _isDeveloper = false;
+  String _monthlyPrice = '';
+  String _annualPrice = '';
+  bool _pricesLoaded = false;
 
   @override
   void initState() {
@@ -34,6 +37,32 @@ class _PaywallDialogState extends State<PaywallDialog> {
       setState(() {
         _isDeveloper = isDev;
       });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadPrices();
+  }
+
+  Future<void> _loadPrices() async {
+    try {
+      final products = await PaymentService.instance.getProducts();
+      for (final product in products) {
+        if (product.id == PaymentService.monthlySubscriptionId) {
+          _monthlyPrice = product.price;
+        } else if (product.id == PaymentService.annualSubscriptionId) {
+          _annualPrice = product.price;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _pricesLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load prices: $e');
     }
   }
 
@@ -165,50 +194,33 @@ class _PaywallDialogState extends State<PaywallDialog> {
                 ),
                 child: Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          '\$6',
-                          style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.emerald,
-                            height: 1,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Text(
-                            '.99',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.emerald,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.only(top: 12),
-                          child: Text(
-                            '/mo',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      _pricesLoaded && _monthlyPrice.isNotEmpty
+                          ? _monthlyPrice
+                          : '\$6.99',
+                      style: const TextStyle(
+                        fontSize: 40,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.emerald,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '/month',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Cancel anytime',
+                      'Billed monthly. Auto-renews until cancelled.',
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.textTertiary,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -243,10 +255,10 @@ class _PaywallDialogState extends State<PaywallDialog> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text(
-                          'Get Premium - \$6.99/mo',
+                      : Text(
+                          'Get Premium${_pricesLoaded && _monthlyPrice.isNotEmpty ? ' - $_monthlyPrice/mo' : ''}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
                             color: Colors.black,
@@ -267,10 +279,10 @@ class _PaywallDialogState extends State<PaywallDialog> {
                     border: Border.all(color: AppColors.emerald, width: 2),
                     borderRadius: BorderRadius.circular(AppBorderRadius.xl),
                   ),
-                  child: const Text(
-                    'Annual Plan - \$69.99/year (Save 16%)',
+                  child: Text(
+                    'Annual Plan${_pricesLoaded && _annualPrice.isNotEmpty ? ' - $_annualPrice/year' : ''} (Save 40%)',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.emerald,
@@ -293,8 +305,21 @@ class _PaywallDialogState extends State<PaywallDialog> {
                 ),
               ),
               
-              const SizedBox(height: 16),
-              
+              const SizedBox(height: 12),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Auto-renews until cancelled. Cancel anytime in Google Play > Subscriptions. Subscription is optional.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.captionSmall.copyWith(
+                    color: AppColors.textTertiary,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
               // Cancel button
               TextButton(
                 onPressed: () => Navigator.pop(context),

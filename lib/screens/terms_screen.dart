@@ -68,8 +68,8 @@ class TermsScreen extends StatelessWidget {
             _buildSection(
               '5. Subscription and Payment',
               'Free Tier: Basic habit tracking and task management\n'
-              'Premium Tier (\$9.99/month or \$69.99/year): Full access to AI features, unlimited What-If planning, and personalized coaching.\n\n'
-              'Subscriptions auto-renew unless cancelled 24 hours before the end of the current period. Cancellations take effect at the end of the current billing cycle.',
+              'Premium Tier: Full access to AI features, unlimited What-If planning, and personalized coaching. Pricing varies by region and is displayed at the time of purchase.\n\n'
+              'Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current billing period. You can manage or cancel your subscription in Google Play Store > Subscriptions (Android) or Settings > Apple ID > Subscriptions (iOS). Cancellations take effect at the end of the current billing cycle. No refunds for partial periods.',
             ),
             
             _buildSection(
