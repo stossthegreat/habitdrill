@@ -1,7 +1,7 @@
 name: future_you_os
 description: A premium Flutter app for self-improvement and habit mastery - Future You OS (Unicorn)
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+506
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
