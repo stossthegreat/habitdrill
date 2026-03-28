@@ -89,7 +89,7 @@ class FutureYouApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Future You OS',
+      title: 'Drillsarj',
       theme: _getSafeTheme(),
       home: const AppRouter(),
       debugShowCheckedModeBanner: false,
@@ -237,7 +237,7 @@ class _AppRouterState extends State<AppRouter> {
               CircularProgressIndicator(color: Colors.blue),
               SizedBox(height: 20),
               Text(
-                'Loading Future You OS...',
+                'Loading Drillsarj...',
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             ],

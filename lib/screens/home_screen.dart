@@ -436,44 +436,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Brain logo with "Future-You OS" text
+          // App icon + "Drillsarj" text
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.emerald,
-                      AppColors.emerald.withOpacity(0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.emerald.withOpacity(0.3),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  LucideIcons.brain,
-                  color: Colors.white,
-                  size: 24,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                child: Image.asset(
+                  'assets/icon/app_icon.png',
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
               ShaderMask(
                 shaderCallback: (bounds) => AppColors.emeraldGradient
                     .createShader(bounds),
                 child: const Text(
-                  'Future-You OS',
+                  'Drillsarj',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 26,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                     letterSpacing: 1.2,

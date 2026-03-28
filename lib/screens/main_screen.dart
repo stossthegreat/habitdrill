@@ -45,7 +45,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   Widget _buildFAB() {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg + 10),
       child: FloatingActionButton.extended(
         onPressed: _openPlanner,
         backgroundColor: AppColors.emerald,

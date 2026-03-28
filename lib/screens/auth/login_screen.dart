@@ -212,10 +212,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: AppSpacing.xxl),
                 
                 // Logo/Title
+                // App icon
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/icon/app_icon.png',
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.md),
+
                 ShaderMask(
                   shaderCallback: (bounds) => AppColors.emeraldGradient.createShader(bounds),
                   child: const Text(
-                    'FUTURE-YOU OS',
+                    'DRILLSARJ',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w900,
@@ -225,11 +240,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                
+
                 const SizedBox(height: AppSpacing.sm),
-                
+
                 Text(
-                  'Welcome back',
+                  'No excuses. Just results.',
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                   ),
