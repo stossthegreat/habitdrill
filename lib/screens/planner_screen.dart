@@ -8,14 +8,11 @@ import '../design/tokens.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../widgets/date_strip.dart';
-import '../widgets/simple_header.dart';
 import '../widgets/system_card.dart';
 import '../providers/habit_provider.dart';
 import '../models/habit.dart';
 import '../models/habit_system.dart';
 import '../services/local_storage.dart';
-import 'what_if_screen.dart';
-import 'viral_systems_screen.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
   const PlannerScreen({super.key});
@@ -41,75 +38,31 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
   Color _selectedColor = AppColors.emerald;
   String? _selectedEmoji;
-  bool _reminderOn = false; // Alarm toggle - defaults OFF
-  bool _timeEnabled = false; // NEW: Time is OPTIONAL now
+  bool _reminderOn = false;
+  bool _timeEnabled = false;
   final List<bool> _repeatDays = List.generate(7, (index) => false);
   final List<String> _dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-  // System creation state
-  final List<TextEditingController> _systemHabitControllers = [];
-  final List<String?> _systemHabitEmojis = [];
-  final List<TimeOfDay> _systemHabitTimes = []; // Individual time for each habit
-  final List<bool> _systemHabitTimeEnabled = []; // Time enabled per habit
-  final List<bool> _systemHabitAlarmEnabled = []; // Alarm enabled per habit
-  final _systemNameController = TextEditingController();
-  final _systemTaglineController = TextEditingController();
-  String? _systemEmoji;
-  Color _systemColor = AppColors.emerald;
-  List<Color> _systemGradientColors = [AppColors.emerald, AppColors.emerald.withOpacity(0.7)];
-  DateTime _systemStartDate = DateTime.now();
-  DateTime _systemEndDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _initializeScreen();
-    // Start on Manage tab by default
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
+    // 2 tabs: Add New + Manage (start on Manage)
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
     _onTypeChanged(_selectedType);
-    // Start with 3 habit fields
-    _addSystemHabitField();
-    _addSystemHabitField();
-    _addSystemHabitField();
   }
 
   Future<void> _initializeScreen() async {
     try {
-      // Load habits from cache (should be fast)
       await ref.read(habitEngineProvider).loadHabits();
-      
       if (mounted) {
         setState(() => _isInitialized = true);
       }
     } catch (e) {
-      debugPrint('⚠️ Error initializing planner: $e');
-      // Always show UI even on error to prevent grey screen
+      debugPrint('Error initializing planner: $e');
       if (mounted) {
         setState(() => _isInitialized = true);
       }
-    }
-  }
-
-  void _addSystemHabitField() {
-    setState(() {
-      _systemHabitControllers.add(TextEditingController());
-      _systemHabitEmojis.add(null);
-      _systemHabitTimes.add(TimeOfDay.now()); // Use current time instead of 9:00
-      _systemHabitTimeEnabled.add(false);
-      _systemHabitAlarmEnabled.add(false);
-    });
-  }
-
-  void _removeSystemHabitField(int index) {
-    if (_systemHabitControllers.length > 1) {
-      setState(() {
-        _systemHabitControllers[index].dispose();
-        _systemHabitControllers.removeAt(index);
-        _systemHabitEmojis.removeAt(index);
-        _systemHabitTimes.removeAt(index);
-        _systemHabitTimeEnabled.removeAt(index);
-        _systemHabitAlarmEnabled.removeAt(index);
-      });
     }
   }
 
@@ -117,11 +70,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   void dispose() {
     _titleController.dispose();
     _timeController.dispose();
-    _systemNameController.dispose();
-    _systemTaglineController.dispose();
-    for (var controller in _systemHabitControllers) {
-      controller.dispose();
-    }
     _tabController.dispose();
     super.dispose();
   }
@@ -196,31 +144,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     }
   }
 
-  Future<void> _selectSystemHabitTime(int index) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _systemHabitTimes[index],
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: AppColors.emerald,
-            onSurface: AppColors.textPrimary,
-          ),
-          timePickerTheme: const TimePickerThemeData(
-            backgroundColor: AppColors.baseDark2,
-            dialBackgroundColor: AppColors.baseDark3,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() {
-        _systemHabitTimes[index] = picked;
-      });
-    }
-  }
-
   Future<void> _pickEmoji() async {
     await showModalBottomSheet(
       context: context,
@@ -281,13 +204,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       await ref.read(habitEngineProvider).createHabit(
         title: _titleController.text.trim(),
         type: _selectedType,
-        time: _timeEnabled ? _timeController.text : '', // Empty string if time disabled
+        time: _timeEnabled ? _timeController.text : '',
         startDate: DateTime.now(),
         endDate: _endDate,
         repeatDays: _getRepeatDays(),
         color: _selectedColor,
         emoji: _selectedEmoji,
-        reminderOn: _reminderOn, // Pass the alarm toggle state
+        reminderOn: _reminderOn,
       );
 
       _titleController.clear();
@@ -296,8 +219,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         _frequency = 'daily';
         _selectedColor = AppColors.emerald;
         _selectedEmoji = null;
-        _reminderOn = false; // Reset alarm toggle
-        _timeEnabled = false; // Reset time toggle
+        _reminderOn = false;
+        _timeEnabled = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -327,10 +250,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Show loading state while initializing (prevents grey screen)
     if (!_isInitialized) {
       return Scaffold(
-        backgroundColor: Colors.black, // ✅ Pure black like OS chat screen
+        backgroundColor: Colors.black,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -350,48 +272,62 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         ),
       );
     }
-    
+
     return Scaffold(
-      backgroundColor: Colors.black, // ✅ Pure black like OS chat screen
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(LucideIcons.x, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Color(0xFFFF6B35), Color(0xFFFF8C42)],
+          ).createShader(bounds),
+          child: const Text(
+            'Planner',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: Stack(
         children: [
           NestedScrollView(
             headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
               return [
-                // Header
+                // Date strip
                 SliverToBoxAdapter(
-                  child: const SimpleHeader(
-                    tabName: 'Planner',
-                    tabColor: Color(0xFFFF6B35), // Beautiful orange-red
-                  ),
-              ),
-                    // Date strip
-              SliverToBoxAdapter(
                   child: DateStrip(
-                    selectedDate: _selectedDate, 
+                    selectedDate: _selectedDate,
                     onDateSelected: _onDateSelected,
-                    accentColor: const Color(0xFFFF6B35), // Match planner header
+                    accentColor: const Color(0xFFFF6B35),
                   ),
                 ),
                 SliverToBoxAdapter(
                   child: const SizedBox(height: AppSpacing.md),
                 ),
-                // ✅ Habit Library and Viral Systems moved to Habit Master tab
 
-                // Tab bar
+                // Tab bar (2 tabs: Add New + Manage)
                 SliverToBoxAdapter(
                   child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: AppColors.glassBackground,
-                        borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-                        border: Border.all(color: AppColors.glassBorder),
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        tabs: const [Tab(text:'Add New'),Tab(text:'Manage'),Tab(text:'System')],
-                      ),
+                    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: AppColors.glassBackground,
+                      borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+                      border: Border.all(color: AppColors.glassBorder),
                     ),
+                    child: TabBar(
+                      controller: _tabController,
+                      tabs: const [Tab(text:'Add New'),Tab(text:'Manage')],
+                    ),
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: const SizedBox(height: AppSpacing.lg),
@@ -399,9 +335,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ];
             },
             body: TabBarView(
-                  controller: _tabController,
-                  children: [_buildAddNewTab(), _buildManageTab(), _buildSystemTab()],
-                ),
+              controller: _tabController,
+              children: [_buildAddNewTab(), _buildManageTab()],
+            ),
           ),
           // Floating "Create" button only visible on Manage tab
           if (_tabController.index == 1)
@@ -419,6 +355,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       ),
     );
   }
+
   Widget _buildAddNewTab() {
     return SingleChildScrollView(
       child: GlassCard(
@@ -558,7 +495,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         child: Row(
           children: [
             Icon(
-              _timeEnabled ? LucideIcons.clock : LucideIcons.clock,
+              LucideIcons.clock,
               color: _timeEnabled ? AppColors.emerald : AppColors.textTertiary,
               size: 20,
             ),
@@ -590,7 +527,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                 setState(() {
                   _timeEnabled = value;
                   if (!value) {
-                    _reminderOn = false; // Disable alarm if time is disabled
+                    _reminderOn = false;
                   }
                 });
               },
@@ -763,7 +700,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       );
 
   // ---------------------------------------------------------
-  // 🧠 MANAGE TAB (fixed + upgraded visuals)
+  // MANAGE TAB
   // ---------------------------------------------------------
   Widget _buildManageTab() {
     final habitEngine = ref.watch(habitEngineProvider);
@@ -779,7 +716,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             child: Container(
-              padding: const EdgeInsets.all(AppSpacing.lg), // ✅ Reduced from xl (40% shorter)
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -799,37 +736,37 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.md), // ✅ Reduced
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFF6B35).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       LucideIcons.target,
-                      size: 36, // ✅ Reduced from 48
+                      size: 36,
                       color: const Color(0xFFFF6B35),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md), // ✅ Reduced
+                  const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Build Your Systems',
-                    style: AppTextStyles.h3.copyWith( // ✅ Smaller heading
+                    'No Habits Yet',
+                    style: AppTextStyles.h3.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'No habits scheduled for this day.\nCreate powerful systems and habits to transform your future.',
+                    'No habits scheduled for this day.\nTap Add New to create one.',
                     style: AppTextStyles.body.copyWith(
                       color: AppColors.textSecondary,
-                      fontSize: 14, // ✅ Slightly smaller
+                      fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: AppSpacing.md), // ✅ Reduced
+                  const SizedBox(height: AppSpacing.md),
                   GestureDetector(
-                    onTap: () => _tabController.animateTo(0), // Navigate to Add New tab
+                    onTap: () => _tabController.animateTo(0),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
@@ -854,7 +791,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Text(
-                            'Create System',
+                            'Add New',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
@@ -874,20 +811,18 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
     // Load all systems
     final allSystems = LocalStorageService.getAllSystems();
-    
-    // Group habits by systemId (same logic as Home screen)
+
+    // Group habits by systemId
     final Map<String, List<Habit>> systemHabitsMap = {};
     final List<Habit> standaloneHabits = [];
-    
+
     for (final habit in filtered) {
       if (habit.systemId != null && habit.systemId!.isNotEmpty) {
-        // Habit belongs to a system
         if (!systemHabitsMap.containsKey(habit.systemId)) {
           systemHabitsMap[habit.systemId!] = [];
         }
         systemHabitsMap[habit.systemId!]!.add(habit);
       } else {
-        // Standalone habit
         standaloneHabits.add(habit);
       }
     }
@@ -896,10 +831,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       onRefresh: () async => await ref.read(habitEngineProvider).loadHabits(),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, 
-          0, 
-          AppSpacing.lg, 
-          150, // Extra bottom padding for breathing room
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          150,
         ),
         children: [
           // System Cards
@@ -908,9 +843,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             return SystemCard(
               system: system,
               habits: systemHabits,
-              selectedDate: DateTime.now(), // ✅ Planner always shows today's status
-              // ✅ REMOVED onDelete - only individual habit deletion now
-              // ✅ Delete individual habits one at a time (orange button)
+              selectedDate: DateTime.now(),
               onDeleteHabits: () async {
                 final selectedHabits = await showDialog<List<String>>(
                   context: context,
@@ -919,12 +852,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     habits: systemHabits,
                   ),
                 );
-                
+
                 if (selectedHabits != null && selectedHabits.isNotEmpty) {
                   for (final habitId in selectedHabits) {
                     await ref.read(habitEngineProvider.notifier).deleteHabit(habitId);
                   }
-                  
+
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -936,26 +869,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                 }
               },
             );
-          }).toList(),
-          
+          }),
+
           // Standalone Habit Cards
           ...standaloneHabits.map((habit) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: _buildHabitCard(habit),
-          )).toList(),
+          )),
         ],
       ),
     );
   }
 
   // ---------------------------------------------------------
-  // 🎨 PROFESSIONAL HABIT CARD (matches reference image style)
+  // HABIT CARD
   // ---------------------------------------------------------
   Widget _buildHabitCard(Habit habit) {
-    final accent = habit.color ?? // use saved color
+    final accent = habit.color ??
         (habit.type == 'habit' ? AppColors.emerald : AppColors.cyan);
-    
-    // Calculate progress percentage based on current streak
+
     final progressPercent = habit.streak > 0 ? (habit.streak % 10) / 10 : 0.0;
 
     return Container(
@@ -978,7 +910,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Main content
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
@@ -987,7 +918,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Emoji or icon on left
+                    // Emoji or icon
                     Container(
                       width: 56,
                       height: 56,
@@ -1007,20 +938,18 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                               ),
                             )
                           : Icon(
-                              habit.type == 'habit' 
-                                  ? LucideIcons.flame 
+                              habit.type == 'habit'
+                                  ? LucideIcons.flame
                                   : LucideIcons.checkCircle,
                               color: accent,
                               size: 28,
                             ),
                     ),
                     const SizedBox(width: AppSpacing.md),
-                    // Title and metadata
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Title
                           Text(
                             habit.title,
                             style: AppTextStyles.bodyMedium.copyWith(
@@ -1030,7 +959,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                             ),
                           ),
                           const SizedBox(height: AppSpacing.xs),
-                          // Type, frequency, and alarm indicator
                           Row(
                             children: [
                               Text(
@@ -1042,7 +970,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                                 ),
                               ),
                               Text(
-                                ' • ',
+                                ' \u2022 ',
                                 style: TextStyle(
                                   color: AppColors.textTertiary,
                                 ),
@@ -1053,10 +981,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                                   color: AppColors.textTertiary,
                                 ),
                               ),
-                              // Show alarm indicator if reminder is on
                               if (habit.reminderOn) ...[
                                 Text(
-                                  ' • ',
+                                  ' \u2022 ',
                                   style: TextStyle(
                                     color: AppColors.textTertiary,
                                   ),
@@ -1080,7 +1007,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                         ],
                       ),
                     ),
-                    // Settings menu icon
+                    // Settings menu
                     PopupMenuButton<String>(
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -1159,7 +1086,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                       ),
                     ),
                     const SizedBox(width: AppSpacing.md),
-                    // Streak indicator
                     Icon(
                       LucideIcons.flame,
                       size: 16,
@@ -1178,7 +1104,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               ],
             ),
           ),
-          // Progress bar at bottom
+          // Progress bar
           Container(
             height: 6,
             decoration: BoxDecoration(
@@ -1260,566 +1186,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
       ));
     }
   }
-
-  // ✅ Habit Library and Viral Systems cards removed - now in Habit Master tab
-
-  // ---------------------------------------------------------
-  // 🎯 SYSTEM TAB (Create custom habit systems)
-  // ---------------------------------------------------------
-  Widget _buildSystemTab() {
-    return SingleChildScrollView(
-      child: GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // System Name
-            Text(
-              'System Name',
-              style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _systemNameController,
-              style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'e.g., 5AM Club, Morning Routine',
-                hintStyle: AppTextStyles.body.copyWith(color: AppColors.textTertiary),
-                filled: true,
-                fillColor: AppColors.glassBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                  borderSide: BorderSide(color: AppColors.glassBorder),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: AppSpacing.lg),
-            
-            // System Tagline
-            Text(
-              'Tagline',
-              style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _systemTaglineController,
-              style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'e.g., Own your morning, own your day',
-                hintStyle: AppTextStyles.body.copyWith(color: AppColors.textTertiary),
-                filled: true,
-                fillColor: AppColors.glassBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                  borderSide: BorderSide(color: AppColors.glassBorder),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: AppSpacing.lg),
-            
-            // System Icon/Emoji
-            Text(
-              'System Icon',
-              style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            GestureDetector(
-              onTap: () => _showSystemEmojiPicker(),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.glassBackground,
-                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      _systemEmoji ?? '🎯',
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      'Tap to change',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: AppSpacing.lg),
-            
-            // System Color
-            Text(
-              'System Color',
-              style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              children: [
-                AppColors.emerald,
-                const Color(0xFF3B82F6), // Blue
-                AppColors.purple,
-                const Color(0xFFFF6B35),
-                const Color(0xFFDC143C),
-                const Color(0xFFFFD700),
-              ].map((color) => GestureDetector(
-                onTap: () => setState(() {
-                  _systemColor = color;
-                  _systemGradientColors = [color, color.withOpacity(0.7)];
-                }),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _systemColor == color ? Colors.white : Colors.transparent,
-                      width: 3,
-                    ),
-                  ),
-                  child: _systemColor == color
-                      ? const Icon(LucideIcons.check, color: Colors.white, size: 20)
-                      : null,
-                ),
-              )).toList(),
-            ),
-            
-            const SizedBox(height: AppSpacing.xl),
-            
-            // Habits in System
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Habits in System',
-                  style: AppTextStyles.h3.copyWith(color: AppColors.emerald),
-                ),
-                TextButton.icon(
-                  onPressed: _addSystemHabitField,
-                  icon: const Icon(LucideIcons.plus, size: 16),
-                  label: const Text('Add Habit'),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: AppSpacing.md),
-            
-            // Habit fields
-            ...List.generate(_systemHabitControllers.length, (index) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                child: Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.glassBackground,
-                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Habit title row
-                      Row(
-                        children: [
-                          // Emoji picker
-                          GestureDetector(
-                            onTap: () => _showHabitEmojiPicker(index),
-                            child: Container(
-                              width: 45,
-                              height: 45,
-                              decoration: BoxDecoration(
-                                color: AppColors.baseDark2,
-                                borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-                                border: Border.all(color: AppColors.glassBorder),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _systemHabitEmojis[index] ?? '➕',
-                                  style: const TextStyle(fontSize: 22),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          // Habit title
-                          Expanded(
-                            child: TextField(
-                              controller: _systemHabitControllers[index],
-                              style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
-                              decoration: InputDecoration(
-                                hintText: 'Habit ${index + 1}',
-                                hintStyle: AppTextStyles.body.copyWith(color: AppColors.textTertiary),
-                                filled: true,
-                                fillColor: AppColors.baseDark2,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-                                  borderSide: BorderSide(color: AppColors.glassBorder),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-                                  borderSide: BorderSide(color: AppColors.glassBorder),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            ),
-                          ),
-                          // Delete button
-                          if (_systemHabitControllers.length > 1)
-                            IconButton(
-                              onPressed: () => _removeSystemHabitField(index),
-                              icon: const Icon(LucideIcons.x, size: 18),
-                              color: AppColors.error,
-                            ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: AppSpacing.sm),
-                      
-                      // Time toggle
-                      Row(
-                        children: [
-                          Icon(
-                            _systemHabitTimeEnabled[index] ? LucideIcons.clock : LucideIcons.clock,
-                            size: 16,
-                            color: _systemHabitTimeEnabled[index] ? AppColors.emerald : AppColors.textTertiary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Time',
-                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-                          ),
-                          const Spacer(),
-                          Switch(
-                            value: _systemHabitTimeEnabled[index],
-                            onChanged: (value) {
-                              setState(() => _systemHabitTimeEnabled[index] = value);
-                            },
-                            activeColor: AppColors.emerald,
-                            activeTrackColor: AppColors.emerald.withOpacity(0.3),
-                          ),
-                        ],
-                      ),
-                      
-                      // Time picker (if enabled)
-                      if (_systemHabitTimeEnabled[index]) ...[
-                        const SizedBox(height: AppSpacing.xs),
-                        GestureDetector(
-                          onTap: () => _selectSystemHabitTime(index),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.baseDark2,
-                              borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-                              border: Border.all(color: AppColors.emerald.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(LucideIcons.clock, size: 16, color: AppColors.emerald),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _systemHabitTimes[index].format(context),
-                                  style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        // Alarm toggle (only shown if time is enabled)
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Icon(
-                              _systemHabitAlarmEnabled[index] ? LucideIcons.bell : LucideIcons.bellOff,
-                              size: 16,
-                              color: _systemHabitAlarmEnabled[index] ? AppColors.emerald : AppColors.textTertiary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Reminder Alarm',
-                              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-                            ),
-                            const Spacer(),
-                            Switch(
-                              value: _systemHabitAlarmEnabled[index],
-                              onChanged: (value) {
-                                setState(() => _systemHabitAlarmEnabled[index] = value);
-                              },
-                              activeColor: AppColors.emerald,
-                              activeTrackColor: AppColors.emerald.withOpacity(0.3),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
-            
-            const SizedBox(height: AppSpacing.xl),
-            
-            // System Settings Divider
-            Divider(color: AppColors.glassBorder, height: 32),
-            
-            Text(
-              'System Settings',
-              style: AppTextStyles.h3.copyWith(color: AppColors.emerald),
-            ),
-            
-            const SizedBox(height: AppSpacing.md),
-            
-            // Start Date
-            ListTile(
-              leading: const Icon(LucideIcons.calendar, color: AppColors.emerald),
-              title: Text('Start Date', style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary)),
-              subtitle: Text(
-                DateFormat('MMM d, yyyy').format(_systemStartDate),
-                style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
-              ),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _systemStartDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) {
-                  setState(() => _systemStartDate = picked);
-                }
-              },
-            ),
-            
-            // End Date
-            ListTile(
-              leading: const Icon(LucideIcons.calendarCheck, color: AppColors.emerald),
-              title: Text('End Date', style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.textPrimary)),
-              subtitle: Text(
-                DateFormat('MMM d, yyyy').format(_systemEndDate),
-                style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
-              ),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _systemEndDate,
-                  firstDate: _systemStartDate,
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-                if (picked != null) {
-                  setState(() => _systemEndDate = picked);
-                }
-              },
-            ),
-            
-            const SizedBox(height: AppSpacing.xl),
-            
-            // Note about individual habit settings
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.emerald.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                border: Border.all(color: AppColors.emerald.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.info, size: 16, color: AppColors.emerald),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'Each habit can have its own time and alarm settings',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: AppSpacing.xl),
-            
-            // Create System Button
-            GlassButton(
-              onPressed: _createSystem,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              gradient: LinearGradient(
-                colors: [AppColors.emerald, AppColors.emerald.withOpacity(0.7)],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(LucideIcons.checkCircle, size: 20, color: Colors.white),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    'Create System',
-                    style: AppTextStyles.h3.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Bottom padding so button is above nav bar
-            const SizedBox(height: 120),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSystemEmojiPicker() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => EmojiPicker(
-        onEmojiSelected: (category, emoji) {
-          setState(() => _systemEmoji = emoji.emoji);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  void _showHabitEmojiPicker(int index) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => EmojiPicker(
-        onEmojiSelected: (category, emoji) {
-          setState(() => _systemHabitEmojis[index] = emoji.emoji);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  Future<void> _createSystem() async {
-    // Validate
-    if (_systemNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please enter a system name')),
-      );
-      return;
-    }
-
-    final validHabits = <String>[];
-    for (int i = 0; i < _systemHabitControllers.length; i++) {
-      final habitText = _systemHabitControllers[i].text.trim();
-      if (habitText.isNotEmpty) {
-        final emoji = _systemHabitEmojis[i] ?? '✅';
-        validHabits.add('$emoji $habitText');
-      }
-    }
-
-    if (validHabits.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Please add at least one habit')),
-      );
-      return;
-    }
-
-    // Create all habits
-    try {
-      final habitIds = <String>[];
-      final systemId = 'system_${DateTime.now().millisecondsSinceEpoch}'; // Generate unique system ID
-      
-      // Create habits with individual settings
-      int habitCounter = 0; // Counter for creating unique IDs
-      for (int i = 0; i < _systemHabitControllers.length; i++) {
-        final habitText = _systemHabitControllers[i].text.trim();
-        if (habitText.isEmpty) continue; // Skip empty habits
-        
-        final emoji = _systemHabitEmojis[i] ?? '✅';
-        final fullText = '$emoji $habitText';
-        
-        // Prepare individual time string
-        String timeString = '';
-        if (_systemHabitTimeEnabled[i]) {
-          final time = _systemHabitTimes[i];
-          timeString = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-          debugPrint('✅ System habit "$habitText" - Time enabled: $timeString, Alarm: ${_systemHabitAlarmEnabled[i]}');
-        } else {
-          debugPrint('⏰ System habit "$habitText" - Time NOT enabled');
-        }
-        
-        // Generate UNIQUE habit ID using system ID + counter
-        // This ensures no hash collisions in alarm scheduling
-        final habitId = '${systemId}_habit_$habitCounter';
-        habitIds.add(habitId);
-        habitCounter++;
-        
-        debugPrint('🆔 Creating habit with ID: $habitId');
-        
-        await ref.read(habitEngineProvider.notifier).createHabit(
-          title: fullText,
-          type: 'habit',
-          time: timeString, // Use individual habit time
-          startDate: _systemStartDate,
-          endDate: _systemEndDate,
-          repeatDays: [0, 1, 2, 3, 4, 5, 6], // Daily (all days)
-          color: _systemColor,
-          emoji: emoji,
-          reminderOn: _systemHabitAlarmEnabled[i], // Use individual alarm setting
-          systemId: systemId, // Link habit to system
-        );
-        
-        // Longer delay to ensure alarms don't interfere
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-
-      // Save system metadata
-      final system = HabitSystem(
-        id: systemId, // Use the same systemId
-        name: _systemNameController.text.trim(),
-        tagline: _systemTaglineController.text.trim().isEmpty 
-            ? 'Custom system' 
-            : _systemTaglineController.text.trim(),
-        iconCodePoint: (_systemEmoji?.isNotEmpty ?? false) ? _systemEmoji!.codeUnitAt(0) : Icons.star.codePoint,
-        accentColor: _systemColor,
-        gradientColors: _systemGradientColors,
-        habitIds: habitIds,
-        createdAt: DateTime.now(),
-      );
-
-      await LocalStorageService.saveSystem(system);
-
-      // Clear form
-      _systemNameController.clear();
-      _systemTaglineController.clear();
-      setState(() {
-        _systemEmoji = null;
-        _systemColor = AppColors.emerald;
-        _systemGradientColors = [AppColors.emerald, AppColors.emerald.withOpacity(0.7)];
-        _systemStartDate = DateTime.now();
-        _systemEndDate = DateTime.now();
-        for (var controller in _systemHabitControllers) {
-          controller.clear();
-        }
-        _systemHabitEmojis.fillRange(0, _systemHabitEmojis.length, null);
-        // Reset individual habit settings
-        for (int i = 0; i < _systemHabitTimes.length; i++) {
-          _systemHabitTimes[i] = TimeOfDay.now();
-          _systemHabitTimeEnabled[i] = false;
-          _systemHabitAlarmEnabled[i] = false;
-        }
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Created system "${system.name}" with ${habitIds.length} habits!'),
-            backgroundColor: _systemColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Failed to create system: $e')),
-      );
-    }
-  }
 }
 
 class _FrequencyChip extends StatelessWidget {
@@ -1855,7 +1221,7 @@ class _FrequencyChip extends StatelessWidget {
   }
 }
 
-// ✅ FIX 3: Dialog for selecting ONE habit to delete at a time
+// Dialog for selecting habit to delete from a system
 class _HabitSelectionDialog extends StatefulWidget {
   final String systemName;
   final List<Habit> habits;
@@ -1870,7 +1236,7 @@ class _HabitSelectionDialog extends StatefulWidget {
 }
 
 class _HabitSelectionDialogState extends State<_HabitSelectionDialog> {
-  String? selectedHabitId; // Only ONE habit at a time
+  String? selectedHabitId;
 
   @override
   void initState() {
@@ -1907,15 +1273,14 @@ class _HabitSelectionDialogState extends State<_HabitSelectionDialog> {
                 itemBuilder: (context, index) {
                   final habit = widget.habits[index];
                   final isSelected = selectedHabitId == habit.id;
-                  
+
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        // Only allow selecting ONE habit at a time
                         if (isSelected) {
-                          selectedHabitId = null; // Deselect
+                          selectedHabitId = null;
                         } else {
-                          selectedHabitId = habit.id; // Select this one
+                          selectedHabitId = habit.id;
                         }
                       });
                     },
@@ -1923,13 +1288,13 @@ class _HabitSelectionDialogState extends State<_HabitSelectionDialog> {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isSelected 
-                            ? Colors.orange.withOpacity(0.2) 
+                        color: isSelected
+                            ? Colors.orange.withOpacity(0.2)
                             : Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isSelected 
-                              ? Colors.orange 
+                          color: isSelected
+                              ? Colors.orange
                               : Colors.white.withOpacity(0.1),
                           width: isSelected ? 2 : 1,
                         ),
@@ -1937,8 +1302,8 @@ class _HabitSelectionDialogState extends State<_HabitSelectionDialog> {
                       child: Row(
                         children: [
                           Icon(
-                            isSelected 
-                                ? Icons.radio_button_checked 
+                            isSelected
+                                ? Icons.radio_button_checked
                                 : Icons.radio_button_unchecked,
                             color: isSelected ? Colors.orange : Colors.white.withOpacity(0.3),
                             size: 20,
@@ -1972,10 +1337,10 @@ class _HabitSelectionDialogState extends State<_HabitSelectionDialog> {
         TextButton(
           onPressed: selectedHabitId == null
               ? null
-              : () => Navigator.pop(context, [selectedHabitId!]), // Return as list with one item
+              : () => Navigator.pop(context, [selectedHabitId!]),
           style: TextButton.styleFrom(
-            backgroundColor: selectedHabitId == null 
-                ? Colors.grey.withOpacity(0.2) 
+            backgroundColor: selectedHabitId == null
+                ? Colors.grey.withOpacity(0.2)
                 : Colors.orange.withOpacity(0.2),
           ),
           child: Text(

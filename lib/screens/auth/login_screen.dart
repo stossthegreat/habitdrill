@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../design/tokens.dart';
 import '../../services/auth_service.dart';
 import '../../services/sync_service.dart';
@@ -621,6 +622,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ],
+                ),
+
+                const SizedBox(height: AppSpacing.md),
+
+                // Skip for now button
+                Center(
+                  child: TextButton(
+                    onPressed: () async {
+                      // Store a flag so AppRouter can detect skip mode
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('user_id', 'guest_user');
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const MainScreen()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    child: Text(
+                      'Skip for now',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textTertiary,
+                        fontSize: 15,
+                        decoration: TextDecoration.underline,
+                        decorationColor: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
