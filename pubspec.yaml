@@ -79,12 +79,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/onboarding/
-    - assets/images/
-    - assets/cinema/music/
-    - assets/cinema/anims/
-    - assets/cinema/audio/
     - assets/icon/
+    - assets/images/
 
   # fonts:
   #   - family: Inter
