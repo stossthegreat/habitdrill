@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../design/tokens.dart';
 import '../../services/auth_service.dart';
-import '../../services/sync_service.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 import '../main_screen.dart';
@@ -82,9 +81,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
         
         // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
+        // Auth state listener handles navigation
         
         // ✅ Navigation happens automatically via auth state listener in main.dart
         // DO NOT manually navigate here - let the AppRouter handle it
@@ -137,9 +134,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
         
         // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
+        // Auth state listener handles navigation
         
         // ✅ Wait a moment for auth state to propagate to AppRouter
         await Future.delayed(const Duration(milliseconds: 100));
@@ -205,9 +200,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
         
         // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
+        // Auth state listener handles navigation
         
         // ✅ Wait a moment for auth state to propagate to AppRouter
         await Future.delayed(const Duration(milliseconds: 100));
@@ -227,24 +220,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  /// Initialize app data after successful signup
-  Future<void> _initializeAfterLogin() async {
-    try {
-      debugPrint('🔄 Initializing data after signup...');
-      
-      // Re-initialize sync service with authenticated user
-      await syncService.init();
-      
-      // Trigger immediate sync
-      await syncService.syncMessages();
-      
-      debugPrint('✅ Post-signup initialization complete');
-    } catch (e) {
-      debugPrint('⚠️ Post-signup initialization error: $e');
-      // Don't throw - allow user to continue even if sync fails
     }
   }
 

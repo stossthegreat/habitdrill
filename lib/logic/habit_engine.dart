@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/habit.dart';
 import '../services/local_storage.dart';
-import '../services/sync_service.dart';
-import '../services/api_client.dart';
 import '../services/alarm_service.dart';
 
 class HabitEngine extends ChangeNotifier {
@@ -223,41 +221,6 @@ class HabitEngine extends ChangeNotifier {
       notifyListeners();
     }
 
-    // Sync completion to backend
-    _syncCompletionToBackend(habitId, nowDone, today);
-  }
-
-  void _syncCompletionToBackend(String habitId, bool done, DateTime date) {
-    try {
-      // Find the habit to get its title and streak
-      final habit = _habits.firstWhere(
-        (h) => h.id == habitId,
-        orElse: () => Habit(
-          id: habitId,
-          title: 'Unknown',
-          type: 'habit',
-          time: '',
-          startDate: DateTime.now(),
-          endDate: DateTime.now(),
-          repeatDays: [],
-          createdAt: DateTime.now(),
-        ),
-      );
-      
-      final completion = HabitCompletion(
-        habitId: habitId,
-        habitTitle: habit.title,
-        date: date,
-        done: done,
-        streak: habit.streak,
-        completedAt: done ? DateTime.now() : null,
-      );
-
-      syncService.queueCompletion(completion);
-      debugPrint('📤 Queued completion for sync: $habitId "${habit.title}" streak:${habit.streak} (${done ? "done" : "undone"})');
-    } catch (e) {
-      debugPrint('❌ Failed to queue completion: $e');
-    }
   }
 
   List<int> _getDefaultRepeatDays(String type) =>

@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:flutter/foundation.dart';
-import 'api_client.dart';
 import 'local_storage.dart';
 
 class AuthService {
@@ -237,9 +236,6 @@ class AuthService {
       final user = _auth.currentUser;
       if (user == null) throw Exception('No user signed in');
 
-      // Delete from backend first
-      await ApiClient.deleteAccount();
-
       // Delete Firebase user
       await user.delete();
 
@@ -277,10 +273,7 @@ class AuthService {
       await LocalStorageService.saveSetting('userAge', 0); // Can be updated later
       await LocalStorageService.saveSetting('burningQuestion', ''); // Can be updated later
 
-      // Sync with backend
-      await ApiClient.syncIdentityToBackend();
-
-      debugPrint('✅ User registered with backend');
+      debugPrint('✅ User registered locally');
     } catch (e) {
       debugPrint('⚠️ Backend registration error: $e');
       // Don't throw - allow Firebase auth to succeed even if backend fails

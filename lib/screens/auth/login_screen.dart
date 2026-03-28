@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../design/tokens.dart';
 import '../../services/auth_service.dart';
-import '../../services/sync_service.dart';
 import '../../providers/auth_provider.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -67,14 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
         
-        // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        // The auth state listener in main.dart will handle navigation automatically
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
-        
-        // ✅ Navigation happens automatically via auth state listener in main.dart
-        // DO NOT manually navigate here - let the AppRouter handle it
+        // Navigation happens automatically via auth state listener in main.dart
       }
     } catch (e) {
       if (mounted) {
@@ -123,15 +115,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
         
-        // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
-        
-        // ✅ Wait a moment for auth state to propagate to AppRouter
+        // Wait a moment for auth state to propagate to AppRouter
         await Future.delayed(const Duration(milliseconds: 100));
-        
-        // Navigation happens automatically via auth state listener in main.dart
       } else {
         // User cancelled sign-in
         if (mounted) {
@@ -191,15 +176,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
         
-        // ✅ FIX: Initialize sync in background WITHOUT blocking navigation
-        _initializeAfterLogin().catchError((syncError) {
-          debugPrint('⚠️ Background sync failed: $syncError');
-        });
-        
-        // ✅ Wait a moment for auth state to propagate to AppRouter
+        // Wait a moment for auth state to propagate to AppRouter
         await Future.delayed(const Duration(milliseconds: 100));
-        
-        // Navigation happens automatically via auth state listener in main.dart
       }
     } catch (e) {
       if (mounted) {
@@ -214,24 +192,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  /// Initialize app data after successful login
-  Future<void> _initializeAfterLogin() async {
-    try {
-      debugPrint('🔄 Initializing data after login...');
-      
-      // Re-initialize sync service with authenticated user
-      await syncService.init();
-      
-      // Trigger immediate sync
-      await syncService.syncMessages();
-      
-      debugPrint('✅ Post-login initialization complete');
-    } catch (e) {
-      debugPrint('⚠️ Post-login initialization error: $e');
-      // Don't throw - allow user to continue even if sync fails
     }
   }
 

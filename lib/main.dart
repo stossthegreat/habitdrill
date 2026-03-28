@@ -14,11 +14,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 import 'models/habit.dart';
-import 'models/coach_message.dart';
 import 'services/local_storage.dart';
-import 'services/messages_service.dart';
-import 'services/sync_service.dart';
-import 'services/offline_queue.dart';
 import 'services/alarm_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -65,23 +61,8 @@ Future<void> main() async {
       if (!Hive.isAdapterRegistered(0)) {
         Hive.registerAdapter(HabitAdapter());
       }
-      if (!Hive.isAdapterRegistered(3)) {
-        Hive.registerAdapter(CoachMessageAdapter());
-      }
-      if (!Hive.isAdapterRegistered(4)) {
-        Hive.registerAdapter(QueuedRequestAdapter());
-      }
-      if (!Hive.isAdapterRegistered(5)) {
-        Hive.registerAdapter(MessageKindAdapter());
-      }
       await LocalStorageService.initialize();
-      await messagesService.init();
       debugPrint('Hive initialized');
-
-      // Initialize sync service in background
-      syncService.init().catchError((e) {
-        debugPrint('Sync initialization failed: $e');
-      });
     } catch (e) {
       debugPrint('Hive/Sync initialization failed: $e');
     }
