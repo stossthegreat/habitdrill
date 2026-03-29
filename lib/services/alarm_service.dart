@@ -4,6 +4,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/habit.dart';
+import '../models/violation.dart';
+import '../models/escalation_config.dart';
 
 class AlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -81,9 +83,21 @@ class AlarmService {
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       
+      // Channel 3: Drill Sergeant (max priority, aggressive)
+      const sergeantChannel = AndroidNotificationChannel(
+        'drill_sergeant',
+        'Drill Sergeant',
+        description: 'Accountability notifications from the drill sergeant',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+      );
+
       await androidPlugin?.createNotificationChannel(habitChannel);
       await androidPlugin?.createNotificationChannel(coachChannel);
-      debugPrint('✅ Notification channels created (habits + coach messages)');
+      await androidPlugin?.createNotificationChannel(sergeantChannel);
+      debugPrint('✅ Notification channels created (habits + coach + sergeant)');
 
       _initialized = true;
       debugPrint('🎉 AlarmService fully initialized!');
@@ -405,5 +419,95 @@ class AlarmService {
         'day': entry.value['day'] ?? 0,
       };
     }).toList();
+  }
+
+  // ==================== DRILL SERGEANT NOTIFICATIONS ====================
+
+  /// Schedule escalating notifications for a violation
+  static Future<void> scheduleSergeantNotifications(Violation violation) async {
+    final delays = EscalationConfig.notificationDelayMinutes;
+
+    for (int i = 0; i < delays.length; i++) {
+      final delay = delays[i];
+      final message = EscalationConfig.getMessage(
+        violation.escalationLevel,
+        i,
+        violation.habitTitle,
+      );
+      final notifId = _getSergeantNotifId(violation.id, i);
+      final fireTime = tz.TZDateTime.now(tz.local).add(Duration(minutes: delay));
+
+      try {
+        await _notifications.zonedSchedule(
+          notifId,
+          'DRILLSARJ',
+          message,
+          fireTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'drill_sergeant',
+              'Drill Sergeant',
+              channelDescription: 'Accountability notifications from the drill sergeant',
+              importance: Importance.max,
+              priority: Priority.max,
+              playSound: true,
+              enableVibration: true,
+              fullScreenIntent: true,
+            ),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentSound: true,
+              presentBadge: true,
+              interruptionLevel: InterruptionLevel.timeSensitive,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        debugPrint('Scheduled sergeant notification #$i at +${delay}min: $message');
+      } catch (e) {
+        debugPrint('Failed to schedule sergeant notification: $e');
+      }
+    }
+  }
+
+  /// Cancel all sergeant notifications for a violation
+  static Future<void> cancelSergeantNotifications(String violationId) async {
+    final delays = EscalationConfig.notificationDelayMinutes;
+    for (int i = 0; i < delays.length; i++) {
+      await _notifications.cancel(_getSergeantNotifId(violationId, i));
+    }
+    debugPrint('Cancelled sergeant notifications for violation: $violationId');
+  }
+
+  /// Send an immediate sergeant notification
+  static Future<void> sendSergeantNotification(String title, String body) async {
+    await _notifications.show(
+      DateTime.now().millisecondsSinceEpoch % 100000 + 800000,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'drill_sergeant',
+          'Drill Sergeant',
+          channelDescription: 'Accountability notifications from the drill sergeant',
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          enableVibration: true,
+          fullScreenIntent: true,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBadge: true,
+        ),
+      ),
+    );
+  }
+
+  static int _getSergeantNotifId(String violationId, int index) {
+    return (violationId.hashCode.abs() % 90000) + 700000 + index;
   }
 }

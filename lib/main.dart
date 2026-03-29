@@ -14,10 +14,14 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 import 'models/habit.dart';
+import 'models/violation.dart';
 import 'services/local_storage.dart';
 import 'services/alarm_service.dart';
+import 'services/sergeant_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/sergeant/punishment_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/privacy_screen.dart';
@@ -61,8 +65,12 @@ Future<void> main() async {
       if (!Hive.isAdapterRegistered(0)) {
         Hive.registerAdapter(HabitAdapter());
       }
+      if (!Hive.isAdapterRegistered(1)) {
+        Hive.registerAdapter(ViolationAdapter());
+      }
       await LocalStorageService.initialize();
-      debugPrint('Hive initialized');
+      await SergeantService.initialize();
+      debugPrint('Hive + SergeantService initialized');
     } catch (e) {
       debugPrint('Hive/Sync initialization failed: $e');
     }
@@ -125,6 +133,7 @@ class AppRouter extends StatefulWidget {
 class _AppRouterState extends State<AppRouter> {
   bool _isAuthenticated = false;
   bool _isLoading = true;
+  bool _needsOnboarding = false;
   String _errorMessage = '';
   StreamSubscription<User?>? _authStateSubscription;
 
@@ -158,20 +167,24 @@ class _AppRouterState extends State<AppRouter> {
 
   Future<void> _checkAppState() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
       bool isAuthenticated = false;
       try {
         final user = FirebaseAuth.instance.currentUser;
         isAuthenticated = user != null;
       } catch (e) {
         debugPrint('Firebase Auth not available: $e');
-        final prefs = await SharedPreferences.getInstance();
         final userId = prefs.getString('user_id');
         isAuthenticated = userId != null && userId.isNotEmpty;
       }
 
+      // Check onboarding
+      final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+
       if (!mounted) return;
       setState(() {
         _isAuthenticated = isAuthenticated;
+        _needsOnboarding = !seenOnboarding;
         _isLoading = false;
       });
     } catch (e) {
@@ -246,11 +259,80 @@ class _AppRouterState extends State<AppRouter> {
       );
     }
 
-    // Show login if not authenticated, otherwise main app
+    // Onboarding (first launch)
+    if (_needsOnboarding) {
+      return const OnboardingScreen();
+    }
+
+    // Show login if not authenticated
     if (!_isAuthenticated) {
       return const LoginScreen();
     }
 
+    // Punishment gate - check for pending violations
+    return const PunishmentGate();
+  }
+}
+
+/// Wraps MainScreen - intercepts with punishment if violations are pending
+class PunishmentGate extends StatefulWidget {
+  const PunishmentGate({super.key});
+
+  @override
+  State<PunishmentGate> createState() => _PunishmentGateState();
+}
+
+class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObserver {
+  bool _showPunishment = false;
+  Violation? _activeViolation;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkForPunishment();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForPunishment();
+    }
+  }
+
+  void _checkForPunishment() {
+    final violation = SergeantService.getWorstPendingViolation();
+    if (violation != null && mounted) {
+      setState(() {
+        _activeViolation = violation;
+        _showPunishment = true;
+      });
+    }
+  }
+
+  void _onPunishmentComplete() {
+    if (mounted) {
+      setState(() {
+        _showPunishment = false;
+        _activeViolation = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showPunishment && _activeViolation != null) {
+      return PunishmentScreen(
+        violation: _activeViolation!,
+        onComplete: _onPunishmentComplete,
+      );
+    }
     return const MainScreen();
   }
 }

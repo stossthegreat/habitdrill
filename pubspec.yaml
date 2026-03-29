@@ -1,5 +1,5 @@
-name: future_you_os
-description: A premium Flutter app for self-improvement and habit mastery - Future You OS (Unicorn)
+name: drillsarj
+description: Habit accountability app with a drill sergeant - no excuses, just results.
 publish_to: 'none'
 version: 1.0.0+506
 
@@ -67,6 +67,9 @@ dependencies:
   # In-App Purchases
   in_app_purchase: ^3.1.13
 
+  # Video Player (drill sergeant videos)
+  video_player: ^2.8.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,6 +84,8 @@ flutter:
   assets:
     - assets/icon/
     - assets/images/
+    - assets/onboarding/
+    - assets/videos/
 
   # fonts:
   #   - family: Inter

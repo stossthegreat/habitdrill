@@ -80,11 +80,15 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
     setState(() {
       _selectedType = type;
       for (int i = 0; i < 7; i++) {
-        if (type == 'habit') {
-          _repeatDays[i] = i >= 1 && i <= 5;
+        if (type == 'habit' || type == 'bad_habit') {
+          _repeatDays[i] = i >= 1 && i <= 5; // Weekdays default
         } else {
           _repeatDays[i] = i == DateTime.now().weekday % 7;
         }
+      }
+      // Bad habits default to red color
+      if (type == 'bad_habit') {
+        _selectedColor = AppColors.error;
       }
     });
   }
@@ -431,6 +435,24 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                   color: _selectedType == 'task'
                       ? Colors.black
                       : AppColors.textSecondary,
+                )),
+          )),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+              child: GlassButton(
+            onPressed: () => _onTypeChanged('bad_habit'),
+            backgroundColor: _selectedType == 'bad_habit'
+                ? AppColors.error
+                : AppColors.glassBackground,
+            borderColor: _selectedType == 'bad_habit'
+                ? AppColors.error
+                : AppColors.glassBorder,
+            child: Text('Bad Habit',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: _selectedType == 'bad_habit'
+                      ? Colors.white
+                      : AppColors.textSecondary,
+                  fontSize: 13,
                 )),
           )),
         ],

@@ -12,7 +12,7 @@ class Habit extends HiveObject {
   String title;
 
   @HiveField(2)
-  String type; // 'habit' or 'task'
+  String type; // 'habit', 'task', or 'bad_habit'
 
   @HiveField(3)
   String time; // "HH:mm" format

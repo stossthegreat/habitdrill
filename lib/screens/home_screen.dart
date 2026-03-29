@@ -7,8 +7,10 @@ import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/system_card.dart';
 import '../screens/settings_screen.dart';
+import '../screens/sergeant/punishment_screen.dart';
 import '../providers/habit_provider.dart';
 import '../services/local_storage.dart';
+import '../services/sergeant_service.dart';
 import '../models/habit_system.dart';
 import '../models/habit.dart';
 
@@ -131,7 +133,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         isDone: isDone,
                         index: index + allSystems.length,
                         onToggle: () async {
-                          await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+                          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+                          if (violation != null && context.mounted) {
+                            // Bad habit triggered - show punishment
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => PunishmentScreen(
+                                violation: violation,
+                                onComplete: () => Navigator.of(context).pop(),
+                              ),
+                            ));
+                          }
                         },
                       );
                     }),
@@ -318,7 +329,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                 ),
                               ),
                               child: Text(
-                                isDone ? 'done' : 'planned',
+                                habit.type == 'bad_habit'
+                                    ? (isDone ? 'slipped' : 'tracking')
+                                    : (isDone ? 'done' : 'planned'),
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w900,
@@ -376,14 +389,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     ),
                     const SizedBox(width: 8),
                   ],
-                  // Checkmark icon
-                  Icon(
-                    isDone ? LucideIcons.checkCircle2 : LucideIcons.circle,
-                    size: 28,
-                    color: isDone
-                        ? habitColor
-                        : Colors.white.withOpacity(0.3),
-                  ),
+                  // Checkmark / Bad habit icon
+                  habit.type == 'bad_habit'
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withOpacity(isDone ? 0.3 : 0.15),
+                            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                            border: Border.all(color: AppColors.error.withOpacity(0.5)),
+                          ),
+                          child: Text(
+                            isDone ? 'LOGGED' : 'I SLIPPED',
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          isDone ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                          size: 28,
+                          color: isDone
+                              ? habitColor
+                              : Colors.white.withOpacity(0.3),
+                        ),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),

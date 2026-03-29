@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/habit.dart';
+import '../models/violation.dart';
 import '../services/local_storage.dart';
 import '../services/alarm_service.dart';
+import '../services/sergeant_service.dart';
 
 class HabitEngine extends ChangeNotifier {
   final LocalStorageService localStorageService;
@@ -201,8 +203,28 @@ class HabitEngine extends ChangeNotifier {
     }
   }
 
-  Future<void> toggleHabitCompletion(String habitId) async {
+  /// Returns a Violation if a bad habit was triggered, null otherwise
+  Future<Violation?> toggleHabitCompletion(String habitId) async {
     final habit = _habits.firstWhere((h) => h.id == habitId);
+
+    // Bad habits: "completing" means user indulged → trigger sergeant
+    if (habit.type == 'bad_habit') {
+      final violation = await SergeantService.triggerBadHabitViolation(habit);
+      // Mark as "done" for today so UI shows it was logged
+      final updated = habit.copyWith(
+        done: true,
+        completedAt: DateTime.now(),
+      );
+      await LocalStorageService.saveHabit(updated);
+      final idx = _habits.indexWhere((h) => h.id == habitId);
+      if (idx != -1) {
+        _habits[idx] = updated;
+        notifyListeners();
+      }
+      return violation;
+    }
+
+    // Normal habits: toggle done/undone
     final today = DateTime.now();
     final isCurrentlyDone = habit.isDoneOn(today);
     final nowDone = !isCurrentlyDone;
@@ -220,11 +242,11 @@ class HabitEngine extends ChangeNotifier {
       _habits[idx] = updated;
       notifyListeners();
     }
-
+    return null;
   }
 
   List<int> _getDefaultRepeatDays(String type) =>
-      type == 'habit' ? [1, 2, 3, 4, 5] : [DateTime.now().weekday % 7];
+      (type == 'habit' || type == 'bad_habit') ? [1, 2, 3, 4, 5] : [DateTime.now().weekday % 7];
 
   Future<void> syncAllHabits() async {
     _isSyncing = true;
