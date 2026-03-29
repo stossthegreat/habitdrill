@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:camera/camera.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../design/tokens.dart';
 import '../../models/violation.dart';
 import '../../models/exercise_set.dart';
 import '../../services/sergeant_service.dart';
+import '../../services/pose_detector_service.dart';
+import '../../services/workout_session.dart';
+import '../../widgets/skeleton_painter.dart';
+import '../../widgets/power_gauge.dart';
+import '../../widgets/pt_setup_advice_screen.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
   final Violation violation;
@@ -21,118 +30,411 @@ class ExerciseCircuitScreen extends StatefulWidget {
 
 class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   late ExerciseSet _exerciseSet;
+
+  // Camera + AI
+  CameraController? _cameraController;
+  PoseDetectorService? _poseDetector;
+  WorkoutSession? _session;
+  List<PoseLandmark>? _landmarks;
+  bool _cameraReady = false;
+  bool _isProcessing = false;
+
+  // State
+  int _currentExerciseIndex = 0;
+  bool _showAdvice = true;
+  bool _countdown = false;
+  int _countdownValue = 5;
+  bool _exerciseActive = false;
   bool _showComplete = false;
+
+  // UI feedback
+  String _feedback = '';
+  double _chargeProgress = 0.0;
 
   @override
   void initState() {
     super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    WakelockPlus.enable();
     _exerciseSet = SergeantService.getExerciseSet(widget.violation);
   }
 
-  void _toggleExercise(int index) {
+  @override
+  void dispose() {
+    _cameraController?.dispose();
+    _poseDetector?.dispose();
+    WakelockPlus.disable();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      final frontCamera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
+      );
+
+      _cameraController = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.yuv420,
+      );
+
+      await _cameraController!.initialize();
+
+      _poseDetector = PoseDetectorService();
+      _poseDetector!.sensorOrientation = frontCamera.sensorOrientation;
+
+      _cameraController!.startImageStream(_processFrame);
+
+      if (mounted) {
+        setState(() => _cameraReady = true);
+      }
+    } catch (e) {
+      debugPrint('Camera init error: $e');
+      // Fall back to honor system if camera fails
+      if (mounted) {
+        setState(() {
+          _cameraReady = false;
+          _showAdvice = false;
+          _exerciseActive = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _processFrame(CameraImage image) async {
+    if (_isProcessing || !_exerciseActive || _poseDetector == null) return;
+    _isProcessing = true;
+
+    try {
+      final landmarks = await _poseDetector!.detectPose(image);
+      if (landmarks != null && mounted) {
+        setState(() => _landmarks = landmarks);
+
+        // Feed to workout session
+        if (_session != null) {
+          _session!.processPose(landmarks);
+
+          // Update gauge
+          setState(() {
+            _chargeProgress = _session!.chargeProgress;
+            _feedback = _session!.feedback;
+          });
+        }
+      }
+    } catch (e) {
+      // Skip frame on error
+    }
+
+    _isProcessing = false;
+  }
+
+  void _onAdviceDismissed() {
+    setState(() => _showAdvice = false);
+    _initCamera();
+    _startCountdown();
+  }
+
+  void _startCountdown() {
     setState(() {
-      _exerciseSet.exercises[index].completed =
-          !_exerciseSet.exercises[index].completed;
+      _countdown = true;
+      _countdownValue = 5;
+    });
+
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+      setState(() => _countdownValue--);
+      if (_countdownValue <= 0) {
+        _startExercise();
+        return false;
+      }
+      return true;
     });
   }
 
-  void _completeCircuit() {
-    setState(() => _showComplete = true);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) widget.onComplete();
+  void _startExercise() {
+    final exercise = _exerciseSet.exercises[_currentExerciseIndex];
+
+    _session = WorkoutSession();
+    _session!.onRepCounted = (reps) {
+      if (mounted) {
+        setState(() {
+          exercise.completedReps = reps;
+          if (reps >= exercise.reps) {
+            exercise.completed = true;
+            _onExerciseFinished();
+          }
+        });
+      }
+    };
+    _session!.onFeedback = (msg) {
+      if (mounted) setState(() => _feedback = msg);
+    };
+
+    _session!.startExercise(
+      exerciseId: exercise.engineId,
+      sets: 1,
+      reps: exercise.reps,
+    );
+
+    setState(() {
+      _countdown = false;
+      _exerciseActive = true;
+    });
+  }
+
+  void _onExerciseFinished() {
+    _exerciseActive = false;
+    _session = null;
+
+    if (_currentExerciseIndex < _exerciseSet.exercises.length - 1) {
+      // Next exercise after brief pause
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _currentExerciseIndex++;
+            _chargeProgress = 0;
+            _feedback = '';
+            _landmarks = null;
+          });
+          _startCountdown();
+        }
+      });
+    } else {
+      // All done
+      setState(() => _showComplete = true);
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) widget.onComplete();
+      });
+    }
+  }
+
+  /// Fallback: manual tap to count rep (when camera unavailable)
+  void _manualRep() {
+    final exercise = _exerciseSet.exercises[_currentExerciseIndex];
+    setState(() {
+      exercise.completedReps++;
+      if (exercise.completedReps >= exercise.reps) {
+        exercise.completed = true;
+        _onExerciseFinished();
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_showComplete) return _buildDismissed();
+    if (_showAdvice) return _buildAdvicePhase();
 
-    final allDone = _exerciseSet.allCompleted;
+    final exercise = _exerciseSet.exercises[_currentExerciseIndex];
 
-    return Container(
-      key: const ValueKey('exercises'),
-      color: Colors.black,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Camera preview
+          if (_cameraReady && _cameraController != null)
+            Transform.scale(
+              scaleX: -1, // Mirror front camera
+              child: CameraPreview(_cameraController!),
+            )
+          else
+            Container(color: Colors.black),
+
+          // Skeleton overlay
+          if (_landmarks != null && _cameraReady)
+            CustomPaint(
+              painter: SkeletonPainter(
+                landmarks: _landmarks,
+                imageSize: Size(
+                  _cameraController!.value.previewSize?.height ?? 480,
+                  _cameraController!.value.previewSize?.width ?? 640,
+                ),
+                isFrontCamera: true,
+                chargeProgress: _chargeProgress,
+              ),
+              size: Size.infinite,
+            ),
+
+          // Dark overlay at top for text readability
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 180,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+
+          // Top HUD
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              children: [
+                // Exercise name
+                Text(
+                  exercise.name.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Rep counter
+                if (_exerciseActive || exercise.completedReps > 0)
+                  Text(
+                    '${exercise.completedReps} / ${exercise.reps}',
+                    style: TextStyle(
+                      color: exercise.completed ? AppColors.emerald : Colors.red,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                if (_countdown)
+                  Text(
+                    '$_countdownValue',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 72,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ).animate().scale(
+                    begin: const Offset(1.5, 1.5),
+                    end: const Offset(1, 1),
+                    duration: 300.ms,
+                  ),
+              ],
+            ),
+          ),
+
+          // Feedback text
+          if (_feedback.isNotEmpty)
+            Positioned(
+              bottom: 160,
+              left: 32,
+              right: 32,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _feedback,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+
+          // Power gauge (left side)
+          if (_exerciseActive)
+            Positioned(
+              left: 16,
+              top: MediaQuery.of(context).size.height * 0.35,
+              child: PowerGauge(fillPercent: _chargeProgress),
+            ),
+
+          // Progress bar at bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildBottomBar(exercise),
+          ),
+
+          // Manual tap fallback (when no camera)
+          if (!_cameraReady && _exerciseActive)
+            Positioned(
+              bottom: 120,
+              left: 32,
+              right: 32,
+              child: GestureDetector(
+                onTap: _manualRep,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.emerald.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
+                  ),
+                  child: const Text(
+                    'TAP TO COUNT REP',
+                    style: TextStyle(
+                      color: AppColors.emerald,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdvicePhase() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: AppSpacing.lg),
-
-              // Header
-              Text(
-                'EXERCISE CIRCUIT',
-                style: TextStyle(
-                  color: Colors.red.withOpacity(0.9),
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                ),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(),
-
-              const SizedBox(height: AppSpacing.sm),
-
-              Text(
-                'Offense #${widget.violation.offenseNumber} — ${_exerciseSet.offenseNumber}x multiplier',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1,
-                ),
-                textAlign: TextAlign.center,
+              const Icon(Icons.accessibility_new, size: 64, color: AppColors.emerald),
+              const SizedBox(height: 24),
+              const Text(
+                'SETUP YOUR PHONE',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2),
               ),
-
-              const SizedBox(height: AppSpacing.xl),
-
-              // Exercise list
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _exerciseSet.exercises.length,
-                  itemBuilder: (context, index) {
-                    final exercise = _exerciseSet.exercises[index];
-                    return _buildExerciseCard(exercise, index);
-                  },
-                ),
-              ),
-
-              const SizedBox(height: AppSpacing.lg),
-
-              // Complete button
-              AnimatedOpacity(
-                opacity: allDone ? 1.0 : 0.3,
-                duration: const Duration(milliseconds: 300),
+              const SizedBox(height: 32),
+              _adviceRow(Icons.phone_android, 'Place phone below hip height'),
+              _adviceRow(Icons.straighten, 'Stand 6-8 feet away'),
+              _adviceRow(Icons.accessibility_new, 'Full body must be visible'),
+              _adviceRow(Icons.light_mode, 'Good lighting works best'),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: allDone
-                        ? AppColors.emeraldGradient
-                        : const LinearGradient(colors: [Colors.grey, Colors.grey]),
-                    borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-                    boxShadow: allDone
-                        ? [BoxShadow(
-                            color: AppColors.emerald.withOpacity(0.4),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          )]
-                        : [],
+                    gradient: AppColors.emeraldGradient,
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: allDone ? _completeCircuit : null,
-                      borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                      onTap: _onAdviceDismissed,
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
                         child: Text(
-                          allDone ? 'CIRCUIT COMPLETE' : 'COMPLETE ALL EXERCISES',
-                          style: TextStyle(
-                            color: allDone ? Colors.black : Colors.white38,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5,
-                          ),
+                          'GOT IT — LET\'S GO',
+                          style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -140,8 +442,6 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
                   ),
                 ),
               ),
-
-              const SizedBox(height: AppSpacing.lg),
             ],
           ),
         ),
@@ -149,127 +449,100 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     );
   }
 
-  Widget _buildExerciseCard(Exercise exercise, int index) {
+  Widget _adviceRow(IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: GestureDetector(
-        onTap: () => _toggleExercise(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: exercise.completed
-                ? AppColors.emerald.withOpacity(0.1)
-                : Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-            border: Border.all(
-              color: exercise.completed
-                  ? AppColors.emerald.withOpacity(0.5)
-                  : Colors.red.withOpacity(0.2),
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            children: [
-              // Emoji
-              Text(
-                exercise.emoji,
-                style: const TextStyle(fontSize: 36),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              // Name + reps
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name,
-                      style: TextStyle(
-                        color: exercise.completed
-                            ? AppColors.emerald
-                            : Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${exercise.reps} reps',
-                      style: TextStyle(
-                        color: exercise.completed
-                            ? AppColors.emerald.withOpacity(0.7)
-                            : Colors.red.withOpacity(0.8),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Checkbox
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: exercise.completed
-                      ? AppColors.emerald
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: exercise.completed
-                        ? AppColors.emerald
-                        : Colors.white.withOpacity(0.3),
-                    width: 2,
-                  ),
-                ),
-                child: exercise.completed
-                    ? const Icon(Icons.check, color: Colors.black, size: 24)
-                    : null,
-              ),
-            ],
-          ),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.emerald, size: 24),
+          const SizedBox(width: 16),
+          Text(text, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(Exercise exercise) {
+    final progress = _exerciseSet.exercises
+        .where((e) => e.completed)
+        .length / _exerciseSet.exercises.length;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black.withOpacity(0.9), Colors.transparent],
         ),
       ),
-    ).animate(delay: (index * 100).ms)
-        .fadeIn(duration: 300.ms)
-        .slideX(begin: 0.1, end: 0);
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Exercise progress dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _exerciseSet.exercises.asMap().entries.map((entry) {
+              final i = entry.key;
+              final ex = entry.value;
+              return Container(
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ex.completed
+                      ? AppColors.emerald
+                      : i == _currentExerciseIndex
+                          ? Colors.red
+                          : Colors.white24,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          // Overall progress
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white12,
+              valueColor: const AlwaysStoppedAnimation(AppColors.emerald),
+              minHeight: 4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Exercise ${_currentExerciseIndex + 1} of ${_exerciseSet.exercises.length}',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDismissed() {
-    return Container(
-      color: Colors.black,
-      child: Center(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.check_circle_outline,
-              size: 80,
-              color: AppColors.emerald,
-            ).animate().scale(
-              begin: const Offset(0.5, 0.5),
-              end: const Offset(1, 1),
-              duration: 400.ms,
-            ),
-            const SizedBox(height: AppSpacing.xl),
+            const Icon(Icons.check_circle_outline, size: 80, color: AppColors.emerald)
+                .animate().scale(
+                  begin: const Offset(0.5, 0.5),
+                  end: const Offset(1, 1),
+                  duration: 400.ms,
+                ),
+            const SizedBox(height: 24),
             const Text(
               'DISMISSED.',
-              style: TextStyle(
-                color: AppColors.emerald,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-              ),
+              style: TextStyle(color: AppColors.emerald, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
             ).animate(delay: 200.ms).fadeIn(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 12),
             Text(
               'Don\'t let it happen again.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600),
             ).animate(delay: 500.ms).fadeIn(),
           ],
         ),
