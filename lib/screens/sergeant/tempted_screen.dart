@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:video_player/video_player.dart';
 import '../../design/tokens.dart';
 import '../../models/exercise_set.dart';
+import '../../models/escalation_config.dart';
 
 /// When user feels tempted to break a bad habit, they can proactively
 /// do a workout to fight the urge. This is the POSITIVE path.
@@ -15,22 +17,52 @@ class TemptedScreen extends StatefulWidget {
   State<TemptedScreen> createState() => _TemptedScreenState();
 }
 
+enum _TemptedPhase { video, exercises, complete }
+
 class _TemptedScreenState extends State<TemptedScreen> {
   late List<Exercise> _exercises;
-  bool _showComplete = false;
+  _TemptedPhase _phase = _TemptedPhase.video;
+  VideoPlayerController? _videoController;
+  bool _videoReady = false;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // Tempted workouts are always level 1 intensity (encouraging, not punishing)
     _exercises = ExerciseSet.forOffense(1).exercises;
+    _initVideo();
   }
 
   @override
   void dispose() {
+    _videoController?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      _videoController = VideoPlayerController.asset(EscalationConfig.temptedVideo);
+      await _videoController!.initialize();
+      _videoController!.addListener(_onVideoEnd);
+      if (mounted) {
+        setState(() => _videoReady = true);
+        _videoController!.play();
+      }
+    } catch (e) {
+      debugPrint('Tempted video not available: $e');
+      if (mounted) setState(() => _phase = _TemptedPhase.exercises);
+    }
+  }
+
+  void _onVideoEnd() {
+    if (_videoController != null &&
+        _videoController!.value.isInitialized &&
+        _videoController!.value.position >= _videoController!.value.duration &&
+        _videoController!.value.duration > Duration.zero) {
+      _videoController!.removeListener(_onVideoEnd);
+      if (mounted) setState(() => _phase = _TemptedPhase.exercises);
+    }
   }
 
   void _toggleExercise(int index) {
@@ -40,7 +72,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
   }
 
   void _complete() {
-    setState(() => _showComplete = true);
+    setState(() => _phase = _TemptedPhase.complete);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.of(context).pop();
     });
@@ -48,7 +80,8 @@ class _TemptedScreenState extends State<TemptedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_showComplete) return _buildSuccess();
+    if (_phase == _TemptedPhase.complete) return _buildSuccess();
+    if (_phase == _TemptedPhase.video) return _buildVideoPhase();
 
     final allDone = _exercises.every((e) => e.completed);
 
@@ -257,6 +290,20 @@ class _TemptedScreenState extends State<TemptedScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoPhase() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: _videoReady && _videoController != null
+          ? Center(
+              child: AspectRatio(
+                aspectRatio: _videoController!.value.aspectRatio,
+                child: VideoPlayer(_videoController!),
+              ),
+            )
+          : const Center(child: CircularProgressIndicator(color: Colors.orange)),
     );
   }
 

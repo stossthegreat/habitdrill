@@ -101,49 +101,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
             const SizedBox(height: AppSpacing.md),
 
-            // "I'm Tempted" quick action - shows when user has bad habits
-            if (allHabits.any((h) => h.type == 'bad_habit'))
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                      fullscreenDialog: true,
-                      builder: (_) => const TemptedScreen(),
-                    ));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.orange.withOpacity(0.15),
-                          Colors.red.withOpacity(0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.local_fire_department, color: Colors.orange.withOpacity(0.9), size: 22),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            'Feeling tempted? Tap to fight the urge',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: Colors.orange.withOpacity(0.9),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        Icon(LucideIcons.chevronRight, color: Colors.orange.withOpacity(0.5), size: 18),
+            // Sergeant mood card - green when good, red when slipping
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: _buildSergeantMoodCard(dayHabits, completedCount),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            // "I'm Tempted" quick action - always visible
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => const TemptedScreen(),
+                  ));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.orange.withOpacity(0.15),
+                        Colors.red.withOpacity(0.08),
                       ],
                     ),
+                    borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_fire_department, color: Colors.orange.withOpacity(0.9), size: 22),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Feeling tempted? Tap to fight the urge',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: Colors.orange.withOpacity(0.9),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      Icon(LucideIcons.chevronRight, color: Colors.orange.withOpacity(0.5), size: 18),
+                    ],
                   ),
                 ),
               ),
+            ),
 
             const SizedBox(height: AppSpacing.lg),
 
@@ -164,7 +171,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         habits: systemHabits,
                         selectedDate: _selectedDate,
                         onToggleHabit: (habit) async {
-                          await ref.read(habitEngineProvider.notifier).toggleHabitCompletion(habit.id);
+                          final violation = await ref.read(habitEngineProvider.notifier).toggleHabitCompletion(habit.id);
+                          if (violation != null && context.mounted) {
+                            Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => PunishmentScreen(
+                                violation: violation,
+                                onComplete: () => Navigator.of(context).pop(),
+                              ),
+                            ));
+                          }
                         },
                       );
                     }),
@@ -201,6 +216,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             const SizedBox(height: 120),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSergeantMoodCard(List<dynamic> dayHabits, int completedCount) {
+    if (dayHabits.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final total = dayHabits.length;
+    final percent = total > 0 ? (completedCount / total * 100).round() : 0;
+    final hasPending = SergeantService.hasPendingPunishment();
+
+    // Determine mood
+    final bool isHappy;
+    final String message;
+    final Color moodColor;
+    final IconData moodIcon;
+
+    if (hasPending) {
+      isHappy = false;
+      moodColor = AppColors.error;
+      moodIcon = Icons.warning_amber_rounded;
+      message = 'You have punishment waiting. Don\'t make me angrier.';
+    } else if (percent == 100) {
+      isHappy = true;
+      moodColor = AppColors.emerald;
+      moodIcon = LucideIcons.shieldCheck;
+      message = 'All habits done. The sergeant is proud, soldier.';
+    } else if (percent >= 50) {
+      isHappy = true;
+      moodColor = AppColors.emerald;
+      moodIcon = LucideIcons.target;
+      message = '$percent% done. Keep pushing — finish strong.';
+    } else if (completedCount > 0) {
+      isHappy = false;
+      moodColor = Colors.orange;
+      moodIcon = LucideIcons.alertTriangle;
+      message = 'Only $percent% done. Pick it up, recruit.';
+    } else {
+      isHappy = false;
+      moodColor = AppColors.error;
+      moodIcon = LucideIcons.flame;
+      message = 'Nothing done yet. The sergeant is watching.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+      decoration: BoxDecoration(
+        color: moodColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+        border: Border.all(color: moodColor.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(moodIcon, color: moodColor, size: 20),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: moodColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

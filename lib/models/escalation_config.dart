@@ -1,10 +1,14 @@
 class EscalationConfig {
-  // Video assets per escalation level (user will provide these)
+  // Video assets per escalation level
   static const Map<int, String> videoAssets = {
-    1: 'assets/videos/sergeant_level1.mp4',
-    2: 'assets/videos/sergeant_level2.mp4',
-    3: 'assets/videos/sergeant_level3.mp4',
+    1: 'assets/images/sergeant_level1.mp4',
+    2: 'assets/images/sergeant_level2.mp4',
+    3: 'assets/images/sergeant_level3.mp4',
   };
+
+  // Special videos
+  static const String temptedVideo = 'assets/images/sergeant_almost.mp4';
+  static const String introVideo = 'assets/images/sergeant_intro.mp4';
 
   // Notification timing (minutes after violation detected)
   static const List<int> notificationDelayMinutes = [0, 15, 45, 120, 360];
