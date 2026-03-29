@@ -8,6 +8,7 @@ import '../widgets/date_strip.dart';
 import '../widgets/system_card.dart';
 import '../screens/settings_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
+import '../screens/sergeant/tempted_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../providers/habit_provider.dart';
 import '../services/local_storage.dart';
@@ -99,6 +100,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
 
             const SizedBox(height: AppSpacing.md),
+
+            // "I'm Tempted" quick action - shows when user has bad habits
+            if (allHabits.any((h) => h.type == 'bad_habit'))
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      fullscreenDialog: true,
+                      builder: (_) => const TemptedScreen(),
+                    ));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.orange.withOpacity(0.15),
+                          Colors.red.withOpacity(0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.local_fire_department, color: Colors.orange.withOpacity(0.9), size: 22),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            'Feeling tempted? Tap to fight the urge',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.orange.withOpacity(0.9),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        Icon(LucideIcons.chevronRight, color: Colors.orange.withOpacity(0.5), size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
             const SizedBox(height: AppSpacing.lg),
 
             // Habit cards (System cards + Standalone habits)

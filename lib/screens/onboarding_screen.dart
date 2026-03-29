@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../design/tokens.dart';
@@ -19,36 +20,53 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Full immersive
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(flex: 2),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full-screen background gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF0A0A0A),
+                  Color(0xFF000000),
+                  Color(0xFF0A1A0F),
+                  Color(0xFF000000),
+                ],
+              ),
+            ),
+          ),
 
-                // App icon
+          // Content
+          SafeArea(
+            child: Column(
+              children: [
+                const Spacer(flex: 3),
+
+                // App icon - big and bold
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(32),
                   child: Image.asset(
                     'assets/icon/app_icon.png',
-                    width: 120,
-                    height: 120,
+                    width: 140,
+                    height: 140,
                     fit: BoxFit.cover,
                   ),
-                ).animate().fadeIn(duration: 600.ms).scale(
-                  begin: const Offset(0.8, 0.8),
+                ).animate().fadeIn(duration: 800.ms).scale(
+                  begin: const Offset(0.6, 0.6),
                   end: const Offset(1, 1),
-                  duration: 600.ms,
+                  duration: 800.ms,
+                  curve: Curves.easeOutBack,
                 ),
 
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: 32),
 
                 // Title
                 ShaderMask(
@@ -57,88 +75,95 @@ class OnboardingScreen extends StatelessWidget {
                   child: const Text(
                     'DRILLSARJ',
                     style: TextStyle(
-                      fontSize: 40,
+                      fontSize: 44,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
-                      letterSpacing: 3,
+                      letterSpacing: 4,
                     ),
                   ),
-                ).animate(delay: 300.ms).fadeIn(duration: 500.ms),
+                ).animate(delay: 400.ms).fadeIn(duration: 600.ms),
 
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: 16),
 
                 // Tagline
                 Text(
                   'Break a habit?\nFace the sergeant.',
                   style: AppTextStyles.h3.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Colors.white.withOpacity(0.7),
                     height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ).animate(delay: 500.ms).fadeIn(duration: 500.ms),
-
-                const SizedBox(height: AppSpacing.md),
-
-                // Description
-                Text(
-                  'Build discipline through accountability.\nMiss a habit and the drill sergeant makes you train.',
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.textTertiary,
-                    height: 1.5,
+                    fontSize: 20,
                   ),
                   textAlign: TextAlign.center,
                 ).animate(delay: 700.ms).fadeIn(duration: 500.ms),
 
-                const Spacer(flex: 3),
+                const SizedBox(height: 24),
 
-                // Get Started button
-                SizedBox(
-                  width: double.infinity,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: AppColors.emeraldGradient,
-                      borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.emerald.withOpacity(0.4),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
+                // Subtitle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Text(
+                    'Build discipline through accountability.\nMiss a habit and the drill sergeant makes you train.',
+                    style: AppTextStyles.body.copyWith(
+                      color: Colors.white.withOpacity(0.35),
+                      height: 1.6,
+                      fontSize: 14,
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _proceed(context),
-                        borderRadius:
-                            BorderRadius.circular(AppBorderRadius.lg),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                          child: Text(
-                            'GET STARTED',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
+                    textAlign: TextAlign.center,
+                  ),
+                ).animate(delay: 1000.ms).fadeIn(duration: 500.ms),
+
+                const Spacer(flex: 4),
+
+                // Continue button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.emeraldGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.emerald.withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _proceed(context),
+                          borderRadius: BorderRadius.circular(16),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 18),
+                            child: Text(
+                              'CONTINUE',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 2,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
                     ),
                   ),
-                ).animate(delay: 900.ms).fadeIn(duration: 400.ms).slideY(
+                ).animate(delay: 1300.ms).fadeIn(duration: 400.ms).slideY(
                   begin: 0.3,
                   end: 0,
                   duration: 400.ms,
                 ),
 
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: 48),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
