@@ -8,6 +8,7 @@ import '../widgets/glass_button.dart';
 import '../services/local_storage.dart';
 import '../providers/auth_provider.dart';
 import 'auth/login_screen.dart';
+import 'paywall_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -166,6 +167,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           children: [
+            // Drillsarj Pro
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                fullscreenDialog: true,
+                builder: (_) => const PaywallScreen(),
+              )),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.emerald.withOpacity(0.2),
+                      AppColors.emerald.withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+                  border: Border.all(color: AppColors.emerald.withOpacity(0.4), width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.emeraldGradient,
+                        borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                      ),
+                      child: const Icon(LucideIcons.crown, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Drillsarj Pro', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald)),
+                          Text('Unlock the full sergeant experience', style: AppTextStyles.captionSmall.copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    const Icon(LucideIcons.chevronRight, color: AppColors.emerald, size: 20),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
+
             // Account Management
             GlassCard(
               child: Column(

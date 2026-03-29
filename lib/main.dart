@@ -18,6 +18,7 @@ import 'models/violation.dart';
 import 'services/local_storage.dart';
 import 'services/alarm_service.dart';
 import 'services/sergeant_service.dart';
+import 'services/retention_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -70,7 +71,9 @@ Future<void> main() async {
       }
       await LocalStorageService.initialize();
       await SergeantService.initialize();
-      debugPrint('Hive + SergeantService initialized');
+      await RetentionService.initialize();
+      await RetentionService.ensureScheduled();
+      debugPrint('Hive + SergeantService + Retention initialized');
     } catch (e) {
       debugPrint('Hive/Sync initialization failed: $e');
     }

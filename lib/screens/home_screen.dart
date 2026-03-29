@@ -8,6 +8,7 @@ import '../widgets/date_strip.dart';
 import '../widgets/system_card.dart';
 import '../screens/settings_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
+import '../screens/paywall_screen.dart';
 import '../providers/habit_provider.dart';
 import '../services/local_storage.dart';
 import '../services/sergeant_service.dart';
@@ -496,32 +497,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ],
           ),
 
-          // Settings icon only
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SettingsScreen(),
-                ),
-              );
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.glassBackground,
-                borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                border: Border.all(
-                  color: AppColors.emerald.withOpacity(0.2),
+          Row(
+            children: [
+              // Get Pro button
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => const PaywallScreen(),
+                  ));
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.emeraldGradient,
+                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.emerald.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.crown, color: Colors.black, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'PRO',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: const Icon(
-                LucideIcons.settings,
-                color: AppColors.emerald,
-                size: 22,
+              const SizedBox(width: 8),
+              // Settings icon
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const SettingsScreen(),
+                  ));
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.glassBackground,
+                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    border: Border.all(color: AppColors.emerald.withOpacity(0.2)),
+                  ),
+                  child: const Icon(LucideIcons.settings, color: AppColors.emerald, size: 22),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

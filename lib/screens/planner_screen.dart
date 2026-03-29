@@ -343,18 +343,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
               children: [_buildAddNewTab(), _buildManageTab()],
             ),
           ),
-          // Floating "Create" button only visible on Manage tab
-          if (_tabController.index == 1)
-            Positioned(
-              bottom: 24,
-              right: 24,
-              child: FloatingActionButton.extended(
-                onPressed: () => _tabController.animateTo(0),
-                backgroundColor: AppColors.emerald,
-                icon: const Icon(LucideIcons.plus, color: Colors.black),
-                label: const Text('Create', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
-              ),
-            ),
         ],
       ),
     );
