@@ -16,25 +16,25 @@ class EscalationConfig {
   // Notification messages per escalation level
   static const Map<int, List<String>> notificationMessages = {
     1: [
-      'You missed {habit}. The Sergeant is waiting.',
-      'Still haven\'t opened the app? Get in here.',
-      'This is your second warning. Open Drillsarj NOW.',
-      'I\'ve been waiting. Your punishment is getting worse.',
-      'LAST CHANCE. Open the app or tomorrow will be hell.',
+      'ORDER FAILED: {habit}. Open Drillsarj.',
+      '{habit} not completed. Punishment waiting.',
+      'Second warning. {habit} still failed.',
+      'Your punishment is escalating. Open now.',
+      'Final warning. {habit}.',
     ],
     2: [
-      'You missed {habit} AGAIN. The Sergeant is NOT happy.',
-      'Drop what you\'re doing and open Drillsarj. NOW.',
-      'You think you can hide? Get in here, recruit!',
-      'Your punishment just doubled. Open the app.',
-      'I will NOT forget this. Get in here immediately.',
+      'ORDER FAILED AGAIN: {habit}. Strike 2.',
+      '{habit} failed twice. Open Drillsarj. NOW.',
+      'Strike 2. Punishment doubled.',
+      'Still hiding? {habit} still failed.',
+      'This will not be forgotten. Open the app.',
     ],
     3: [
-      '{habit} BROKEN AGAIN?! GET IN THE APP RIGHT NOW!',
-      'THIS IS UNACCEPTABLE! OPEN DRILLSARJ IMMEDIATELY!',
-      'YOU ARE IN SERIOUS TROUBLE! GET IN HERE!',
-      'YOUR PUNISHMENT IS THROUGH THE ROOF! OPEN NOW!',
-      'I HAVE BEEN WAITING ALL DAY! GET IN HERE SOLDIER!',
+      'STRIKE 3: {habit}. OPEN NOW.',
+      '{habit} FAILED AGAIN. MAXIMUM PUNISHMENT.',
+      'YOU KEEP FAILING. OPEN DRILLSARJ.',
+      'PUNISHMENT AT MAXIMUM. OPEN NOW.',
+      'LAST WARNING. {habit}.',
     ],
   };
 

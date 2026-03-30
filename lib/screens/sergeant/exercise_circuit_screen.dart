@@ -428,7 +428,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
               const Icon(Icons.accessibility_new, size: 64, color: AppColors.emerald),
               const SizedBox(height: 24),
               const Text(
-                'SETUP YOUR PHONE',
+                'POSITION YOURSELF',
                 style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2),
               ),
               const SizedBox(height: 32),
@@ -452,7 +452,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: Text(
-                          'GOT IT — LET\'S GO',
+                          'READY',
                           style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
                           textAlign: TextAlign.center,
                         ),
@@ -555,12 +555,12 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
                 ),
             const SizedBox(height: 24),
             const Text(
-              'DISMISSED.',
+              'PUNISHMENT COMPLETE.',
               style: TextStyle(color: AppColors.emerald, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
             ).animate(delay: 200.ms).fadeIn(),
             const SizedBox(height: 12),
             Text(
-              'Don\'t let it happen again.',
+              'Don\'t fail again.',
               style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600),
             ).animate(delay: 500.ms).fadeIn(),
           ],

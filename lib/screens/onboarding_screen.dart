@@ -143,7 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 16),
 
                 Text(
-                  'Break a habit?\nFace the sergeant.',
+                  'Set orders.\nBreak them. Pay.',
                   style: AppTextStyles.h3.copyWith(color: Colors.white.withOpacity(0.7), height: 1.4, fontSize: 20),
                   textAlign: TextAlign.center,
                 ).animate(delay: 700.ms).fadeIn(duration: 500.ms),
@@ -153,8 +153,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 48),
                   child: Text(
-                    'Build discipline through accountability.\nMiss a habit and the drill sergeant makes you train.',
-                    style: AppTextStyles.body.copyWith(color: Colors.white.withOpacity(0.35), height: 1.6, fontSize: 14),
+                    'Discipline enforcement.\nFail an order and you train.',
+                    style: AppTextStyles.body.copyWith(color: Colors.white.withOpacity(0.3), height: 1.6, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
                 ).animate(delay: 1000.ms).fadeIn(duration: 500.ms),

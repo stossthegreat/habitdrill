@@ -13,73 +13,68 @@ class RetentionService {
 
   // Notification schedule: hour, message pairs
   static const List<Map<String, dynamic>> _schedule = [
-    // Morning: Plan your day
     {
       'id': 500001,
       'hour': 7,
       'minute': 0,
-      'title': 'WAKE UP, SOLDIER!',
-      'body': 'Time to plan your day. The sergeant is waiting.',
+      'title': 'DRILLSARJ',
+      'body': 'Orders active. Complete them or face punishment.',
     },
     {
       'id': 500002,
       'hour': 8,
       'minute': 30,
-      'title': 'Morning check-in',
-      'body': 'Your habits won\'t complete themselves. Open up and get moving.',
+      'title': 'DRILLSARJ',
+      'body': 'Status check. Are your orders completed?',
     },
-    // Midday: Stay on track
     {
       'id': 500003,
       'hour': 12,
       'minute': 0,
-      'title': 'MIDDAY REPORT',
-      'body': 'How many habits have you crushed today? Check in now.',
+      'title': 'DRILLSARJ',
+      'body': 'Midday. Orders still pending.',
     },
-    // Afternoon: Push through
     {
       'id': 500004,
       'hour': 15,
       'minute': 0,
-      'title': 'No slacking off!',
-      'body': 'The afternoon is when discipline separates the weak from the strong.',
+      'title': 'DRILLSARJ',
+      'body': 'Time is running out. Complete your orders.',
     },
-    // Evening: Final push
     {
       'id': 500005,
       'hour': 20,
       'minute': 0,
-      'title': 'EVENING DEBRIEF',
-      'body': 'Day\'s almost done. Did you finish everything? Log it now before I get angry.',
+      'title': 'DRILLSARJ',
+      'body': 'Final hours. Incomplete orders = punishment.',
     },
-    // Night: End of day accountability
     {
       'id': 500006,
       'hour': 22,
       'minute': 0,
-      'title': 'LAST CHANCE',
-      'body': 'Mark your habits done or face the sergeant tomorrow. Your choice.',
+      'title': 'DRILLSARJ',
+      'body': 'Last chance. Complete or train.',
     },
   ];
 
   // Rotating motivational messages for variety
   static const List<String> _morningVariants = [
-    'Rise and grind. Your future self is counting on you.',
-    'Another day, another chance to be better. Don\'t waste it.',
-    'The sergeant doesn\'t sleep. Neither should your discipline.',
-    'Champions are made in the morning. Plan your attack.',
-    'Your habits are waiting. Don\'t make me come find you.',
-    'Day starts NOW. Open up and own it.',
-    'Excuses don\'t build muscle. Discipline does. Get planning.',
+    'Orders active. Execute.',
+    'New day. Same discipline.',
+    'Your orders are waiting.',
+    'Status: PENDING. Fix that.',
+    'Execute your orders today.',
+    'Day starts now. No excuses.',
+    'Orders set. Get moving.',
   ];
 
   static const List<String> _eveningVariants = [
-    'End of day report. How\'d you do, soldier?',
-    'The day doesn\'t end until every habit is logged.',
-    'Did you show up today? Prove it. Open the app.',
-    'Winners review their day. Losers scroll social media.',
-    'One day closer to your goals... IF you did the work.',
-    'Log your habits now or the sergeant gets creative tomorrow.',
+    'Orders still incomplete.',
+    'Complete or face punishment.',
+    'Status check. Open the app.',
+    'Incomplete orders = punishment.',
+    'Last hours. Complete your orders.',
+    'Tomorrow starts with your failures.',
   ];
 
   /// Initialize the retention notification channel

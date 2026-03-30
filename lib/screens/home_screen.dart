@@ -5,15 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
-import '../widgets/system_card.dart';
 import '../screens/settings_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
 import '../screens/sergeant/tempted_screen.dart';
 import '../screens/paywall_screen.dart';
 import '../providers/habit_provider.dart';
-import '../services/local_storage.dart';
 import '../services/sergeant_service.dart';
-import '../models/habit_system.dart';
 import '../models/habit.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -41,15 +38,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Refresh habits when app comes to foreground
       if (mounted) setState(() {});
     }
   }
 
   void _onDateSelected(DateTime date) {
-    setState(() {
-      _selectedDate = date;
-    });
+    setState(() => _selectedDate = date);
   }
 
   @override
@@ -57,31 +51,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final habitEngine = ref.watch(habitEngineProvider);
     final allHabits = habitEngine.habits;
 
-    // Filter habits for selected date
-    final dayHabits = allHabits.where((habit) {
-      return habit.isScheduledForDate(_selectedDate);
-    }).toList();
+    final dayOrders = allHabits.where((h) => h.isScheduledForDate(_selectedDate)).toList();
+    final completedCount = dayOrders.where((h) => h.isDoneOn(_selectedDate)).length;
+    final total = dayOrders.length;
+    final hasFailed = SergeantService.hasPendingPunishment();
+    final hasRules = dayOrders.any((h) => h.type == 'bad_habit');
 
-    // Load all systems
-    final allSystems = LocalStorageService.getAllSystems();
-
-    // Group habits by systemId
-    final Map<String, List<dynamic>> systemHabitsMap = {};
-    final List<dynamic> standaloneHabits = [];
-
-    for (final habit in dayHabits) {
-      if (habit.systemId != null && habit.systemId!.isNotEmpty) {
-        if (!systemHabitsMap.containsKey(habit.systemId)) {
-          systemHabitsMap[habit.systemId!] = [];
-        }
-        systemHabitsMap[habit.systemId!]!.add(habit);
-      } else {
-        standaloneHabits.add(habit);
-      }
+    // Status
+    String status;
+    Color statusColor;
+    if (hasFailed) {
+      status = 'FAILED';
+      statusColor = AppColors.error;
+    } else if (total > 0 && completedCount == total) {
+      status = 'CONTROLLED';
+      statusColor = AppColors.emerald;
+    } else if (total > 0 && completedCount < total) {
+      status = 'AT RISK';
+      statusColor = Colors.orange;
+    } else {
+      status = 'NO ORDERS';
+      statusColor = AppColors.textTertiary;
     }
-
-    // Date-aware completion
-    final completedCount = dayHabits.where((h) => h.isDoneOn(_selectedDate)).length;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -89,27 +80,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
-            _buildHomeHeader(),
+            _buildHeader(),
 
-            // Date strip
             DateStrip(
               selectedDate: _selectedDate,
               onDateSelected: _onDateSelected,
               accentColor: AppColors.emerald,
             ),
 
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
 
-            // Sergeant mood card - green when good, red when slipping
+            // STATUS - large, dominant
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: _buildSergeantMoodCard(dayHabits, completedCount),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+                  border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
 
             const SizedBox(height: AppSpacing.md),
 
-            // "I'm Tempted" quick action - always visible
+            // KILL URGE button - always visible
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               child: GestureDetector(
@@ -120,33 +126,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   ));
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.orange.withOpacity(0.15),
-                        Colors.red.withOpacity(0.08),
-                      ],
-                    ),
+                    color: Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(AppBorderRadius.xl),
                     border: Border.all(color: Colors.orange.withOpacity(0.3)),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.local_fire_department, color: Colors.orange.withOpacity(0.9), size: 22),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          'Feeling tempted? Tap to fight the urge',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: Colors.orange.withOpacity(0.9),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      Icon(LucideIcons.chevronRight, color: Colors.orange.withOpacity(0.5), size: 18),
-                    ],
+                  child: const Text(
+                    'KILL URGE',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -154,65 +148,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
             const SizedBox(height: AppSpacing.lg),
 
-            // Habit cards (System cards + Standalone habits)
-            if (dayHabits.isEmpty)
-              _buildEmptyState(),
-
-            if (dayHabits.isNotEmpty)
+            // ORDERS LIST
+            if (dayOrders.isEmpty)
+              _buildEmptyState()
+            else
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
-                  children: [
-                    // System Cards
-                    ...allSystems.where((system) => systemHabitsMap.containsKey(system.id)).map((system) {
-                      final systemHabits = systemHabitsMap[system.id]!.cast<Habit>();
-                      return SystemCard(
-                        system: system,
-                        habits: systemHabits,
-                        selectedDate: _selectedDate,
-                        onToggleHabit: (habit) async {
-                          final violation = await ref.read(habitEngineProvider.notifier).toggleHabitCompletion(habit.id);
-                          if (violation != null && context.mounted) {
-                            Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => PunishmentScreen(
-                                violation: violation,
-                                onComplete: () => Navigator.of(context).pop(),
-                              ),
-                            ));
-                          }
-                        },
-                      );
-                    }),
-
-                    // Standalone Habit Cards
-                    ...standaloneHabits.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final habit = entry.value;
-                      final isDone = habit.isDoneOn(_selectedDate);
-
-                      return _buildHabitCard(
-                        habit: habit,
-                        isDone: isDone,
-                        index: index + allSystems.length,
-                        onToggle: () async {
-                          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
-                          if (violation != null && context.mounted) {
-                            // Bad habit triggered - show punishment
-                            Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => PunishmentScreen(
-                                violation: violation,
-                                onComplete: () => Navigator.of(context).pop(),
-                              ),
-                            ));
-                          }
-                        },
-                      );
-                    }),
-                  ],
+                  children: dayOrders.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final habit = entry.value;
+                    final isDone = habit.isDoneOn(_selectedDate);
+                    return _buildOrderCard(
+                      habit: habit,
+                      isDone: isDone,
+                      index: index,
+                      onToggle: () async {
+                        final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+                        if (violation != null && context.mounted) {
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => PunishmentScreen(
+                              violation: violation,
+                              onComplete: () => Navigator.of(context).pop(),
+                            ),
+                          ));
+                        }
+                      },
+                    );
+                  }).toList(),
                 ),
               ),
 
-            // Bottom padding for FAB
             const SizedBox(height: 120),
           ],
         ),
@@ -220,122 +186,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildSergeantMoodCard(List<dynamic> dayHabits, int completedCount) {
-    if (dayHabits.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final total = dayHabits.length;
-    final percent = total > 0 ? (completedCount / total * 100).round() : 0;
-    final hasPending = SergeantService.hasPendingPunishment();
-
-    // Determine mood
-    final bool isHappy;
-    final String message;
-    final Color moodColor;
-    final IconData moodIcon;
-
-    if (hasPending) {
-      isHappy = false;
-      moodColor = AppColors.error;
-      moodIcon = Icons.warning_amber_rounded;
-      message = 'You have punishment waiting. Don\'t make me angrier.';
-    } else if (percent == 100) {
-      isHappy = true;
-      moodColor = AppColors.emerald;
-      moodIcon = LucideIcons.shieldCheck;
-      message = 'All habits done. The sergeant is proud, soldier.';
-    } else if (percent >= 50) {
-      isHappy = true;
-      moodColor = AppColors.emerald;
-      moodIcon = LucideIcons.target;
-      message = '$percent% done. Keep pushing — finish strong.';
-    } else if (completedCount > 0) {
-      isHappy = false;
-      moodColor = Colors.orange;
-      moodIcon = LucideIcons.alertTriangle;
-      message = 'Only $percent% done. Pick it up, recruit.';
-    } else {
-      isHappy = false;
-      moodColor = AppColors.error;
-      moodIcon = LucideIcons.flame;
-      message = 'Nothing done yet. The sergeant is watching.';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
-      decoration: BoxDecoration(
-        color: moodColor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-        border: Border.all(color: moodColor.withOpacity(0.25)),
-      ),
-      child: Row(
-        children: [
-          Icon(moodIcon, color: moodColor, size: 20),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: moodColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildEmptyState() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 60, AppSpacing.lg, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 40, AppSpacing.lg, 0),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.xl),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.emerald.withOpacity(0.1),
-              AppColors.emerald.withOpacity(0.05),
-            ],
-          ),
+          color: Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-          border: Border.all(
-            color: AppColors.emerald.withOpacity(0.2),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.emerald.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                LucideIcons.target,
-                size: 36,
-                color: AppColors.emerald,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
             Text(
-              'No Habits Yet',
-              style: AppTextStyles.h3.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
+              'NO ORDERS SET',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.4),
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Tap the Planner button below\nto create your first habit',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
+              'Tap ORDERS below to set your first order.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.2),
                 fontSize: 14,
               ),
               textAlign: TextAlign.center,
@@ -346,24 +223,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildHabitCard({
+  Widget _buildOrderCard({
     required dynamic habit,
     required bool isDone,
     required int index,
     required VoidCallback onToggle,
   }) {
-    // Handle empty time
     String? time;
     if (habit.time != null && habit.time.isNotEmpty) {
       try {
-        final timeFormatter = DateFormat('HH:mm');
-        time = timeFormatter.format(DateTime.parse('2025-01-01 ${habit.time}:00'));
+        time = DateFormat('HH:mm').format(DateTime.parse('2025-01-01 ${habit.time}:00'));
       } catch (e) {
         time = null;
       }
     }
 
-    final habitColor = habit.color;
+    final isRule = habit.type == 'bad_habit';
+
+    // Status text
+    String statusText;
+    Color statusColor;
+    if (isRule) {
+      statusText = isDone ? 'FAILED' : 'ACTIVE';
+      statusColor = isDone ? AppColors.error : AppColors.emerald;
+    } else {
+      statusText = isDone ? 'COMPLETED' : 'PENDING';
+      statusColor = isDone ? AppColors.emerald : Colors.white.withOpacity(0.4);
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -372,208 +258,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: isDone
-                ? habitColor.withOpacity(0.05)
-                : Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(AppBorderRadius.xl),
+            color: isDone && !isRule
+                ? AppColors.emerald.withOpacity(0.05)
+                : isDone && isRule
+                    ? AppColors.error.withOpacity(0.08)
+                    : Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(AppBorderRadius.lg),
             border: Border.all(
-              color: isDone
-                  ? habitColor.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.1),
-              width: 1,
+              color: isDone && !isRule
+                  ? AppColors.emerald.withOpacity(0.3)
+                  : isDone && isRule
+                      ? AppColors.error.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.08),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  // Emoji or icon
-                  if (habit.emoji != null)
+              // Left: title + time
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      habit.emoji!,
-                      style: const TextStyle(fontSize: 32),
-                    )
-                  else
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: habitColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        LucideIcons.flame,
-                        size: 20,
-                        color: habitColor,
+                      habit.title.toString().toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Time + Alarm + Status chip
-                        Row(
-                          children: [
-                            if (time != null) ...[
-                              Text(
-                                time,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: habitColor,
-                                  fontFamily: 'monospace',
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              if (habit.reminderOn) ...[
-                                Icon(
-                                  LucideIcons.bellRing,
-                                  size: 12,
-                                  color: habitColor.withOpacity(0.8),
-                                ),
-                              ],
-                              const SizedBox(width: AppSpacing.sm),
-                              Text('\u2022', style: TextStyle(color: Colors.white38)),
-                              const SizedBox(width: AppSpacing.sm),
-                            ],
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: habitColor.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: habitColor.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Text(
-                                habit.type == 'bad_habit'
-                                    ? (isDone ? 'slipped' : 'tracking')
-                                    : (isDone ? 'done' : 'planned'),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: habitColor,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        // Title
-                        Text(
-                          habit.title,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 17,
-                            color: Colors.white.withOpacity(0.95),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Streak flame indicator
-                  if (habit.streak > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-                        border: Border.all(
-                          color: AppColors.warning.withOpacity(0.3),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            LucideIcons.flame,
-                            size: 14,
-                            color: AppColors.warning,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${habit.streak}',
-                            style: AppTextStyles.label.copyWith(
-                              color: AppColors.warning,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  // Checkmark / Bad habit icon
-                  habit.type == 'bad_habit'
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(isDone ? 0.3 : 0.15),
-                            borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                            border: Border.all(color: AppColors.error.withOpacity(0.5)),
-                          ),
-                          child: Text(
-                            isDone ? 'LOGGED' : 'I SLIPPED',
-                            style: const TextStyle(
-                              color: AppColors.error,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        )
-                      : Icon(
-                          isDone ? LucideIcons.checkCircle2 : LucideIcons.circle,
-                          size: 28,
-                          color: isDone
-                              ? habitColor
-                              : Colors.white.withOpacity(0.3),
-                        ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              // Progress bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppBorderRadius.full),
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppBorderRadius.full),
-                  ),
-                  child: Stack(
-                    children: [
-                      FractionallySizedBox(
-                        widthFactor: isDone ? 1.0 : 0.56,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                habitColor.withOpacity(0.8),
-                                habitColor,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(AppBorderRadius.full),
-                          ),
+                    if (time != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        time,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.3),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ],
+                  ],
+                ),
+              ),
+              // Right: status
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
                   ),
                 ),
               ),
@@ -581,109 +325,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
         ),
       ),
-    ).animate(delay: (index * 30).ms)
-      .fadeIn(duration: 260.ms)
-      .scale(begin: const Offset(0.98, 0.98), end: const Offset(1, 1));
+    ).animate(delay: (index * 40).ms).fadeIn(duration: 200.ms);
   }
 
-  Widget _buildHomeHeader() {
+  Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.md,
-      ),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xl, AppSpacing.sm, AppSpacing.md),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // App icon + "Drillsarj" text
           Row(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                child: Image.asset(
-                  'assets/icon/app_icon.png',
-                  width: 44,
-                  height: 44,
-                  fit: BoxFit.cover,
-                ),
+                child: Image.asset('assets/icon/app_icon.png', width: 44, height: 44, fit: BoxFit.cover),
               ),
               const SizedBox(width: 8),
               ShaderMask(
-                shaderCallback: (bounds) => AppColors.emeraldGradient
-                    .createShader(bounds),
+                shaderCallback: (bounds) => AppColors.emeraldGradient.createShader(bounds),
                 child: const Text(
-                  'Drillsarj',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
+                  'DRILLSARJ',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
                 ),
               ),
             ],
           ),
-
           Row(
             children: [
-              // Get Pro button
               GestureDetector(
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    fullscreenDialog: true,
-                    builder: (_) => const PaywallScreen(),
-                  ));
-                },
+                onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen())),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     gradient: AppColors.emeraldGradient,
                     borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.emerald.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.crown, color: Colors.black, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'PRO',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
                 ),
               ),
               const SizedBox(width: 8),
-              // Settings icon
               GestureDetector(
-                onTap: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => const SettingsScreen(),
-                  ));
-                },
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 child: Container(
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
                     color: AppColors.glassBackground,
                     borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                    border: Border.all(color: AppColors.emerald.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
-                  child: const Icon(LucideIcons.settings, color: AppColors.emerald, size: 22),
+                  child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.5), size: 20),
                 ),
               ),
             ],

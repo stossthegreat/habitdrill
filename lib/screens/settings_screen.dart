@@ -202,8 +202,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Drillsarj Pro', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald)),
-                          Text('Unlock the full sergeant experience', style: AppTextStyles.captionSmall.copyWith(color: AppColors.textSecondary)),
+                          Text('DRILLSARJ PRO', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald, letterSpacing: 1)),
+                          Text('Unlock full enforcement', style: AppTextStyles.captionSmall.copyWith(color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
@@ -317,7 +317,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Break a habit? Face the sergeant. Build discipline through accountability and exercise. v1.0.0',
+                    'Discipline enforcement system. v1.0.0',
                     style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
                   ),
                 ],

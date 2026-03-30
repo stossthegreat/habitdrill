@@ -329,7 +329,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                     ),
                     child: TabBar(
                       controller: _tabController,
-                      tabs: const [Tab(text:'Add New'),Tab(text:'Manage')],
+                      tabs: const [Tab(text:'NEW ORDER'),Tab(text:'ACTIVE')],
                     ),
                   ),
                 ),
@@ -401,7 +401,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             borderColor: _selectedType == 'habit'
                 ? AppColors.emerald
                 : AppColors.glassBorder,
-            child: Text('Habit',
+            child: Text('ORDER',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'habit'
                       ? Colors.black
@@ -418,7 +418,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             borderColor: _selectedType == 'task'
                 ? AppColors.cyan
                 : AppColors.glassBorder,
-            child: Text('Task',
+            child: Text('TASK',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'task'
                       ? Colors.black
@@ -435,7 +435,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             borderColor: _selectedType == 'bad_habit'
                 ? AppColors.error
                 : AppColors.glassBorder,
-            child: Text('Bad Habit',
+            child: Text('RULE',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'bad_habit'
                       ? Colors.white
@@ -767,7 +767,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'No habits scheduled for this day.\nTap Add New to create one.',
+                    'No orders for this day.',
                     style: AppTextStyles.body.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -801,7 +801,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Text(
-                            'Add New',
+                            'NEW ORDER',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,

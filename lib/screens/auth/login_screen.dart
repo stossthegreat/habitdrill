@@ -244,7 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: AppSpacing.sm),
 
                 Text(
-                  'No excuses. Just results.',
+                  'Discipline enforcement system.',
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                   ),

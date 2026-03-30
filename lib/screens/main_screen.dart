@@ -51,11 +51,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         backgroundColor: AppColors.emerald,
         icon: const Icon(LucideIcons.plus, color: Colors.black, size: 22),
         label: const Text(
-          'Planner',
+          'ORDERS',
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            letterSpacing: 1,
           ),
         ),
         elevation: 8,

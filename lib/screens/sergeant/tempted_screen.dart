@@ -156,13 +156,13 @@ class _TemptedScreenState extends State<TemptedScreen> {
 
                 const SizedBox(height: AppSpacing.md),
 
-                Text(
-                  'FEELING TEMPTED?',
+                const Text(
+                  'URGE DETECTED',
                   style: TextStyle(
-                    color: Colors.orange.withOpacity(0.9),
+                    color: Colors.orange,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    letterSpacing: 3,
                   ),
                   textAlign: TextAlign.center,
                 ).animate(delay: 200.ms).fadeIn(),
@@ -183,11 +183,10 @@ class _TemptedScreenState extends State<TemptedScreen> {
                 const SizedBox(height: AppSpacing.sm),
 
                 Text(
-                  'Fight the urge. Do these exercises instead.\nYour discipline will thank you.',
+                  'Kill it with work.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withOpacity(0.3),
                     fontSize: 14,
-                    height: 1.5,
                   ),
                   textAlign: TextAlign.center,
                 ).animate(delay: 500.ms).fadeIn(),
@@ -349,7 +348,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
                 ),
             const SizedBox(height: AppSpacing.xl),
             const Text(
-              'URGE DEFEATED.',
+              'URGE KILLED.',
               style: TextStyle(
                 color: AppColors.emerald,
                 fontSize: 28,
@@ -359,11 +358,10 @@ class _TemptedScreenState extends State<TemptedScreen> {
             ).animate(delay: 200.ms).fadeIn(),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'That\'s what discipline looks like.\nThe sergeant is proud.',
+              'Controlled.',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withOpacity(0.4),
                 fontSize: 15,
-                height: 1.5,
               ),
               textAlign: TextAlign.center,
             ).animate(delay: 500.ms).fadeIn(),

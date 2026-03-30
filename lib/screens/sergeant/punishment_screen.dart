@@ -7,7 +7,6 @@ import '../../design/tokens.dart';
 import '../../models/violation.dart';
 import '../../models/escalation_config.dart';
 import '../../services/sergeant_service.dart';
-import '../../services/sergeant_voice_service.dart';
 import 'exercise_circuit_screen.dart';
 
 class PunishmentScreen extends StatefulWidget {
@@ -97,19 +96,9 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
     }
   }
 
-  void _startVoicePhase() async {
-    // Generate AI message and speak it via ElevenLabs
-    try {
-      final message = await SergeantVoiceService.generateAndSpeak(widget.violation);
-      if (mounted) {
-        setState(() => _sergeantMessage = message);
-      }
-    } catch (e) {
-      debugPrint('Voice phase error: $e');
-    }
-
-    // Wait for voice to finish, then move to exercises
-    Future.delayed(const Duration(seconds: 6), () {
+  void _startVoicePhase() {
+    // Show punishment message, then move to exercises
+    Future.delayed(const Duration(seconds: 4), () {
       if (mounted) {
         setState(() => _phase = _Phase.exercises);
       }
@@ -170,8 +159,8 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
             const SizedBox(height: AppSpacing.xl),
             Text(
               isIndulged
-                  ? 'YOU SLIPPED.'
-                  : 'YOU BROKE YOUR STREAK.',
+                  ? 'RULE BROKEN.'
+                  : 'ORDER FAILED.',
               style: const TextStyle(
                 color: Colors.red,
                 fontSize: 28,
@@ -279,7 +268,7 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
               ).animate(delay: 300.ms).fadeIn(duration: 600.ms),
               const SizedBox(height: AppSpacing.xxl),
               Text(
-                'EXERCISES INCOMING...',
+                'PUNISHMENT INCOMING.',
                 style: TextStyle(
                   color: Colors.red.withOpacity(0.6),
                   fontSize: 14,
