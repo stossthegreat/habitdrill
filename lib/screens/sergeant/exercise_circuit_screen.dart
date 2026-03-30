@@ -13,6 +13,7 @@ import '../../services/workout_session.dart';
 import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/pt_setup_advice_screen.dart';
+import '../../services/sergeant_audio_service.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
   final Violation violation;
@@ -63,6 +64,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   void dispose() {
     _cameraController?.dispose();
     _poseDetector?.dispose();
+    SergeantAudioService.stop();
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -145,6 +147,10 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
       _countdownValue = 5;
     });
 
+    // Play exercise start announcement immediately
+    final exercise = _exerciseSet.exercises[_currentExerciseIndex];
+    SergeantAudioService.playExerciseStart(exercise.engineId);
+
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return false;
@@ -165,11 +171,19 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
       if (mounted) {
         setState(() {
           exercise.completedReps = reps;
-          if (reps >= exercise.reps) {
-            exercise.completed = true;
-            _onExerciseFinished();
-          }
         });
+
+        // Play audio at the right moment
+        SergeantAudioService.onRepCounted(
+          currentRep: reps,
+          targetReps: exercise.reps,
+          exerciseId: exercise.engineId,
+        );
+
+        if (reps >= exercise.reps) {
+          exercise.completed = true;
+          _onExerciseFinished();
+        }
       }
     };
     _session!.onFeedback = (msg) {
@@ -206,9 +220,10 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
         }
       });
     } else {
-      // All done
+      // All done - circuit complete
+      SergeantAudioService.playCircuitComplete();
       setState(() => _showComplete = true);
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 3), () {
         if (mounted) widget.onComplete();
       });
     }
@@ -219,11 +234,18 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     final exercise = _exerciseSet.exercises[_currentExerciseIndex];
     setState(() {
       exercise.completedReps++;
-      if (exercise.completedReps >= exercise.reps) {
-        exercise.completed = true;
-        _onExerciseFinished();
-      }
     });
+
+    SergeantAudioService.onRepCounted(
+      currentRep: exercise.completedReps,
+      targetReps: exercise.reps,
+      exerciseId: exercise.engineId,
+    );
+
+    if (exercise.completedReps >= exercise.reps) {
+      exercise.completed = true;
+      _onExerciseFinished();
+    }
   }
 
   @override

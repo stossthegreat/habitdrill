@@ -2,7 +2,7 @@ import 'violation.dart';
 
 class Exercise {
   final String name;
-  final String engineId; // Maps to MovementEngine exercise ID
+  final String engineId;
   final String emoji;
   final int reps;
   int completedReps;
@@ -31,33 +31,41 @@ class ExerciseSet {
 
   bool get allCompleted => exercises.every((e) => e.completed);
 
-  // name, engineId (matches movement_engine.dart), emoji, base reps
-  static const List<Map<String, dynamic>> _exerciseDefinitions = [
-    {'name': 'Squats',        'id': 'squats',        'emoji': '\u{1F9CE}', 'base': 10},
-    {'name': 'Burpees',       'id': 'burpees',       'emoji': '\u{1F4A5}', 'base': 5},
-    {'name': 'High Knees',    'id': 'high_knees',    'emoji': '\u{1F3C3}', 'base': 20},
-    {'name': 'Push-ups',      'id': 'push_ups',      'emoji': '\u{1F4AA}', 'base': 10},
-    {'name': 'Jumping Jacks', 'id': 'jumping_jacks', 'emoji': '\u{2B50}',  'base': 15},
-  ];
+  /// Tempted workout: just 20 burpees (proactive, not punishment)
+  factory ExerciseSet.tempted() {
+    return ExerciseSet(
+      exercises: [
+        Exercise(name: 'Burpees', engineId: 'burpees', emoji: '\u{1F4A5}', reps: 20),
+      ],
+      escalationLevel: 0,
+      offenseNumber: 0,
+    );
+  }
 
-  /// Create exercise set scaled to offense number
-  /// 1st = base reps, 2nd = 2x, 3rd = 3x, capped at 5x
+  /// Punishment circuit based on offense number:
+  /// Strike 1 = 10 of each
+  /// Strike 2 = 15 of each
+  /// Strike 3+ = 20 of each
   factory ExerciseSet.forOffense(int offenseNumber) {
-    final multiplier = offenseNumber.clamp(1, 5);
     final level = Violation.getEscalationLevel(offenseNumber);
 
-    final exercises = _exerciseDefinitions.map((def) {
-      final base = def['base'] as int;
-      return Exercise(
-        name: def['name'] as String,
-        engineId: def['id'] as String,
-        emoji: def['emoji'] as String,
-        reps: base * multiplier,
-      );
-    }).toList();
+    int reps;
+    if (offenseNumber <= 1) {
+      reps = 10;
+    } else if (offenseNumber == 2) {
+      reps = 15;
+    } else {
+      reps = 20;
+    }
 
     return ExerciseSet(
-      exercises: exercises,
+      exercises: [
+        Exercise(name: 'Squats', engineId: 'squats', emoji: '\u{1F9CE}', reps: reps),
+        Exercise(name: 'Burpees', engineId: 'burpees', emoji: '\u{1F4A5}', reps: reps),
+        Exercise(name: 'High Knees', engineId: 'high_knees', emoji: '\u{1F3C3}', reps: reps),
+        Exercise(name: 'Push-ups', engineId: 'push_ups', emoji: '\u{1F4AA}', reps: reps),
+        Exercise(name: 'Jumping Jacks', engineId: 'jumping_jacks', emoji: '\u{2B50}', reps: reps),
+      ],
       escalationLevel: level,
       offenseNumber: offenseNumber,
     );

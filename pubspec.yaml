@@ -91,6 +91,7 @@ flutter:
     - assets/images/
     - assets/onboarding/
     - assets/videos/
+    - assets/audio/sergeant/
 
   # fonts:
   #   - family: Inter

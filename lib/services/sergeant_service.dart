@@ -123,8 +123,12 @@ class SergeantService {
   // ==================== PUNISHMENT FLOW ====================
 
   /// Get the exercise set for a violation
-  static ExerciseSet getExerciseSet(Violation violation) =>
-      ExerciseSet.forOffense(violation.offenseNumber);
+  static ExerciseSet getExerciseSet(Violation violation) {
+    if (violation.violationType == 'tempted') {
+      return ExerciseSet.tempted();
+    }
+    return ExerciseSet.forOffense(violation.offenseNumber);
+  }
 
   /// Get the video path for a violation
   static String getVideoPath(Violation violation) =>

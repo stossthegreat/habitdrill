@@ -31,7 +31,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _exercises = ExerciseSet.forOffense(1).exercises;
+    _exercises = ExerciseSet.tempted().exercises;
     _initVideo();
   }
 
@@ -68,7 +68,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
   }
 
   void _launchWorkout() {
-    // Create a dummy violation for the exercise circuit (offense 1 = base reps)
+    // Create a tempted violation (20 burpees only)
     final dummyViolation = Violation(
       id: 'tempted_${DateTime.now().millisecondsSinceEpoch}',
       habitId: 'tempted',
@@ -76,8 +76,8 @@ class _TemptedScreenState extends State<TemptedScreen> {
       violationType: 'tempted',
       occurredAt: DateTime.now(),
       scheduledFor: DateTime.now(),
-      offenseNumber: 1,
-      escalationLevel: 1,
+      offenseNumber: 0,
+      escalationLevel: 0,
     );
 
     Navigator.of(context).pushReplacement(
