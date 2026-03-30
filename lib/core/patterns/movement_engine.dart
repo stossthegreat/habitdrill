@@ -3,9 +3,10 @@ import 'base_pattern.dart';
 import 'squat_pattern.dart';
 import 'push_pattern.dart';
 import 'high_knee_pattern.dart';
+import 'piston_pattern.dart';
 
 /// Pattern types for Drillsarj exercises
-enum PatternType { squat, push, highKnee }
+enum PatternType { squat, push, highKnee, piston }
 
 /// Exercise configuration
 class ExerciseConfig {
@@ -122,6 +123,17 @@ class MovementEngine {
           cueBad: config.params['cueBad'] ?? 'Higher!',
           triggerThreshold: (config.params['triggerThreshold'] ?? 0.06).toDouble(),
         );
+
+      case PatternType.piston:
+        return PistonPattern(
+          pointA: config.params['pointA'] ?? PoseLandmarkType.leftAnkle,
+          pointB: config.params['pointB'] ?? PoseLandmarkType.rightAnkle,
+          mode: config.params['mode'] ?? PistonMode.grow,
+          triggerPercent: (config.params['triggerPercent'] ?? 1.80).toDouble(),
+          resetPercent: (config.params['resetPercent'] ?? 1.30).toDouble(),
+          cueGood: config.params['cueGood'] ?? 'Jump!',
+          cueBad: config.params['cueBad'] ?? 'Wider!',
+        );
     }
   }
 
@@ -152,11 +164,14 @@ class MovementEngine {
       'cueBad': 'Lower!',
     }),
 
-    // Jumping Jacks - squat pattern (uses knee angle)
-    'jumping_jacks': ExerciseConfig(patternType: PatternType.squat, params: {
-      'triggerPercent': 0.85,
-      'resetPercent': 0.95,
-      'cueGood': 'Open!',
+    // Jumping Jacks - piston pattern (ankle spread tracking)
+    'jumping_jacks': ExerciseConfig(patternType: PatternType.piston, params: {
+      'pointA': PoseLandmarkType.leftAnkle,
+      'pointB': PoseLandmarkType.rightAnkle,
+      'mode': PistonMode.grow,
+      'triggerPercent': 1.80,
+      'resetPercent': 1.30,
+      'cueGood': 'Jump!',
       'cueBad': 'Wider!',
     }),
   };

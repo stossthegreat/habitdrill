@@ -5,6 +5,8 @@ import 'package:video_player/video_player.dart';
 import '../../design/tokens.dart';
 import '../../models/exercise_set.dart';
 import '../../models/escalation_config.dart';
+import '../../models/violation.dart';
+import 'exercise_circuit_screen.dart';
 
 /// When user feels tempted to break a bad habit, they can proactively
 /// do a workout to fight the urge. This is the POSITIVE path.
@@ -51,7 +53,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
       }
     } catch (e) {
       debugPrint('Tempted video not available: $e');
-      if (mounted) setState(() => _phase = _TemptedPhase.exercises);
+      if (mounted) _launchWorkout();
     }
   }
 
@@ -61,8 +63,33 @@ class _TemptedScreenState extends State<TemptedScreen> {
         _videoController!.value.position >= _videoController!.value.duration &&
         _videoController!.value.duration > Duration.zero) {
       _videoController!.removeListener(_onVideoEnd);
-      if (mounted) setState(() => _phase = _TemptedPhase.exercises);
+      if (mounted) _launchWorkout();
     }
+  }
+
+  void _launchWorkout() {
+    // Create a dummy violation for the exercise circuit (offense 1 = base reps)
+    final dummyViolation = Violation(
+      id: 'tempted_${DateTime.now().millisecondsSinceEpoch}',
+      habitId: 'tempted',
+      habitTitle: widget.habitTitle ?? 'Temptation',
+      violationType: 'tempted',
+      occurredAt: DateTime.now(),
+      scheduledFor: DateTime.now(),
+      offenseNumber: 1,
+      escalationLevel: 1,
+    );
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ExerciseCircuitScreen(
+          violation: dummyViolation,
+          onComplete: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
   }
 
   void _toggleExercise(int index) {

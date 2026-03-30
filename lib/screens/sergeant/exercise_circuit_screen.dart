@@ -238,12 +238,9 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview
+          // Camera preview (no Transform - skeleton painter handles front camera flip)
           if (_cameraReady && _cameraController != null)
-            Transform.scale(
-              scaleX: -1, // Mirror front camera
-              child: CameraPreview(_cameraController!),
-            )
+            CameraPreview(_cameraController!)
           else
             Container(color: Colors.black),
 
