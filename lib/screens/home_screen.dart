@@ -55,23 +55,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final completedCount = dayOrders.where((h) => h.isDoneOn(_selectedDate)).length;
     final total = dayOrders.length;
     final hasFailed = SergeantService.hasPendingPunishment();
-    final hasRules = dayOrders.any((h) => h.type == 'bad_habit');
+
+    // Separate orders and rules
+    final orders = dayOrders.where((h) => h.type != 'bad_habit').toList();
+    final rules = dayOrders.where((h) => h.type == 'bad_habit').toList();
 
     // Status
     String status;
     Color statusColor;
     if (hasFailed) {
       status = 'FAILED';
-      statusColor = AppColors.error;
+      statusColor = const Color(0xFFDC2626);
     } else if (total > 0 && completedCount == total) {
       status = 'CONTROLLED';
-      statusColor = AppColors.emerald;
-    } else if (total > 0 && completedCount < total) {
+      statusColor = const Color(0xFF16A34A);
+    } else if (total > 0) {
       status = 'AT RISK';
-      statusColor = Colors.orange;
+      statusColor = const Color(0xFFF59E0B);
     } else {
-      status = 'NO ORDERS';
-      statusColor = AppColors.textTertiary;
+      status = 'STANDBY';
+      statusColor = Colors.white24;
     }
 
     return Scaffold(
@@ -88,34 +91,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               accentColor: AppColors.emerald,
             ),
 
-            const SizedBox(height: AppSpacing.lg),
-
-            // STATUS - large, dominant
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-                  border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
+            // ===== 1. STATUS BANNER (full width, solid bg, NOT a card) =====
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              margin: const EdgeInsets.only(top: AppSpacing.md),
+              color: statusColor.withOpacity(0.15),
+              child: Text(
+                status,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 6,
                 ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                textAlign: TextAlign.center,
               ),
             ),
 
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
 
-            // KILL URGE button - always visible
+            // ===== 2. KILL URGE (glowing button, raised, pressable) =====
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               child: GestureDetector(
@@ -126,19 +122,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   ));
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFEA580C), Color(0xFFDC2626)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFEA580C).withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: const Text(
                     'KILL URGE',
                     style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 14,
+                      color: Colors.white,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                      letterSpacing: 3,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -146,38 +150,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
             ),
 
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.xl),
 
-            // ORDERS LIST
-            if (dayOrders.isEmpty)
-              _buildEmptyState()
-            else
+            // ===== 3. ORDERS (green border, "DO" label) =====
+            if (orders.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                child: Column(
-                  children: dayOrders.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final habit = entry.value;
-                    final isDone = habit.isDoneOn(_selectedDate);
-                    return _buildOrderCard(
-                      habit: habit,
-                      isDone: isDone,
-                      index: index,
-                      onToggle: () async {
-                        final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
-                        if (violation != null && context.mounted) {
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => PunishmentScreen(
-                              violation: violation,
-                              onComplete: () => Navigator.of(context).pop(),
-                            ),
-                          ));
-                        }
-                      },
-                    );
-                  }).toList(),
+                child: Text(
+                  'ORDERS',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 3,
+                  ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              ...orders.asMap().entries.map((entry) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: _buildOrderCard(entry.value, entry.value.isDoneOn(_selectedDate), entry.key),
+              )),
+            ],
+
+            // ===== 4. RULES (red border, "AVOID" label) =====
+            if (rules.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  'RULES',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 3,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ...rules.asMap().entries.map((entry) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: _buildRuleCard(entry.value, entry.value.isDoneOn(_selectedDate), entry.key),
+              )),
+            ],
+
+            if (dayOrders.isEmpty) _buildEmptyState(),
 
             const SizedBox(height: 120),
           ],
@@ -186,135 +204,89 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 40, AppSpacing.lg, 0),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'NO ORDERS SET',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Tap ORDERS below to set your first order.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.2),
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrderCard({
-    required dynamic habit,
-    required bool isDone,
-    required int index,
-    required VoidCallback onToggle,
-  }) {
+  // ===== ORDER CARD: green accent, "DO" tag, tap = COMPLETED =====
+  Widget _buildOrderCard(Habit habit, bool isDone, int index) {
     String? time;
-    if (habit.time != null && habit.time.isNotEmpty) {
+    if (habit.time.isNotEmpty) {
       try {
         time = DateFormat('HH:mm').format(DateTime.parse('2025-01-01 ${habit.time}:00'));
-      } catch (e) {
-        time = null;
-      }
-    }
-
-    final isRule = habit.type == 'bad_habit';
-
-    // Status text
-    String statusText;
-    Color statusColor;
-    if (isRule) {
-      statusText = isDone ? 'FAILED' : 'ACTIVE';
-      statusColor = isDone ? AppColors.error : AppColors.emerald;
-    } else {
-      statusText = isDone ? 'COMPLETED' : 'PENDING';
-      statusColor = isDone ? AppColors.emerald : Colors.white.withOpacity(0.4);
+      } catch (_) {}
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
-        onTap: onToggle,
+        onTap: () async {
+          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+          if (violation != null && context.mounted) {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop()),
+            ));
+          }
+        },
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: isDone && !isRule
-                ? AppColors.emerald.withOpacity(0.05)
-                : isDone && isRule
-                    ? AppColors.error.withOpacity(0.08)
-                    : Colors.white.withOpacity(0.04),
-            borderRadius: BorderRadius.circular(AppBorderRadius.lg),
+            color: isDone ? const Color(0xFF16A34A).withOpacity(0.08) : const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDone && !isRule
-                  ? AppColors.emerald.withOpacity(0.3)
-                  : isDone && isRule
-                      ? AppColors.error.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.08),
+              color: isDone ? const Color(0xFF16A34A).withOpacity(0.4) : const Color(0xFF16A34A).withOpacity(0.15),
+              width: isDone ? 1.5 : 1,
             ),
           ),
           child: Row(
             children: [
-              // Left: title + time
+              // DO tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'DO',
+                  style: TextStyle(color: Color(0xFF16A34A), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title + time
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      habit.title.toString().toUpperCase(),
+                      habit.title.toUpperCase(),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
+                        color: Colors.white.withOpacity(isDone ? 0.5 : 0.9),
+                        fontSize: 15,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                        decorationColor: Colors.white38,
                       ),
                     ),
                     if (time != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
-                        time,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.3),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'monospace',
-                        ),
+                        'DUE $time',
+                        style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.w600),
                       ),
                     ],
                   ],
                 ),
               ),
-              // Right: status
+              // Status button
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
+                  color: isDone ? const Color(0xFF16A34A) : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
+                  border: isDone ? null : Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
                 ),
                 child: Text(
-                  statusText,
+                  isDone ? 'COMPLETED' : 'START',
                   style: TextStyle(
-                    color: statusColor,
+                    color: isDone ? Colors.black : const Color(0xFF16A34A),
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1,
@@ -328,6 +300,117 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     ).animate(delay: (index * 40).ms).fadeIn(duration: 200.ms);
   }
 
+  // ===== RULE CARD: red accent, "AVOID" tag, tap = I BROKE IT =====
+  Widget _buildRuleCard(Habit habit, bool isBroken, int index) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: () async {
+          if (isBroken) return; // Already logged
+          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+          if (violation != null && context.mounted) {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop()),
+            ));
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isBroken ? const Color(0xFFDC2626).withOpacity(0.1) : const Color(0xFF1A0A0A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isBroken ? const Color(0xFFDC2626).withOpacity(0.4) : const Color(0xFFDC2626).withOpacity(0.15),
+              width: isBroken ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // AVOID tag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'AVOID',
+                  style: TextStyle(color: Color(0xFFDC2626), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      habit.title.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isBroken ? 'RULE BROKEN' : 'STAY CLEAN',
+                      style: TextStyle(
+                        color: isBroken ? const Color(0xFFDC2626).withOpacity(0.7) : Colors.white.withOpacity(0.2),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Action button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isBroken ? const Color(0xFFDC2626).withOpacity(0.2) : const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isBroken ? 'FAILED' : 'I BROKE IT',
+                  style: TextStyle(
+                    color: isBroken ? const Color(0xFFDC2626) : Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate(delay: (index * 40).ms).fadeIn(duration: 200.ms);
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 40, AppSpacing.lg, 0),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.02),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Column(
+          children: [
+            Text('NO ORDERS', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 3)),
+            const SizedBox(height: 8),
+            Text('Tap ORDERS to set your first order.', style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xl, AppSpacing.sm, AppSpacing.md),
@@ -338,15 +421,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                child: Image.asset('assets/icon/app_icon.png', width: 44, height: 44, fit: BoxFit.cover),
+                child: Image.asset('assets/icon/app_icon.png', width: 40, height: 40, fit: BoxFit.cover),
               ),
               const SizedBox(width: 8),
-              ShaderMask(
-                shaderCallback: (bounds) => AppColors.emeraldGradient.createShader(bounds),
-                child: const Text(
-                  'DRILLSARJ',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
-                ),
+              const Text(
+                'DRILLSARJ',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
               ),
             ],
           ),
@@ -355,27 +435,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen())),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: AppColors.emeraldGradient,
-                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w800)),
                 ),
               ),
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.glassBackground,
-                    borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.5), size: 20),
-                ),
+                child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.3), size: 22),
               ),
             ],
           ),
