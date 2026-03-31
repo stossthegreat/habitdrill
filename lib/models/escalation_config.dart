@@ -11,7 +11,8 @@ class EscalationConfig {
   static const String introVideo = 'assets/images/sergeant_intro.mp4';
 
   // Notification timing (minutes after violation detected)
-  static const List<int> notificationDelayMinutes = [0, 15, 45, 120, 360];
+  // Smart: immediate, then next morning, then evening. Max 3 total.
+  static const List<int> notificationDelayMinutes = [0, 600, 1200];
 
   // Notification messages per escalation level
   static const Map<int, List<String>> notificationMessages = {

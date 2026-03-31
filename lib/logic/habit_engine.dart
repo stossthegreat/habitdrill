@@ -6,6 +6,7 @@ import '../models/violation.dart';
 import '../services/local_storage.dart';
 import '../services/alarm_service.dart';
 import '../services/sergeant_service.dart';
+import '../services/discipline_service.dart';
 
 class HabitEngine extends ChangeNotifier {
   final LocalStorageService localStorageService;
