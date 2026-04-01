@@ -316,7 +316,11 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     }
   }
 
-  void _checkForPunishment() {
+  void _checkForPunishment() async {
+    // First scan for overdue orders today (time passed + 30min grace)
+    await SergeantService.scanForOverdueToday();
+
+    // Then check if any violations need punishment
     final violation = SergeantService.getWorstPendingViolation();
     if (violation != null && mounted) {
       setState(() {

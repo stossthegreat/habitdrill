@@ -350,7 +350,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
 
   Widget _buildAddNewTab() {
     return SingleChildScrollView(
-      child: GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.emerald.withOpacity(0.12)),
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -397,10 +404,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             onPressed: () => _onTypeChanged('habit'),
             backgroundColor: _selectedType == 'habit'
                 ? AppColors.emerald
-                : AppColors.glassBackground,
+                : const Color(0xFF0D0D0D),
             borderColor: _selectedType == 'habit'
                 ? AppColors.emerald
-                : AppColors.glassBorder,
+                : Colors.white.withOpacity(0.08),
             child: Text('ORDER',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'habit'
@@ -414,10 +421,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             onPressed: () => _onTypeChanged('task'),
             backgroundColor: _selectedType == 'task'
                 ? AppColors.cyan
-                : AppColors.glassBackground,
+                : const Color(0xFF0D0D0D),
             borderColor: _selectedType == 'task'
                 ? AppColors.cyan
-                : AppColors.glassBorder,
+                : Colors.white.withOpacity(0.08),
             child: Text('TASK',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'task'
@@ -431,10 +438,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
             onPressed: () => _onTypeChanged('bad_habit'),
             backgroundColor: _selectedType == 'bad_habit'
                 ? AppColors.error
-                : AppColors.glassBackground,
+                : const Color(0xFF0D0D0D),
             borderColor: _selectedType == 'bad_habit'
                 ? AppColors.error
-                : AppColors.glassBorder,
+                : Colors.white.withOpacity(0.08),
             child: Text('RULE',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: _selectedType == 'bad_habit'
@@ -450,10 +457,25 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           {required IconData icon}) =>
       TextFormField(
         controller: c,
-        style: AppTextStyles.body,
+        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
-          hintText: 'Add a $_selectedType title...',
-          prefixIcon: Icon(icon, color: AppColors.textTertiary),
+          hintText: 'Order title...',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+          prefixIcon: Icon(icon, color: AppColors.emerald.withOpacity(0.6)),
+          filled: true,
+          fillColor: const Color(0xFF0D0D0D),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.emerald.withOpacity(0.15)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.emerald.withOpacity(0.15)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.emerald.withOpacity(0.5), width: 1.5),
+          ),
         ),
         validator: (v) => v == null || v.trim().isEmpty ? 'Enter a title' : null,
       );
@@ -463,9 +485,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.glassBackground,
-            border: Border.all(color: AppColors.glassBorder),
-            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            color: const Color(0xFF0D0D0D),
+            border: Border.all(color: AppColors.emerald.withOpacity(0.15)),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
@@ -498,9 +520,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   Widget _timeToggle() => Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.glassBackground,
-          border: Border.all(color: AppColors.glassBorder),
-          borderRadius: BorderRadius.circular(AppBorderRadius.md),
+          color: const Color(0xFF0D0D0D),
+          border: Border.all(color: AppColors.emerald.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
@@ -551,9 +573,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   Widget _alarmToggle() => Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.glassBackground,
-          border: Border.all(color: AppColors.glassBorder),
-          borderRadius: BorderRadius.circular(AppBorderRadius.md),
+          color: const Color(0xFF0D0D0D),
+          border: Border.all(color: AppColors.emerald.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
@@ -621,13 +643,13 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.glassBackground,
-            border: Border.all(color: AppColors.glassBorder),
-            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            color: const Color(0xFF0D0D0D),
+            border: Border.all(color: AppColors.emerald.withOpacity(0.15)),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Row(children: [
-            const Icon(LucideIcons.calendar,
-                color: AppColors.textTertiary, size: 16),
+            Icon(LucideIcons.calendar,
+                color: AppColors.emerald.withOpacity(0.5), size: 16),
             const SizedBox(width: AppSpacing.sm),
             Text('${date.day}/${date.month}/${date.year}',
                 style: AppTextStyles.body),
@@ -689,20 +711,22 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   Widget _commitButton() => SizedBox(
         width: double.infinity,
         child: Container(
-          height: 48,
+          height: 52,
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
-            borderRadius: BorderRadius.circular(AppBorderRadius.md),
+            gradient: AppColors.emeraldGradient,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))],
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: _submitForm,
-              borderRadius: BorderRadius.circular(AppBorderRadius.md),
-              child: Center(
-                child: Text('Commit ${_selectedType.capitalize()}',
-                    style: AppTextStyles.bodySemiBold
-                        .copyWith(color: Colors.black)),
+              borderRadius: BorderRadius.circular(14),
+              child: const Center(
+                child: Text(
+                  'SET ORDER',
+                  style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 2),
+                ),
               ),
             ),
           ),

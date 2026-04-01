@@ -152,8 +152,8 @@ class AlarmService {
         try {
           await _notifications.zonedSchedule(
             alarmId,
-            '🔥 ${habit.title}',
-            '${_getMotivationalQuote()}\n\nTap to mark as complete',
+            'ORDER: ${habit.title.toUpperCase()}',
+            _getAlarmMessage(),
             scheduledTime,
             const NotificationDetails(
               android: AndroidNotificationDetails(
@@ -310,20 +310,20 @@ class AlarmService {
     return days[day];
   }
 
-  /// Get motivational quote
-  static String _getMotivationalQuote() {
-    const quotes = [
-      "Your future self is counting on you.",
-      "Discipline beats motivation.",
-      "Consistency builds destiny.",
-      "Every action shapes tomorrow.",
-      "Small wins, huge future.",
-      "Future You is watching — act now.",
-      "Make yourself proud today.",
-      "One habit closer to your dreams.",
+  /// Get drill sergeant alarm message
+  static String _getAlarmMessage() {
+    const messages = [
+      "This order is due. Execute now.",
+      "Time's up. Complete your order.",
+      "Your order is waiting. Move.",
+      "Due now. Don't make me wait.",
+      "Order due. Complete or face punishment.",
+      "This is your time. Execute.",
+      "Due now. No excuses.",
+      "Order active. Get it done.",
     ];
-    final index = DateTime.now().minute % quotes.length;
-    return quotes[index];
+    final index = DateTime.now().minute % messages.length;
+    return messages[index];
   }
 
   /// Schedule a test alarm (fires in 1 minute)

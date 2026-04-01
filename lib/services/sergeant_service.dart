@@ -97,16 +97,14 @@ class SergeantService {
 
   // ==================== VIOLATION SCANNING ====================
 
-  /// Scan for missed habits on a given date
+  /// Scan for missed orders on a given date (end of day check)
   static Future<List<Violation>> scanForViolations(DateTime date) async {
     final habits = LocalStorageService.getAllHabits();
     final violations = <Violation>[];
 
     for (final habit in habits) {
-      // Skip bad habits (those are triggered manually)
+      // Skip bad habits (those are triggered manually via "I BROKE IT")
       if (habit.type == 'bad_habit') continue;
-      // Skip tasks
-      if (habit.type == 'task') continue;
 
       if (habit.isScheduledForDate(date) && !habit.isDoneOn(date)) {
         final violation = await triggerMissedHabitViolation(habit, date);
@@ -116,6 +114,44 @@ class SergeantService {
 
     if (violations.isNotEmpty) {
       debugPrint('Scan found ${violations.length} violations for ${date.toIso8601String()}');
+    }
+    return violations;
+  }
+
+  /// Scan for OVERDUE orders TODAY (time has passed, not completed).
+  /// Call this on app open/resume.
+  static Future<List<Violation>> scanForOverdueToday() async {
+    final now = DateTime.now();
+    final habits = LocalStorageService.getAllHabits();
+    final violations = <Violation>[];
+
+    for (final habit in habits) {
+      if (habit.type == 'bad_habit') continue;
+      if (!habit.isScheduledForDate(now)) continue;
+      if (habit.isDoneOn(now)) continue;
+      if (habit.time.isEmpty) continue; // No time set = check at end of day
+
+      // Parse the due time
+      try {
+        final parts = habit.time.split(':');
+        final dueHour = int.parse(parts[0]);
+        final dueMinute = int.parse(parts[1]);
+        final dueTime = DateTime(now.year, now.month, now.day, dueHour, dueMinute);
+
+        // Add 30min grace period
+        final deadline = dueTime.add(const Duration(minutes: 30));
+
+        if (now.isAfter(deadline)) {
+          final violation = await triggerMissedHabitViolation(habit, now);
+          violations.add(violation);
+        }
+      } catch (e) {
+        debugPrint('Error parsing time for ${habit.title}: $e');
+      }
+    }
+
+    if (violations.isNotEmpty) {
+      debugPrint('Found ${violations.length} overdue orders today');
     }
     return violations;
   }
