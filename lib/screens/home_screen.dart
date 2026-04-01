@@ -384,16 +384,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: isDone ? const Color(0xFF16A34A) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  border: isDone ? null : Border.all(color: const Color(0xFF16A34A).withOpacity(0.25)),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: isDone ? const Color(0xFF16A34A) : const Color(0xFF16A34A).withOpacity(0.25), width: 2),
                 ),
-                child: Text(
-                  isDone ? 'DONE' : 'START',
-                  style: TextStyle(color: isDone ? Colors.black : const Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1),
-                ),
+                child: isDone ? const Icon(Icons.check, color: Colors.black, size: 18) : null,
               ),
             ],
           ),
@@ -472,21 +470,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               GestureDetector(
                 onTap: _showShareCard,
-                child: Icon(LucideIcons.share2, color: Colors.white.withOpacity(0.3), size: 20),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(LucideIcons.share2, color: Colors.white.withOpacity(0.4), size: 22),
+                ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 4),
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen())),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(gradient: AppColors.emeraldGradient, borderRadius: BorderRadius.circular(6)),
-                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w800)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(gradient: AppColors.emeraldGradient, borderRadius: BorderRadius.circular(8)),
+                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w800)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 4),
               GestureDetector(
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.25), size: 20),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.35), size: 22),
+                ),
               ),
             ],
           ),

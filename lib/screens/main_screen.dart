@@ -45,24 +45,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   Widget _buildFAB() {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.lg + 10),
-      child: FloatingActionButton.extended(
+      margin: const EdgeInsets.only(bottom: AppSpacing.xl),
+      child: FloatingActionButton(
         onPressed: _openPlanner,
         backgroundColor: AppColors.emerald,
-        icon: const Icon(LucideIcons.plus, color: Colors.black, size: 22),
-        label: const Text(
-          'ORDERS',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-            letterSpacing: 1,
-          ),
-        ),
         elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-        ),
+        child: const Icon(LucideIcons.plus, color: Colors.black, size: 26),
       ),
     );
   }

@@ -155,11 +155,18 @@ class _AppRouterState extends State<AppRouter> {
 
   void _listenToAuthChanges() {
     try {
-      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) async {
         debugPrint('Auth state changed: ${user?.uid ?? "null"}');
         if (mounted) {
+          // Also check guest user (skip for now)
+          bool authed = user != null;
+          if (!authed) {
+            final prefs = await SharedPreferences.getInstance();
+            final guestId = prefs.getString('user_id');
+            authed = guestId != null && guestId.isNotEmpty;
+          }
           setState(() {
-            _isAuthenticated = user != null;
+            _isAuthenticated = authed;
           });
         }
       });
