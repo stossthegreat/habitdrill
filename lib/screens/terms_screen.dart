@@ -34,12 +34,12 @@ class TermsScreen extends StatelessWidget {
 
             _buildSection(
               '1. Acceptance of Terms',
-              'By accessing and using Drillsarj, you accept and agree to be bound by these terms. If you do not agree, please do not use this application.',
+              'By accessing and using HabitDrill, you accept and agree to be bound by these terms. If you do not agree, please do not use this application.',
             ),
 
             _buildSection(
               '2. Description of Service',
-              'Drillsarj is a habit accountability app that uses exercise-based consequences to reinforce discipline. The service includes:\n\n'
+              'HabitDrill is a habit accountability app that uses exercise-based consequences to reinforce discipline. The service includes:\n\n'
               '• Habit tracking and scheduling\n'
               '• Task and bad habit management\n'
               '• Exercise-based accountability (drill sergeant mode)\n'
@@ -49,10 +49,10 @@ class TermsScreen extends StatelessWidget {
 
             _buildSection(
               '3. Health Disclaimer',
-              'Drillsarj includes physical exercise components. By using this app, you acknowledge:\n\n'
+              'HabitDrill includes physical exercise components. By using this app, you acknowledge:\n\n'
               '• You are physically capable of performing the exercises shown\n'
               '• You should consult a doctor before starting any exercise program\n'
-              '• Drillsarj is not a substitute for professional medical or fitness advice\n'
+              '• HabitDrill is not a substitute for professional medical or fitness advice\n'
               '• You exercise at your own risk and responsibility',
             ),
 
@@ -72,12 +72,12 @@ class TermsScreen extends StatelessWidget {
 
             _buildSection(
               '6. Intellectual Property',
-              'All content, features, and functionality of Drillsarj, including text, graphics, logos, videos, audio, and software, are the exclusive property of Drillsarj and are protected by intellectual property laws.',
+              'All content, features, and functionality of HabitDrill, including text, graphics, logos, videos, audio, and software, are the exclusive property of HabitDrill and are protected by intellectual property laws.',
             ),
 
             _buildSection(
               '7. Limitation of Liability',
-              'Drillsarj is provided "as is" without warranties of any kind. We are not liable for any injuries, damages, or losses resulting from exercise activities performed through the app. Use all features at your own risk.',
+              'HabitDrill is provided "as is" without warranties of any kind. We are not liable for any injuries, damages, or losses resulting from exercise activities performed through the app. Use all features at your own risk.',
             ),
 
             _buildSection(
@@ -93,7 +93,7 @@ class TermsScreen extends StatelessWidget {
             _buildSection(
               '10. Contact',
               'For questions about these terms, contact us at:\n\n'
-              'Email: support@drillsarj.com',
+              'Email: support@habitdrill.com',
             ),
 
             const SizedBox(height: AppSpacing.xl),
@@ -106,7 +106,7 @@ class TermsScreen extends StatelessWidget {
                 border: Border.all(color: AppColors.emerald.withOpacity(0.3)),
               ),
               child: Text(
-                'By using Drillsarj, you acknowledge that you have read, understood, and agree to these Terms and Conditions.',
+                'By using HabitDrill, you acknowledge that you have read, understood, and agree to these Terms and Conditions.',
                 style: AppTextStyles.caption.copyWith(
                   color: AppColors.emerald,
                   fontWeight: FontWeight.w600,

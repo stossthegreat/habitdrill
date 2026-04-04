@@ -17,7 +17,7 @@ class EscalationConfig {
   // Notification messages per escalation level
   static const Map<int, List<String>> notificationMessages = {
     1: [
-      'ORDER FAILED: {habit}. Open Drillsarj.',
+      'ORDER FAILED: {habit}. Open HabitDrill.',
       '{habit} not completed. Punishment waiting.',
       'Second warning. {habit} still failed.',
       'Your punishment is escalating. Open now.',
@@ -25,7 +25,7 @@ class EscalationConfig {
     ],
     2: [
       'ORDER FAILED AGAIN: {habit}. Strike 2.',
-      '{habit} failed twice. Open Drillsarj. NOW.',
+      '{habit} failed twice. Open HabitDrill. NOW.',
       'Strike 2. Punishment doubled.',
       'Still hiding? {habit} still failed.',
       'This will not be forgotten. Open the app.',
@@ -33,7 +33,7 @@ class EscalationConfig {
     3: [
       'STRIKE 3: {habit}. OPEN NOW.',
       '{habit} FAILED AGAIN. MAXIMUM PUNISHMENT.',
-      'YOU KEEP FAILING. OPEN DRILLSARJ.',
+      'YOU KEEP FAILING. OPEN HABITDRILL.',
       'PUNISHMENT AT MAXIMUM. OPEN NOW.',
       'LAST WARNING. {habit}.',
     ],

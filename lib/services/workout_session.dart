@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../core/patterns/movement_engine.dart';
 
-/// Manages the active workout session for Drillsarj.
+/// Manages the active workout session for HabitDrill.
 /// Connects: Pose Detection -> MovementEngine -> Rep Counting
 class WorkoutSession {
   MovementEngine _engine = MovementEngine();

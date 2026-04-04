@@ -236,7 +236,7 @@ class SergeantService {
       intensity = 'absolutely furious, full drill sergeant rage';
     }
 
-    return '''You are a drill sergeant in a fitness accountability app called Drillsarj.
+    return '''You are a drill sergeant in a fitness accountability app called HabitDrill.
 The user just ${violation.violationType == 'indulged' ? 'indulged in a bad habit' : 'missed their habit'}: "${violation.habitTitle}".
 This is offense #${violation.offenseNumber} for this habit.
 

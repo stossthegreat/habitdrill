@@ -10,8 +10,8 @@ class SupportScreen extends StatelessWidget {
   void _launchEmail() async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
-      path: 'support@drillsarj.com',
-      query: 'subject=Drillsarj Support Request',
+      path: 'support@habitdrill.com',
+      query: 'subject=HabitDrill Support Request',
     );
     if (await canLaunchUrl(emailUri)) {
       await launchUrl(emailUri);
@@ -64,7 +64,7 @@ class SupportScreen extends StatelessWidget {
               'Email Support',
               'Get help via email',
               LucideIcons.mail,
-              'support@drillsarj.com',
+              'support@habitdrill.com',
               _launchEmail,
             ),
 
@@ -103,13 +103,13 @@ class SupportScreen extends StatelessWidget {
             ),
 
             _buildFAQ(
-              'Can I use Drillsarj offline?',
+              'Can I use HabitDrill offline?',
               'Yes. All habit tracking works offline. Your data is stored locally on your device.',
             ),
 
             _buildFAQ(
               'The app crashed or has a bug. What should I do?',
-              'Email us at support@drillsarj.com with your device model, OS version, and steps to reproduce the issue.',
+              'Email us at support@habitdrill.com with your device model, OS version, and steps to reproduce the issue.',
             ),
 
             const SizedBox(height: AppSpacing.xl),
@@ -138,7 +138,7 @@ class SupportScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Email us at support@drillsarj.com\nWe typically respond within 24 hours.',
+                    'Email us at support@habitdrill.com\nWe typically respond within 24 hours.',
                     style: AppTextStyles.body.copyWith(color: Colors.black87),
                     textAlign: TextAlign.center,
                   ),

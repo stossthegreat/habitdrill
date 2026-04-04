@@ -440,7 +440,7 @@ class AlarmService {
       try {
         await _notifications.zonedSchedule(
           notifId,
-          'DRILLSARJ',
+          'HABITDRILL',
           message,
           fireTime,
           const NotificationDetails(

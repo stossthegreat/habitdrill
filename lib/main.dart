@@ -19,6 +19,7 @@ import 'services/local_storage.dart';
 import 'services/alarm_service.dart';
 import 'services/sergeant_service.dart';
 import 'services/retention_service.dart';
+import 'services/premium_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -88,19 +89,19 @@ Future<void> main() async {
       ),
     );
 
-    runApp(const ProviderScope(child: FutureYouApp()));
+    runApp(const ProviderScope(child: HabitDrillApp()));
   }, (error, stack) {
     debugPrint('Fatal error: $error\n$stack');
   });
 }
 
-class FutureYouApp extends StatelessWidget {
-  const FutureYouApp({super.key});
+class HabitDrillApp extends StatelessWidget {
+  const HabitDrillApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Drillsarj',
+      title: 'HabitDrill',
       theme: _getSafeTheme(),
       home: const AppRouter(),
       debugShowCheckedModeBanner: false,
@@ -260,7 +261,7 @@ class _AppRouterState extends State<AppRouter> {
               CircularProgressIndicator(color: Colors.blue),
               SizedBox(height: 20),
               Text(
-                'Loading Drillsarj...',
+                'Loading HabitDrill...',
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             ],
@@ -317,10 +318,14 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   void _checkForPunishment() async {
-    // First scan for overdue orders today (time passed + 30min grace)
+    // Only pro users get punishment system
+    final isPro = await PremiumService.isPremium();
+    if (!isPro) return;
+
+    // Scan for overdue orders today (time passed + 30min grace)
     await SergeantService.scanForOverdueToday();
 
-    // Then check if any violations need punishment
+    // Check if any violations need punishment
     final violation = SergeantService.getWorstPendingViolation();
     if (violation != null && mounted) {
       setState(() {

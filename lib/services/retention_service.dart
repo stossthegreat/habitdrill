@@ -15,11 +15,11 @@ class RetentionService {
   // Only 3 notifications per day. Strategic timing.
   static const List<Map<String, dynamic>> _schedule = [
     // Morning: Set the tone
-    {'id': 500001, 'hour': 7, 'minute': 30, 'title': 'DRILLSARJ', 'body': 'Orders active. Execute.'},
+    {'id': 500001, 'hour': 7, 'minute': 30, 'title': 'HABITDRILL', 'body': 'Orders active. Execute.'},
     // Afternoon: Pressure
-    {'id': 500002, 'hour': 14, 'minute': 0, 'title': 'DRILLSARJ', 'body': 'Status check. Orders pending.'},
+    {'id': 500002, 'hour': 14, 'minute': 0, 'title': 'HABITDRILL', 'body': 'Status check. Orders pending.'},
     // Evening: Last chance
-    {'id': 500003, 'hour': 21, 'minute': 0, 'title': 'DRILLSARJ', 'body': 'Final hours. Complete or train.'},
+    {'id': 500003, 'hour': 21, 'minute': 0, 'title': 'HABITDRILL', 'body': 'Final hours. Complete or train.'},
   ];
 
   // Morning variants (rotate daily)

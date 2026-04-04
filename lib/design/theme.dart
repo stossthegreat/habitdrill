@@ -94,15 +94,15 @@ class AppTheme {
         ),
       ),
 
-      // ----- Card theme (universal fix for Flutter 3.19–3.35+) -----
-      cardTheme: const CardTheme(
+      // ----- Card theme -----
+      cardTheme: const CardThemeData(
         color: AppColors.glassBackground,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(AppBorderRadius.xxl)),
           side: BorderSide(color: AppColors.glassBorder),
         ),
-      ) as CardThemeData?,
+      ),
 
       // ----- Switch theme -----
       switchTheme: SwitchThemeData(

@@ -135,7 +135,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ShaderMask(
                   shaderCallback: (bounds) => AppColors.emeraldGradient.createShader(bounds),
                   child: const Text(
-                    'DRILLSARJ',
+                    'HABITDRILL',
                     style: TextStyle(fontSize: 44, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 4),
                   ),
                 ).animate(delay: 400.ms).fadeIn(duration: 600.ms),

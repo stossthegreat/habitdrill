@@ -230,7 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ShaderMask(
                   shaderCallback: (bounds) => AppColors.emeraldGradient.createShader(bounds),
                   child: const Text(
-                    'DRILLSARJ',
+                    'HABITDRILL',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w900,

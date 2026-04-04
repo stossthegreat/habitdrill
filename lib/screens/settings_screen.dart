@@ -167,7 +167,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           children: [
-            // Drillsarj Pro
+            // HabitDrill Pro
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(
                 fullscreenDialog: true,
@@ -202,7 +202,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('DRILLSARJ PRO', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald, letterSpacing: 1)),
+                          Text('HABITDRILL PRO', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald, letterSpacing: 1)),
                           Text('Unlock full enforcement', style: AppTextStyles.captionSmall.copyWith(color: AppColors.textSecondary)),
                         ],
                       ),
@@ -310,7 +310,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Text(
-                        'Drillsarj',
+                        'HabitDrill',
                         style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700),
                       ),
                     ],

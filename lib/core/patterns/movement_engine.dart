@@ -5,7 +5,7 @@ import 'push_pattern.dart';
 import 'high_knee_pattern.dart';
 import 'piston_pattern.dart';
 
-/// Pattern types for Drillsarj exercises
+/// Pattern types for HabitDrill exercises
 enum PatternType { squat, push, highKnee, piston }
 
 /// Exercise configuration
@@ -20,9 +20,9 @@ class ExerciseConfig {
 }
 
 /// =============================================================================
-/// MOVEMENT ENGINE - Master Controller (Drillsarj Edition)
+/// MOVEMENT ENGINE - Master Controller (HabitDrill Edition)
 /// =============================================================================
-/// Maps the 5 Drillsarj exercises to their pattern types.
+/// Maps the 5 HabitDrill exercises to their pattern types.
 /// Creates the right pattern instance for each exercise.
 /// =============================================================================
 
@@ -138,7 +138,7 @@ class MovementEngine {
   }
 
   /// ==========================================================================
-  /// EXERCISE DATABASE - Drillsarj exercises only
+  /// EXERCISE DATABASE - HabitDrill exercises only
   /// ==========================================================================
   static const Map<String, ExerciseConfig> exercises = {
 

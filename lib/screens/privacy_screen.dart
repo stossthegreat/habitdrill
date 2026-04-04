@@ -77,7 +77,7 @@ class PrivacyScreen extends StatelessWidget {
             _buildSection(
               '2. How We Use Your Information',
               'We use your information to:\n\n'
-              '• Provide and improve Drillsarj services\n'
+              '• Provide and improve HabitDrill services\n'
               '• Track your habits and exercise progress\n'
               '• Send alarm reminders and notifications\n'
               '• Ensure security and prevent fraud\n'
@@ -107,12 +107,12 @@ class PrivacyScreen extends StatelessWidget {
               '• Correct your information\n'
               '• Delete your account and all data\n'
               '• Opt out of notifications\n\n'
-              'Contact support@drillsarj.com to exercise these rights.',
+              'Contact support@habitdrill.com to exercise these rights.',
             ),
 
             _buildSection(
               '6. Children\'s Privacy',
-              'Drillsarj is not intended for users under 13 years of age. We do not knowingly collect personal information from children.',
+              'HabitDrill is not intended for users under 13 years of age. We do not knowingly collect personal information from children.',
             ),
 
             _buildSection(
@@ -123,7 +123,7 @@ class PrivacyScreen extends StatelessWidget {
             _buildSection(
               '8. Contact Us',
               'Questions about this Privacy Policy?\n\n'
-              'Email: privacy@drillsarj.com',
+              'Email: privacy@habitdrill.com',
             ),
 
             const SizedBox(height: AppSpacing.xl),

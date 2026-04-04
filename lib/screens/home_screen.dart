@@ -13,6 +13,7 @@ import '../screens/paywall_screen.dart';
 import '../providers/habit_provider.dart';
 import '../services/sergeant_service.dart';
 import '../services/discipline_service.dart';
+import '../services/premium_service.dart';
 import '../models/habit.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -77,6 +78,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   void _onDateSelected(DateTime date) {
     setState(() => _selectedDate = date);
+  }
+
+  /// Gate pro features - show paywall if not premium
+  Future<bool> _requirePro() async {
+    final isPro = await PremiumService.isPremium();
+    if (!isPro && mounted) {
+      Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen()));
+      return false;
+    }
+    return true;
   }
 
   void _showShareCard() {
@@ -271,7 +282,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
               child: GestureDetector(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const TemptedScreen())),
+                onTap: () async {
+                  if (!await _requirePro()) return;
+                  if (mounted) Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const TemptedScreen()));
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -406,6 +420,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       child: GestureDetector(
         onTap: () async {
           if (isBroken) return;
+          if (!await _requirePro()) return;
           final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
           if (violation != null && context.mounted) {
             Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
@@ -463,7 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             children: [
               ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.asset('assets/icon/app_icon.png', width: 36, height: 36, fit: BoxFit.cover)),
               const SizedBox(width: 8),
-              const Text('DRILLSARJ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2)),
+              const Text('HABITDRILL', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2)),
             ],
           ),
           Row(

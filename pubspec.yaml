@@ -1,5 +1,5 @@
-name: drillsarj
-description: Habit accountability app with a drill sergeant - no excuses, just results.
+name: habitdrill
+description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
 version: 1.0.0+506
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../design/tokens.dart';
+import '../services/premium_service.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -12,8 +13,8 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> {
-  static const String _monthlyId = 'drillsarj_pro_monthly';
-  static const String _yearlyId = 'drillsarj_pro_yearly';
+  static const String _monthlyId = 'habitdrill_pro_monthly';
+  static const String _yearlyId = 'habitdrill_pro_yearly';
 
   bool _yearly = false;
   bool _loading = false;
@@ -22,10 +23,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
-    _sub = InAppPurchase.instance.purchaseStream.listen((purchases) {
+    _sub = InAppPurchase.instance.purchaseStream.listen((purchases) async {
       for (final p in purchases) {
         if (p.status == PurchaseStatus.purchased || p.status == PurchaseStatus.restored) {
           InAppPurchase.instance.completePurchase(p);
+          await PremiumService.setPremium(true);
           if (mounted) Navigator.pop(context, true);
         } else if (p.status == PurchaseStatus.error) {
           if (mounted) setState(() => _loading = false);
@@ -88,7 +90,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               const SizedBox(height: 20),
 
               const Text(
-                'DRILLSARJ PRO',
+                'HABITDRILL PRO',
                 style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3),
               ).animate(delay: 200.ms).fadeIn(),
 

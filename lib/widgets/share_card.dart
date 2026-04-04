@@ -38,10 +38,10 @@ class ShareCard extends StatelessWidget {
       if (byteData == null) return;
 
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/drillsarj_stats.png');
+      final file = File('${dir.path}/habitdrill_stats.png');
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
-      await Share.shareXFiles([XFile(file.path)], text: 'My discipline score on Drillsarj');
+      await Share.shareXFiles([XFile(file.path)], text: 'My discipline score on HabitDrill');
     } catch (e) {
       debugPrint('Share error: $e');
     }
@@ -78,7 +78,7 @@ class ShareCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 const Text(
-                  'DRILLSARJ',
+                  'HABITDRILL',
                   style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 3),
                 ),
               ],
