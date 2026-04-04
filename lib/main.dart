@@ -20,6 +20,7 @@ import 'services/alarm_service.dart';
 import 'services/sergeant_service.dart';
 import 'services/retention_service.dart';
 import 'services/premium_service.dart';
+import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -105,6 +106,7 @@ class HabitDrillApp extends StatelessWidget {
       theme: _getSafeTheme(),
       home: const AppRouter(),
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [AnalyticsService.observer],
       routes: {
         '/settings': (context) => const SettingsScreen(),
         '/terms': (context) => const TermsScreen(),

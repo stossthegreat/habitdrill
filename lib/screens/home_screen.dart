@@ -14,6 +14,7 @@ import '../providers/habit_provider.dart';
 import '../services/sergeant_service.dart';
 import '../services/discipline_service.dart';
 import '../services/premium_service.dart';
+import '../services/analytics_service.dart';
 import '../models/habit.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -36,6 +37,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AnalyticsService.logScreenView('home');
     _loadDisciplineData();
     _runDailyCheck();
   }

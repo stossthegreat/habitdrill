@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../design/tokens.dart';
 import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/analytics_service.dart';
 import 'login_screen.dart';
 import '../main_screen.dart';
 import '../terms_screen.dart';
@@ -17,6 +18,12 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.logScreenView('signup');
+  }
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();

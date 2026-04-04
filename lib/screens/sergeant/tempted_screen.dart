@@ -7,6 +7,7 @@ import '../../models/exercise_set.dart';
 import '../../models/escalation_config.dart';
 import '../../models/violation.dart';
 import 'exercise_circuit_screen.dart';
+import '../../services/analytics_service.dart';
 
 /// When user feels tempted to break a bad habit, they can proactively
 /// do a workout to fight the urge. This is the POSITIVE path.
@@ -30,6 +31,7 @@ class _TemptedScreenState extends State<TemptedScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logScreenView('tempted');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _exercises = ExerciseSet.tempted().exercises;
     _initVideo();

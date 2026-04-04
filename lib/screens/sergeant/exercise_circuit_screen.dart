@@ -14,6 +14,7 @@ import '../../widgets/skeleton_painter.dart';
 import '../../widgets/power_gauge.dart';
 import '../../widgets/pt_setup_advice_screen.dart';
 import '../../services/sergeant_audio_service.dart';
+import '../../services/analytics_service.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
   final Violation violation;
@@ -55,6 +56,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logScreenView('exercise_circuit');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
     _exerciseSet = SergeantService.getExerciseSet(widget.violation);

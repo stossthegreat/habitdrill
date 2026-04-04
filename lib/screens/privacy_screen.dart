@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../design/tokens.dart';
+import '../services/analytics_service.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    AnalyticsService.logScreenView('privacy');
     return Scaffold(
       backgroundColor: AppColors.baseDark1,
       appBar: AppBar(

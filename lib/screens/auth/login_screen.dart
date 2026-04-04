@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../design/tokens.dart';
 import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/analytics_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../main_screen.dart';
@@ -19,6 +20,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.logScreenView('login');
+  }
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();

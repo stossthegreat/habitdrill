@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../design/tokens.dart';
 import '../widgets/glass_card.dart';
+import '../services/analytics_service.dart';
 
 class SupportScreen extends StatelessWidget {
   const SupportScreen({super.key});
@@ -20,6 +21,7 @@ class SupportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AnalyticsService.logScreenView('support');
     return Scaffold(
       backgroundColor: AppColors.baseDark1,
       appBar: AppBar(

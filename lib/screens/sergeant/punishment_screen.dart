@@ -7,6 +7,7 @@ import '../../design/tokens.dart';
 import '../../models/violation.dart';
 import '../../models/escalation_config.dart';
 import '../../services/sergeant_service.dart';
+import '../../services/analytics_service.dart';
 import 'exercise_circuit_screen.dart';
 
 class PunishmentScreen extends StatefulWidget {
@@ -33,6 +34,8 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logScreenView('punishment');
+    AnalyticsService.logPunishmentStarted(widget.violation.offenseNumber);
     // Lock to portrait, hide system UI for immersion
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _startDarkIntro();

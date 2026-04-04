@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../design/tokens.dart';
 import '../services/premium_service.dart';
+import '../services/analytics_service.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -23,6 +24,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logScreenView('paywall');
+    AnalyticsService.logPaywallViewed();
     _sub = InAppPurchase.instance.purchaseStream.listen((purchases) async {
       for (final p in purchases) {
         if (p.status == PurchaseStatus.purchased || p.status == PurchaseStatus.restored) {

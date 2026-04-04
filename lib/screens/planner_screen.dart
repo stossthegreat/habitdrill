@@ -13,6 +13,7 @@ import '../providers/habit_provider.dart';
 import '../models/habit.dart';
 import '../models/habit_system.dart';
 import '../services/local_storage.dart';
+import '../services/analytics_service.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
   const PlannerScreen({super.key});
@@ -46,6 +47,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen>
   @override
   void initState() {
     super.initState();
+    AnalyticsService.logScreenView('planner');
     _initializeScreen();
     // 2 tabs: Add New + Manage (start on Manage)
     _tabController = TabController(length: 2, vsync: this, initialIndex: 1);

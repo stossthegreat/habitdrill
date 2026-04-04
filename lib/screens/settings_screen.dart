@@ -7,6 +7,7 @@ import '../widgets/glass_card.dart';
 import '../widgets/glass_button.dart';
 import '../services/local_storage.dart';
 import '../providers/auth_provider.dart';
+import '../services/analytics_service.dart';
 import 'auth/login_screen.dart';
 import 'paywall_screen.dart';
 
@@ -18,6 +19,11 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AnalyticsService.logScreenView('settings');
+  }
 
   Future<void> _logout() async {
     final confirmed = await _showConfirmationDialog(
