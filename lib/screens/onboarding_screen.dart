@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../design/tokens.dart';
 import '../models/escalation_config.dart';
 import '../services/analytics_service.dart';
-import 'auth/login_screen.dart';
+import 'main_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -66,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setBool('seen_onboarding', true);
     if (mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const MainScreen()),
       );
     }
   }

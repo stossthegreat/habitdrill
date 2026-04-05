@@ -1,12 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 // Timezone init
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -22,7 +19,6 @@ import 'services/retention_service.dart';
 import 'services/premium_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
-import 'screens/auth/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/sergeant/punishment_screen.dart';
 import 'screens/settings_screen.dart';
@@ -44,56 +40,44 @@ Future<void> _initTimezone() async {
 }
 
 Future<void> main() async {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize Firebase
-    try {
-      await Firebase.initializeApp();
-      debugPrint('Firebase initialized');
-    } catch (e) {
-      debugPrint('Firebase initialization failed: $e');
+  // Initialize Firebase (for analytics)
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+  }
+
+  await _initTimezone();
+  await AlarmService.initialize();
+
+  try {
+    await Hive.initFlutter();
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(HabitAdapter());
     }
-
-    // Initialize timezone
-    await _initTimezone();
-
-    // Initialize alarm service
-    await AlarmService.initialize();
-    debugPrint('AlarmService initialized');
-
-    // Hive setup
-    try {
-      await Hive.initFlutter();
-      if (!Hive.isAdapterRegistered(0)) {
-        Hive.registerAdapter(HabitAdapter());
-      }
-      if (!Hive.isAdapterRegistered(1)) {
-        Hive.registerAdapter(ViolationAdapter());
-      }
-      await LocalStorageService.initialize();
-      await SergeantService.initialize();
-      await RetentionService.initialize();
-      await RetentionService.ensureScheduled();
-      debugPrint('Hive + SergeantService + Retention initialized');
-    } catch (e) {
-      debugPrint('Hive/Sync initialization failed: $e');
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(ViolationAdapter());
     }
+    await LocalStorageService.initialize();
+    await SergeantService.initialize();
+    await RetentionService.initialize();
+    await RetentionService.ensureScheduled();
+  } catch (e) {
+    debugPrint('Init failed: $e');
+  }
 
-    // System UI
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-    );
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
 
-    runApp(const ProviderScope(child: HabitDrillApp()));
-  }, (error, stack) {
-    debugPrint('Fatal error: $error\n$stack');
-  });
+  runApp(const ProviderScope(child: HabitDrillApp()));
 }
 
 class HabitDrillApp extends StatelessWidget {
@@ -120,15 +104,12 @@ class HabitDrillApp extends StatelessWidget {
     try {
       return AppTheme.darkTheme;
     } catch (e) {
-      debugPrint('Custom theme failed, using fallback: $e');
-      return ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: Colors.black,
-        primaryColor: Colors.blue,
-      );
+      return ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black);
     }
   }
 }
 
+/// Flow: Loading → Onboarding (once) → PunishmentGate → Home
 class AppRouter extends StatefulWidget {
   const AppRouter({super.key});
 
@@ -137,152 +118,39 @@ class AppRouter extends StatefulWidget {
 }
 
 class _AppRouterState extends State<AppRouter> {
-  bool _isAuthenticated = false;
   bool _isLoading = true;
   bool _needsOnboarding = false;
-  String _errorMessage = '';
-  StreamSubscription<User?>? _authStateSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkAppState();
-    _listenToAuthChanges();
-  }
-
-  @override
-  void dispose() {
-    _authStateSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _listenToAuthChanges() {
-    try {
-      _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-        debugPrint('Auth state changed: ${user?.uid ?? "null"}');
-        if (mounted) {
-          // Also check guest user (skip for now)
-          bool authed = user != null;
-          if (!authed) {
-            final prefs = await SharedPreferences.getInstance();
-            final guestId = prefs.getString('user_id');
-            authed = guestId != null && guestId.isNotEmpty;
-          }
-          setState(() {
-            _isAuthenticated = authed;
-          });
-        }
-      });
-    } catch (e) {
-      debugPrint('Could not listen to auth changes: $e');
-    }
   }
 
   Future<void> _checkAppState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      bool isAuthenticated = false;
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        isAuthenticated = user != null;
-      } catch (e) {
-        debugPrint('Firebase Auth not available: $e');
-        final userId = prefs.getString('user_id');
-        isAuthenticated = userId != null && userId.isNotEmpty;
-      }
+    final prefs = await SharedPreferences.getInstance();
+    final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
 
-      // Check onboarding
-      final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
-
-      if (!mounted) return;
-      setState(() {
-        _isAuthenticated = isAuthenticated;
-        _needsOnboarding = !seenOnboarding;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('App state check error: $e');
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _needsOnboarding = !seenOnboarding;
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Error state
-    if (_errorMessage.isNotEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 20),
-                const Text(
-                  'Initialization Error',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _errorMessage,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _errorMessage = '';
-                      _isLoading = true;
-                    });
-                    _checkAppState();
-                  },
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Loading state
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: Colors.blue),
-              SizedBox(height: 20),
-              Text(
-                'Loading HabitDrill...',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ],
-          ),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
-    // Onboarding (first launch)
     if (_needsOnboarding) {
       return const OnboardingScreen();
     }
 
-    // Show login if not authenticated
-    if (!_isAuthenticated) {
-      return const LoginScreen();
-    }
-
-    // Punishment gate - check for pending violations
     return const PunishmentGate();
   }
 }
@@ -320,14 +188,11 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   void _checkForPunishment() async {
-    // Only pro users get punishment system
     final isPro = await PremiumService.isPremium();
     if (!isPro) return;
 
-    // Scan for overdue orders today (time passed + 30min grace)
     await SergeantService.scanForOverdueToday();
 
-    // Check if any violations need punishment
     final violation = SergeantService.getWorstPendingViolation();
     if (violation != null && mounted) {
       setState(() {

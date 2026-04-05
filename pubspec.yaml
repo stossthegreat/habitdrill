@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.0+512
+version: 1.0.0+513
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -16,11 +16,7 @@ dependencies:
 
   # Firebase & Authentication
   firebase_core: ^3.1.0
-  firebase_auth: ^5.1.0
-  firebase_messaging: ^15.0.0
   firebase_analytics: ^11.4.2
-  google_sign_in: ^6.2.1
-  sign_in_with_apple: ^6.1.0
 
   # Local Storage
   hive: ^2.2.3
