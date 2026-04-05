@@ -3,7 +3,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 /// Plays drill sergeant voice clips at exactly the right moments.
-/// All clips are pre-recorded in assets/audio/sergeant/.
+/// Numbered clips 1-30 = rep count announcements. Played IN ORDER.
 class SergeantAudioService {
   static final AudioPlayer _player = AudioPlayer();
   static final Random _random = Random();
@@ -24,7 +24,7 @@ class SergeantAudioService {
   static const String _countdownClip = 'assets/audio/sergeant/countdown.mp3';
   static const String _circuitCompleteClip = 'assets/audio/sergeant/curcuits_complete.mp3';
 
-  // ==================== NAMED BARK CLIPS ====================
+  // ==================== NAMED BARK CLIPS (random between reps) ====================
   static const List<String> _namedBarks = [
     'assets/audio/sergeant/move_it.mp3',
     'assets/audio/sergeant/pathetic.mp3',
@@ -35,34 +35,18 @@ class SergeantAudioService {
     'assets/audio/sergeant/younever_learn.mp3',
   ];
 
-  // ==================== NUMBERED CLIPS (1-30) ====================
-  // Random barks to play between reps
-  static String _numberedClip(int n) => 'assets/audio/sergeant/${n.clamp(1, 30)}.mp3';
-
-  // All random clips combined (named + numbered)
-  static List<String> get _allRandomBarks {
-    final list = <String>[..._namedBarks];
-    for (int i = 1; i <= 30; i++) {
-      list.add(_numberedClip(i));
-    }
-    return list;
-  }
-
-  // Track what we've played to avoid repeats
   static int _lastBarkIndex = -1;
 
-  // ==================== PLAY METHODS ====================
+  // ==================== PLAY ====================
 
-  /// Play a clip from assets. Non-blocking, skips if already playing.
   static Future<void> _play(String assetPath) async {
-    if (_isPlaying) return; // Don't overlap
+    if (_isPlaying) return;
     try {
       _isPlaying = true;
       await _player.play(AssetSource(assetPath.replaceFirst('assets/', '')));
       _player.onPlayerComplete.listen((_) {
         _isPlaying = false;
       });
-      // Safety timeout - mark not playing after 4s max
       Future.delayed(const Duration(seconds: 4), () {
         _isPlaying = false;
       });
@@ -75,80 +59,72 @@ class SergeantAudioService {
   /// Play exercise start announcement
   static Future<void> playExerciseStart(String exerciseId) async {
     final clip = _exerciseStartClips[exerciseId];
-    if (clip != null) {
-      await _play(clip);
+    if (clip != null) await _play(clip);
+  }
+
+  /// Play the rep count number: 1.mp3 for rep 1, 2.mp3 for rep 2, etc.
+  /// Only works for reps 1-30. Above 30 plays a random bark instead.
+  static Future<void> playRepNumber(int repNumber) async {
+    if (repNumber >= 1 && repNumber <= 30) {
+      await _play('assets/audio/sergeant/$repNumber.mp3');
+    } else {
+      await _playRandomBark();
     }
   }
 
-  /// Play countdown (5-4-3-2-1-GO)
-  static Future<void> playCountdown() async {
-    await _play(_countdownClip);
-  }
-
-  /// Play halfway milestone
-  static Future<void> playHalfway() async {
-    await _play(_halfwayClip);
-  }
-
-  /// Play last rep milestone
-  static Future<void> playLastRep() async {
-    await _play(_lastRepClip);
-  }
-
-  /// Play circuit complete
-  static Future<void> playCircuitComplete() async {
-    await _play(_circuitCompleteClip);
-  }
-
-  /// Play a random bark (during reps). Never repeats the same one twice in a row.
-  static Future<void> playRandomBark() async {
-    final barks = _allRandomBarks;
+  /// Play a random named bark (not a number)
+  static Future<void> _playRandomBark() async {
     int idx;
     do {
-      idx = _random.nextInt(barks.length);
-    } while (idx == _lastBarkIndex && barks.length > 1);
+      idx = _random.nextInt(_namedBarks.length);
+    } while (idx == _lastBarkIndex && _namedBarks.length > 1);
     _lastBarkIndex = idx;
-    await _play(barks[idx]);
+    await _play(_namedBarks[idx]);
   }
 
-  /// Called every rep to decide what to play
+  static Future<void> playHalfway() async => await _play(_halfwayClip);
+  static Future<void> playLastRep() async => await _play(_lastRepClip);
+  static Future<void> playCountdown() async => await _play(_countdownClip);
+  static Future<void> playCircuitComplete() async => await _play(_circuitCompleteClip);
+
+  /// Called every rep. Plays the right audio at the right time.
+  /// Rep 1 = "1!", Rep 2 = "2!", etc.
+  /// Halfway = halfway clip. Last rep = last rep clip.
+  /// Every few reps a random bark for intensity.
   static Future<void> onRepCounted({
     required int currentRep,
     required int targetReps,
     required String exerciseId,
   }) async {
-    // Last rep
-    if (currentRep == targetReps) {
-      // Don't play anything - exercise is done, start clip for next will play
-      return;
-    }
+    // Exercise complete - don't play, next exercise start clip will play
+    if (currentRep >= targetReps) return;
 
-    // Last rep coming
+    // Second to last rep
     if (currentRep == targetReps - 1) {
       await playLastRep();
       return;
     }
 
-    // Halfway
+    // Halfway point
     if (currentRep == (targetReps / 2).round() && targetReps >= 6) {
       await playHalfway();
       return;
     }
 
-    // Random bark every 3rd rep (keeps intensity without overwhelming)
-    if (currentRep > 0 && currentRep % 3 == 0) {
-      await playRandomBark();
-      return;
+    // Every rep: play the rep number (1.mp3, 2.mp3, 3.mp3...)
+    // But every 5th rep, play a random bark instead for variety
+    if (currentRep > 0 && currentRep % 5 == 0) {
+      await _playRandomBark();
+    } else {
+      await playRepNumber(currentRep);
     }
   }
 
-  /// Stop everything
   static Future<void> stop() async {
     await _player.stop();
     _isPlaying = false;
   }
 
-  /// Dispose
   static Future<void> dispose() async {
     await _player.dispose();
   }

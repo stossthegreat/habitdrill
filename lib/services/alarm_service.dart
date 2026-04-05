@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -33,10 +34,13 @@ class AlarmService {
 
       // Request permissions
       final notifStatus = await Permission.notification.request();
-      debugPrint('📱 Notification permission: $notifStatus');
+      debugPrint('Notification permission: $notifStatus');
 
-      final alarmStatus = await Permission.scheduleExactAlarm.request();
-      debugPrint('⏰ Exact alarm permission: $alarmStatus');
+      // Exact alarm permission is Android-only
+      if (Platform.isAndroid) {
+        final alarmStatus = await Permission.scheduleExactAlarm.request();
+        debugPrint('Exact alarm permission: $alarmStatus');
+      }
 
       // Initialize notification plugin
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
