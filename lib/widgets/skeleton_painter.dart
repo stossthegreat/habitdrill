@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -86,10 +87,26 @@ class SkeletonPainter extends CustomPainter {
       return null;
     }
 
-    // Raw screen position
-    double x = lm.x * size.width / imageSize.width;
-    double y = lm.y * size.height / imageSize.height;
-    if (isFrontCamera) x = size.width - x;
+    // Raw screen position - platform specific
+    double x, y;
+    if (Platform.isIOS) {
+      // iOS: sensor reports landscape dimensions in portrait mode
+      // Swap and use aspect-fill scaling. No front camera mirror (iOS does it).
+      final double inputW = imageSize.height;
+      final double inputH = imageSize.width;
+      final double scaleX = size.width / inputW;
+      final double scaleY = size.height / inputH;
+      final double scale = math.max(scaleX, scaleY);
+      final double offsetX = (size.width - inputW * scale) / 2;
+      final double offsetY = (size.height - inputH * scale) / 2;
+      x = lm.x * scale + offsetX;
+      y = lm.y * scale + offsetY;
+    } else {
+      // Android: direct scaling + front camera mirror
+      x = lm.x * size.width / imageSize.width;
+      y = lm.y * size.height / imageSize.height;
+      if (isFrontCamera) x = size.width - x;
+    }
     final raw = Offset(x, y);
 
     // Blend with previous position (visual smoothing only)

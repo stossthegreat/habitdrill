@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -84,7 +85,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
         frontCamera,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
+        imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
       );
 
       await _cameraController!.initialize();
@@ -273,10 +274,15 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
             CustomPaint(
               painter: SkeletonPainter(
                 landmarks: _landmarks,
-                imageSize: Size(
-                  _cameraController!.value.previewSize?.height ?? 480,
-                  _cameraController!.value.previewSize?.width ?? 640,
-                ),
+                imageSize: Platform.isAndroid
+                    ? Size(
+                        _cameraController!.value.previewSize?.height ?? 480,
+                        _cameraController!.value.previewSize?.width ?? 640,
+                      )
+                    : Size(
+                        _cameraController!.value.previewSize?.width ?? 480,
+                        _cameraController!.value.previewSize?.height ?? 640,
+                      ),
                 isFrontCamera: true,
                 chargeProgress: _chargeProgress,
               ),
