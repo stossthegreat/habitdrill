@@ -74,13 +74,12 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
       }
     } catch (e) {
       debugPrint('Video not available: $e');
-      // Skip to voice/exercise phase if no video
+      // Skip straight to exercises if no video
       if (mounted) {
         setState(() {
           _videoError = true;
-          _phase = _Phase.voice;
+          _phase = _Phase.exercises;
         });
-        _startVoicePhase();
       }
     }
   }
@@ -100,8 +99,8 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
   }
 
   void _startVoicePhase() {
-    // Show punishment message, then move to exercises
-    Future.delayed(const Duration(seconds: 4), () {
+    // Go straight to exercises after brief pause
+    Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         setState(() => _phase = _Phase.exercises);
       }

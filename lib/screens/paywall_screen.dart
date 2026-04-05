@@ -166,11 +166,33 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: Text('Restore purchases', style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white24)),
               ),
 
+              const SizedBox(height: 12),
+
+              // Legal links - required by App Store
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/terms'),
+                    child: Text('Terms of Use', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white38)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('|', style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 12)),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                    child: Text('Privacy Policy', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white38)),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 8),
 
               Text(
-                'Auto-renews. Cancel anytime.',
-                style: TextStyle(color: Colors.white.withOpacity(0.1), fontSize: 11),
+                'Payment charged to your Apple ID or Google Play account. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Cancel anytime in device settings.',
+                style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10, height: 1.4),
+                textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 24),

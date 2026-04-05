@@ -39,6 +39,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>HabitDrill needs camera access for AI exercise tracking during workouts.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HabitDrill may use microphone for workout audio features.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>HabitDrill needs notifications to remind you about your orders and enforce discipline.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

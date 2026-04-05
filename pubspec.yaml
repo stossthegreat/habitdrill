@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.0+510
+version: 1.0.0+511
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -42,16 +42,7 @@ dependencies:
   http: ^1.2.1
   audioplayers: ^5.2.1
   
-  # Cinematic UI Audio & Animation
-  just_audio: ^0.10.5
-  audio_session: ^0.2.2
-  flutter_tts: ^4.2.3
-  lottie: ^3.3.2
   share_plus: ^12.0.1
-  
-  # Speech & Audio Recording
-  record: 
-    ^5.0.0
   path_provider: ^2.1.0
 
   # UI & Icons
@@ -120,7 +111,3 @@ flutter_launcher_icons:
   
   # iOS specific  
   remove_alpha_ios: true
-
-dependency_overrides:
-  # Fix record_linux compatibility issue for builds
-  record_linux: ^1.0.0
