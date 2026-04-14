@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,44 +43,80 @@ Future<void> _initTimezone() async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Catch any uncaught zone errors so the app never dies at launch
+  // (this matters for App Review on iPad where unexpected viewport / plugin
+  // edge cases can otherwise surface a red Flutter error screen).
+  await runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase (for analytics)
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint('Firebase init failed: $e');
-  }
+    // Replace Flutter's default red error screen with a safe black fallback
+    // so a single widget exception never blocks app launch (Apple flags this
+    // as "displayed an error message at launch").
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint('ErrorWidget caught: ${details.exception}');
+      return const ColoredBox(color: Colors.black);
+    };
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exception}');
+    };
+    PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+      debugPrint('PlatformDispatcher error: $error');
+      return true;
+    };
 
-  await _initTimezone();
-  await AlarmService.initialize();
-
-  try {
-    await Hive.initFlutter();
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(HabitAdapter());
+    // Initialize Firebase (for analytics)
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase init failed: $e');
     }
-    if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(ViolationAdapter());
+
+    try {
+      await _initTimezone();
+    } catch (e) {
+      debugPrint('Timezone init failed: $e');
     }
-    await LocalStorageService.initialize();
-    await SergeantService.initialize();
-    await RetentionService.initialize();
-    await RetentionService.ensureScheduled();
-  } catch (e) {
-    debugPrint('Init failed: $e');
-  }
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
+    try {
+      await AlarmService.initialize();
+    } catch (e) {
+      debugPrint('AlarmService init failed: $e');
+    }
 
-  runApp(const ProviderScope(child: HabitDrillApp()));
+    try {
+      await Hive.initFlutter();
+      if (!Hive.isAdapterRegistered(0)) {
+        Hive.registerAdapter(HabitAdapter());
+      }
+      if (!Hive.isAdapterRegistered(1)) {
+        Hive.registerAdapter(ViolationAdapter());
+      }
+      await LocalStorageService.initialize();
+      await SergeantService.initialize();
+      await RetentionService.initialize();
+      await RetentionService.ensureScheduled();
+    } catch (e) {
+      debugPrint('Init failed: $e');
+    }
+
+    try {
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+      );
+    } catch (e) {
+      debugPrint('System UI overlay setup failed: $e');
+    }
+
+    runApp(const ProviderScope(child: HabitDrillApp()));
+  }, (Object error, StackTrace stack) {
+    debugPrint('Uncaught zone error: $error');
+  });
 }
 
 class HabitDrillApp extends StatelessWidget {
