@@ -104,7 +104,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
               ).animate(delay: 300.ms).fadeIn(),
 
-              const SizedBox(height: 36),
+              const SizedBox(height: 28),
 
               // Features
               _feature('Drill sergeant punishment videos', 0),
@@ -135,6 +135,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text('Save 50%', style: TextStyle(color: AppColors.emerald, fontSize: 12, fontWeight: FontWeight.w700)),
                 ),
+
+              const SizedBox(height: 12),
+
+              // Required subscription disclosure (Apple Guideline 3.1.2):
+              // title, length, price, and auto-renew terms must be visible.
+              Text(
+                _yearly
+                    ? 'HabitDrill Pro — Annual Subscription\n12 months • \$29.99 (\$2.50/month) • auto-renews yearly'
+                    : 'HabitDrill Pro — Monthly Subscription\n1 month • \$4.99 • auto-renews monthly',
+                style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
 
               const SizedBox(height: 20),
 
@@ -168,30 +180,48 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               const SizedBox(height: 12),
 
-              // Legal links - required by App Store
+              // Legal links - required by App Store (Guideline 3.1.2)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/terms'),
-                    child: Text('Terms of Use', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white38)),
+                    child: Text(
+                      'Terms of Use (EULA)',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white70,
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('|', style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 12)),
+                    child: Text('|', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13)),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/privacy'),
-                    child: Text('Privacy Policy', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white38)),
+                    child: Text(
+                      'Privacy Policy',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white70,
+                      ),
+                    ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
               Text(
-                'Payment charged to your Apple ID or Google Play account. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period. Cancel anytime in device settings.',
-                style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10, height: 1.4),
+                'Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period. You can manage and cancel your subscription in your App Store account settings after purchase.',
+                style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10, height: 1.4),
                 textAlign: TextAlign.center,
               ),
 
