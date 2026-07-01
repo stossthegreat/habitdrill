@@ -107,8 +107,16 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
     });
   }
 
+  bool _completing = false;
+
   void _onExercisesComplete() async {
-    await SergeantService.clearAllPending();
+    if (_completing) return;
+    _completing = true;
+    try {
+      await SergeantService.clearAllPending();
+    } catch (e) {
+      debugPrint('clearAllPending failed: $e');
+    }
     if (mounted) {
       widget.onComplete();
     }

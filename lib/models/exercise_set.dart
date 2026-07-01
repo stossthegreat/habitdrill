@@ -64,7 +64,6 @@ class ExerciseSet {
         Exercise(name: 'Burpees', engineId: 'burpees', emoji: '\u{1F4A5}', reps: reps),
         Exercise(name: 'High Knees', engineId: 'high_knees', emoji: '\u{1F3C3}', reps: reps),
         Exercise(name: 'Push-ups', engineId: 'push_ups', emoji: '\u{1F4AA}', reps: reps),
-        Exercise(name: 'Jumping Jacks', engineId: 'jumping_jacks', emoji: '\u{2B50}', reps: reps),
       ],
       escalationLevel: level,
       offenseNumber: offenseNumber,

@@ -14,7 +14,6 @@ class SergeantAudioService {
     'burpees': 'assets/audio/sergeant/burpees_now.mp3',
     'high_knees': 'assets/audio/sergeant/high_knees.mp3',
     'push_ups': 'assets/audio/sergeant/pushups_now.mp3',
-    'jumping_jacks': 'assets/audio/sergeant/jumpingjacks_now.mp3',
   };
 
   static const String _halfwayClip = 'assets/audio/sergeant/halfway.mp3';

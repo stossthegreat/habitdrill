@@ -227,9 +227,20 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
       SergeantAudioService.playCircuitComplete();
       setState(() => _showComplete = true);
       Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) widget.onComplete();
+        if (mounted && !_finished) {
+          _finished = true;
+          widget.onComplete();
+        }
       });
     }
+  }
+
+  bool _finished = false;
+
+  void _finishNow() {
+    if (_finished) return;
+    _finished = true;
+    widget.onComplete();
   }
 
   /// Fallback: manual tap to count rep (when camera unavailable)
@@ -551,27 +562,44 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   Widget _buildDismissed() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_outline, size: 80, color: AppColors.emerald)
-                .animate().scale(
-                  begin: const Offset(0.5, 0.5),
-                  end: const Offset(1, 1),
-                  duration: 400.ms,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _finishNow,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle_outline, size: 80, color: AppColors.emerald)
+                  .animate().scale(
+                    begin: const Offset(0.5, 0.5),
+                    end: const Offset(1, 1),
+                    duration: 400.ms,
+                  ),
+              const SizedBox(height: 24),
+              const Text(
+                'PUNISHMENT COMPLETE.',
+                style: TextStyle(color: AppColors.emerald, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
+              ).animate(delay: 200.ms).fadeIn(),
+              const SizedBox(height: 12),
+              Text(
+                'Don\'t fail again.',
+                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600),
+              ).animate(delay: 500.ms).fadeIn(),
+              const SizedBox(height: 48),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.emerald,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 4))],
                 ),
-            const SizedBox(height: 24),
-            const Text(
-              'PUNISHMENT COMPLETE.',
-              style: TextStyle(color: AppColors.emerald, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 3),
-            ).animate(delay: 200.ms).fadeIn(),
-            const SizedBox(height: 12),
-            Text(
-              'Don\'t fail again.',
-              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600),
-            ).animate(delay: 500.ms).fadeIn(),
-          ],
+                child: const Text(
+                  'RETURN TO BASE',
+                  style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
+                ),
+              ).animate(delay: 800.ms).fadeIn(),
+            ],
+          ),
         ),
       ),
     );

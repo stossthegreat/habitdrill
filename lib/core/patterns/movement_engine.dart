@@ -163,16 +163,5 @@ class MovementEngine {
       'cueGood': 'Good!',
       'cueBad': 'Lower!',
     }),
-
-    // Jumping Jacks - piston pattern (ankle spread tracking)
-    'jumping_jacks': ExerciseConfig(patternType: PatternType.piston, params: {
-      'pointA': PoseLandmarkType.leftAnkle,
-      'pointB': PoseLandmarkType.rightAnkle,
-      'mode': PistonMode.grow,
-      'triggerPercent': 1.80,
-      'resetPercent': 1.30,
-      'cueGood': 'Jump!',
-      'cueBad': 'Wider!',
-    }),
   };
 }
