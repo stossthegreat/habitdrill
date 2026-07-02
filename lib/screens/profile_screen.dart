@@ -1,8 +1,8 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _share() async {
+    HapticFeedback.mediumImpact();
     try {
       final boundary = _shareKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return;
@@ -79,11 +80,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: _snap == null
             ? const Center(child: CircularProgressIndicator(color: AppColors.emerald))
             : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const _Header(),
-                    _RankBadge(rank: _snap!.rank),
+                    _RankBadge(
+                      rank: _snap!.rank,
+                      daysSinceStart: _snap!.daysSinceStart,
+                    ),
                     const SizedBox(height: 24),
                     _StatBlock(
                       snap: _snap!,
@@ -164,58 +169,168 @@ class _Header extends StatelessWidget {
 
 class _RankBadge extends StatelessWidget {
   final String rank;
-  const _RankBadge({required this.rank});
+  final int daysSinceStart;
+  const _RankBadge({required this.rank, required this.daysSinceStart});
 
   @override
   Widget build(BuildContext context) {
+    final serial = daysSinceStart.toString().padLeft(6, '0');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0A0F0D), Color(0xFF0B0B0B)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF080A08), Color(0xFF0B100D), Color(0xFF080A08)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: AppColors.emerald.withOpacity(0.45), width: 1.5),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.emerald.withOpacity(0.18),
+                blurRadius: 50,
+                spreadRadius: -12,
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.emerald.withOpacity(0.35), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.emerald.withOpacity(0.12),
-              blurRadius: 40,
-              spreadRadius: -8,
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Text(
-              'RANK',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 4,
+          child: Stack(
+            children: [
+              const Positioned.fill(child: _BadgeGlow()),
+              Positioned.fill(child: CustomPaint(painter: _BadgeReticlePainter())),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white.withOpacity(0.18), width: 1),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        'RANK · #$serial',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3.5,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _MonumentalRank(rank: rank),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(width: 18, height: 1, color: Colors.white.withOpacity(0.15)),
+                        const SizedBox(width: 10),
+                        Text(
+                          'DAY $daysSinceStart',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(width: 18, height: 1, color: Colors.white.withOpacity(0.15)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              rank,
-              style: const TextStyle(
-                color: AppColors.emerald,
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 5,
-                height: 1,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0);
+    ).animate(delay: 100.ms).fadeIn(duration: 500.ms).slideY(begin: 0.08, end: 0);
   }
+}
+
+class _MonumentalRank extends StatelessWidget {
+  final String rank;
+  const _MonumentalRank({required this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final words = rank.split(' ');
+    return Column(
+      children: [
+        for (int i = 0; i < words.length; i++)
+          Text(
+            words[i],
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.emerald,
+              fontSize: words.length > 1 ? 40 : 44,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 5,
+              height: 0.95,
+              shadows: [
+                Shadow(color: AppColors.emerald.withOpacity(0.6), blurRadius: 24),
+              ],
+            ),
+          ).animate(delay: (300 + i * 100).ms).fadeIn(duration: 500.ms).then().shimmer(
+                duration: 2400.ms,
+                color: Colors.white.withOpacity(0.6),
+                delay: 1200.ms,
+              ),
+      ],
+    );
+  }
+}
+
+class _BadgeGlow extends StatelessWidget {
+  const _BadgeGlow();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.4),
+          radius: 0.9,
+          colors: [
+            AppColors.emerald.withOpacity(0.18),
+            AppColors.emerald.withOpacity(0.03),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.4, 1.0],
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgeReticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.emerald.withOpacity(0.7)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const inset = 10.0;
+    const bracket = 16.0;
+    canvas.drawLine(Offset(inset, inset + bracket), Offset(inset, inset), paint);
+    canvas.drawLine(Offset(inset, inset), Offset(inset + bracket, inset), paint);
+    canvas.drawLine(Offset(size.width - inset - bracket, inset), Offset(size.width - inset, inset), paint);
+    canvas.drawLine(Offset(size.width - inset, inset), Offset(size.width - inset, inset + bracket), paint);
+    canvas.drawLine(Offset(inset, size.height - inset - bracket), Offset(inset, size.height - inset), paint);
+    canvas.drawLine(Offset(inset, size.height - inset), Offset(inset + bracket, size.height - inset), paint);
+    canvas.drawLine(Offset(size.width - inset - bracket, size.height - inset), Offset(size.width - inset, size.height - inset), paint);
+    canvas.drawLine(Offset(size.width - inset, size.height - inset), Offset(size.width - inset, size.height - inset - bracket), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StatBlock extends StatelessWidget {
@@ -242,15 +357,15 @@ class _StatBlock extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(
           children: [
-            _Row(label: 'Honour', value: snap.honour.toString(), valueColor: AppColors.amber),
-            _Row(label: 'Discipline Score', value: _fmt(snap.disciplineScore), valueColor: AppColors.emerald),
-            _Row(label: 'Current Streak', value: '$currentStreak Days'),
-            _Row(label: 'Longest Contract', value: '$longestContract Days'),
-            _Row(label: 'Total Debt Paid', value: '${_fmt(snap.totalReps)} Reps', last: true),
+            _AnimatedRow(label: 'Honour', value: snap.honour, valueColor: AppColors.amber),
+            _AnimatedRow(label: 'Discipline Score', value: snap.disciplineScore, valueColor: AppColors.emerald, format: _fmt),
+            _AnimatedRow(label: 'Current Streak', value: currentStreak, suffix: ' Days'),
+            _AnimatedRow(label: 'Longest Contract', value: longestContract, suffix: ' Days'),
+            _AnimatedRow(label: 'Total Debt Paid', value: snap.totalReps, suffix: ' Reps', format: _fmt, last: true),
           ],
         ),
       ),
-    );
+    ).animate(delay: 300.ms).fadeIn(duration: 400.ms);
   }
 
   static String _fmt(int n) {
@@ -264,16 +379,20 @@ class _StatBlock extends StatelessWidget {
   }
 }
 
-class _Row extends StatelessWidget {
+class _AnimatedRow extends StatelessWidget {
   final String label;
-  final String value;
+  final int value;
   final Color valueColor;
+  final String suffix;
+  final String Function(int)? format;
   final bool last;
 
-  const _Row({
+  const _AnimatedRow({
     required this.label,
     required this.value,
     this.valueColor = Colors.white,
+    this.suffix = '',
+    this.format,
     this.last = false,
   });
 
@@ -298,15 +417,23 @@ class _Row extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              fontFamily: 'monospace',
-              letterSpacing: 0.5,
-            ),
+          TweenAnimationBuilder<int>(
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            tween: IntTween(begin: 0, end: value),
+            builder: (context, v, _) {
+              final str = format != null ? format!(v) : v.toString();
+              return Text(
+                '$str$suffix',
+                style: TextStyle(
+                  color: valueColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -346,6 +473,10 @@ class _SharePreview extends StatelessWidget {
                     letterSpacing: 4,
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(height: 1, color: Colors.white.withOpacity(0.06)),
+                ),
               ],
             ),
           ),
@@ -363,7 +494,7 @@ class _SharePreview extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ).animate(delay: 500.ms).fadeIn(duration: 500.ms).slideY(begin: 0.03, end: 0);
   }
 }
 
@@ -377,15 +508,15 @@ class _ShareButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
           gradient: AppColors.emeraldGradient,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: AppColors.emerald.withOpacity(0.3),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
+              color: AppColors.emerald.withOpacity(0.35),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -396,10 +527,10 @@ class _ShareButton extends StatelessWidget {
             color: Colors.black,
             fontSize: 14,
             fontWeight: FontWeight.w900,
-            letterSpacing: 3,
+            letterSpacing: 3.5,
           ),
         ),
       ),
-    );
+    ).animate(delay: 700.ms).fadeIn(duration: 400.ms);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../design/tokens.dart';
 import '../models/contract.dart';
@@ -36,6 +37,7 @@ class _NewContractScreenState extends State<NewContractScreen> {
 
   Future<void> _sign() async {
     if (_saving) return;
+    HapticFeedback.mediumImpact();
     String title;
     String emoji;
     int? targetDays;
