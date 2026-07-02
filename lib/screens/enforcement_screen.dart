@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../design/tokens.dart';
@@ -44,6 +45,7 @@ class _EnforcementScreenState extends State<EnforcementScreen> with WidgetsBindi
   }
 
   Future<void> _startPunishment(Violation v) async {
+    HapticFeedback.heavyImpact();
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PunishmentScreen(

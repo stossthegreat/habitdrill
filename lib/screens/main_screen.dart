@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -37,12 +38,19 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 
   void _openPlanner() {
+    HapticFeedback.mediumImpact();
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (context) => const PlannerScreen(),
       ),
     );
+  }
+
+  void _selectTab(int i) {
+    if (i == _tab) return;
+    HapticFeedback.selectionClick();
+    setState(() => _tab = i);
   }
 
   @override
@@ -67,10 +75,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
       ),
       floatingActionButton: _tab == 0 ? _buildFAB() : null,
-      bottomNavigationBar: _NavBar(
-        current: _tab,
-        onSelect: (i) => setState(() => _tab = i),
-      ),
+      bottomNavigationBar: _NavBar(current: _tab, onSelect: _selectTab),
     );
   }
 
@@ -95,28 +100,69 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const items = <_NavItemData>[
+      _NavItemData(icon: LucideIcons.target, label: 'TODAY'),
+      _NavItemData(icon: LucideIcons.scroll, label: 'CONTRACTS'),
+      _NavItemData(icon: LucideIcons.skull, label: 'DEBT'),
+      _NavItemData(icon: LucideIcons.bookOpen, label: 'LEDGER'),
+      _NavItemData(icon: LucideIcons.user, label: 'PROFILE'),
+    ];
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF050505),
+        color: const Color(0xFF040404),
         border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1)),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 62,
-          child: Row(
+          height: 66,
+          child: Stack(
             children: [
-              _NavItem(icon: LucideIcons.target, label: 'TODAY', selected: current == 0, onTap: () => onSelect(0)),
-              _NavItem(icon: LucideIcons.scroll, label: 'CONTRACTS', selected: current == 1, onTap: () => onSelect(1)),
-              _NavItem(icon: LucideIcons.skull, label: 'DEBT', selected: current == 2, onTap: () => onSelect(2)),
-              _NavItem(icon: LucideIcons.bookOpen, label: 'LEDGER', selected: current == 3, onTap: () => onSelect(3)),
-              _NavItem(icon: LucideIcons.user, label: 'PROFILE', selected: current == 4, onTap: () => onSelect(4)),
+              // Animated top indicator that slides between items
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment(-1 + (current * 2 / (items.length - 1)), -1),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / items.length,
+                  child: Center(
+                    child: Container(
+                      width: 26,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: AppColors.emerald,
+                        borderRadius: BorderRadius.circular(1),
+                        boxShadow: [
+                          BoxShadow(color: AppColors.emerald.withOpacity(0.7), blurRadius: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (int i = 0; i < items.length; i++)
+                    _NavItem(
+                      icon: items[i].icon,
+                      label: items[i].label,
+                      selected: current == i,
+                      onTap: () => onSelect(i),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _NavItemData {
+  final IconData icon;
+  final String label;
+  const _NavItemData({required this.icon, required this.label});
 }
 
 class _NavItem extends StatelessWidget {
@@ -134,7 +180,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.emerald : Colors.white.withOpacity(0.35);
+    final color = selected ? AppColors.emerald : Colors.white.withOpacity(0.32);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -142,8 +188,18 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.emerald.withOpacity(0.1) : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(

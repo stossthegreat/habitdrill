@@ -350,21 +350,26 @@ class _LedgerRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: labelColor ?? Colors.white.withOpacity(0.6),
+                color: labelColor ?? Colors.white.withOpacity(0.55),
                 fontSize: 13,
                 fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
                 letterSpacing: bold ? 2 : 0.2,
               ),
             ),
           ),
-          Text(
-            _formatNumber(value),
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              fontFamily: 'monospace',
-              letterSpacing: 0.5,
+          TweenAnimationBuilder<int>(
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            tween: IntTween(begin: 0, end: value),
+            builder: (context, v, _) => Text(
+              _formatNumber(v),
+              style: TextStyle(
+                color: valueColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
