@@ -98,7 +98,7 @@ class LedgerSnapshot {
   int get totalReps => reps.values.fold(0, (sum, v) => sum + v);
   int get daysSinceStart => DateTime.now().difference(disciplineSince).inDays;
 
-  int get repsFor(String id) => reps[id] ?? 0;
+  int repsFor(String id) => reps[id] ?? 0;
 
   /// Reputation score — sum of activities weighted toward completed
   /// punishments (hardest signal) and kept promises.
