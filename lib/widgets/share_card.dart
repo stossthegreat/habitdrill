@@ -178,3 +178,174 @@ class ShareCard extends StatelessWidget {
     return Container(width: 1, height: 40, color: Colors.white.withOpacity(0.08));
   }
 }
+
+/// New rank-forward profile share card. Used by the Profile tab.
+/// Fixed 4:5 aspect ratio so it looks identical on IG/Twitter/Discord.
+class ProfileShareCard extends StatelessWidget {
+  final String rank;
+  final int honour;
+  final int disciplineScore;
+  final int currentStreak;
+  final int longestContract;
+  final int totalReps;
+  final int daysSinceStart;
+
+  const ProfileShareCard({
+    super.key,
+    required this.rank,
+    required this.honour,
+    required this.disciplineScore,
+    required this.currentStreak,
+    required this.longestContract,
+    required this.totalReps,
+    required this.daysSinceStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 4 / 5,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF050505), Color(0xFF0A100D)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.emerald.withOpacity(0.35), width: 1.5),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: AppColors.emerald,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'HABITDRILL',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.65),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '$daysSinceStart D',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              'RANK',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              rank,
+              style: const TextStyle(
+                color: AppColors.emerald,
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(height: 1, color: Colors.white.withOpacity(0.08)),
+            const SizedBox(height: 18),
+            _ProfileStatLine(label: 'Honour', value: '$honour', color: AppColors.amber),
+            const SizedBox(height: 10),
+            _ProfileStatLine(label: 'Discipline Score', value: _fmt(disciplineScore), color: AppColors.emerald),
+            const SizedBox(height: 10),
+            _ProfileStatLine(label: 'Current Streak', value: '$currentStreak Days'),
+            const SizedBox(height: 10),
+            _ProfileStatLine(label: 'Longest Contract', value: '$longestContract Days'),
+            const SizedBox(height: 10),
+            _ProfileStatLine(label: 'Debt Paid', value: '${_fmt(totalReps)} Reps'),
+            const Spacer(),
+            Text(
+              'VERIFIED',
+              style: TextStyle(
+                color: AppColors.emerald.withOpacity(0.75),
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _fmt(int n) {
+    final s = n.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(s[i]);
+    }
+    return buffer.toString();
+  }
+}
+
+class _ProfileStatLine extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _ProfileStatLine({required this.label, required this.value, this.color = Colors.white});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'monospace',
+            letterSpacing: 0.4,
+          ),
+        ),
+      ],
+    );
+  }
+}

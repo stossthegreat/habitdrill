@@ -8,6 +8,7 @@ import '../../models/violation.dart';
 import '../../models/escalation_config.dart';
 import '../../services/sergeant_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/ledger_service.dart';
 import 'exercise_circuit_screen.dart';
 
 class PunishmentScreen extends StatefulWidget {
@@ -116,6 +117,11 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
       await SergeantService.clearAllPending();
     } catch (e) {
       debugPrint('clearAllPending failed: $e');
+    }
+    try {
+      await LedgerService.recordPunishmentCompleted();
+    } catch (e) {
+      debugPrint('ledger recordPunishmentCompleted failed: $e');
     }
     if (mounted) {
       widget.onComplete();
