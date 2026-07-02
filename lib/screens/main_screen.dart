@@ -8,6 +8,9 @@ import '../services/contract_service.dart';
 import 'home_screen.dart';
 import 'planner_screen.dart';
 import 'contracts_screen.dart';
+import 'enforcement_screen.dart';
+import 'ledger_screen.dart';
+import 'profile_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -48,9 +51,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       extendBody: true,
       resizeToAvoidBottomInset: false,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
         child: SafeArea(
           bottom: false,
           child: IndexedStack(
@@ -58,6 +59,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             children: const [
               HomeScreen(),
               ContractsScreen(),
+              EnforcementScreen(),
+              LedgerScreen(),
+              ProfileScreen(),
             ],
           ),
         ),
@@ -94,9 +98,7 @@ class _NavBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF050505),
-        border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
-        ),
+        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1)),
       ),
       child: SafeArea(
         top: false,
@@ -104,18 +106,11 @@ class _NavBar extends StatelessWidget {
           height: 62,
           child: Row(
             children: [
-              _NavItem(
-                icon: LucideIcons.target,
-                label: 'TODAY',
-                selected: current == 0,
-                onTap: () => onSelect(0),
-              ),
-              _NavItem(
-                icon: LucideIcons.scroll,
-                label: 'CONTRACTS',
-                selected: current == 1,
-                onTap: () => onSelect(1),
-              ),
+              _NavItem(icon: LucideIcons.target, label: 'TODAY', selected: current == 0, onTap: () => onSelect(0)),
+              _NavItem(icon: LucideIcons.scroll, label: 'CONTRACTS', selected: current == 1, onTap: () => onSelect(1)),
+              _NavItem(icon: LucideIcons.skull, label: 'DEBT', selected: current == 2, onTap: () => onSelect(2)),
+              _NavItem(icon: LucideIcons.bookOpen, label: 'LEDGER', selected: current == 3, onTap: () => onSelect(3)),
+              _NavItem(icon: LucideIcons.user, label: 'PROFILE', selected: current == 4, onTap: () => onSelect(4)),
             ],
           ),
         ),
@@ -147,15 +142,15 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
+            Icon(icon, color: color, size: 18),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 9,
+                fontSize: 8,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 1.8,
+                letterSpacing: 1.5,
               ),
             ),
           ],

@@ -16,6 +16,7 @@ import '../../widgets/power_gauge.dart';
 import '../../widgets/pt_setup_advice_screen.dart';
 import '../../services/sergeant_audio_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/ledger_service.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
   final Violation violation;
@@ -208,6 +209,9 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   void _onExerciseFinished() {
     _exerciseActive = false;
     _session = null;
+
+    final done = _exerciseSet.exercises[_currentExerciseIndex];
+    LedgerService.addReps(done.engineId, done.reps).catchError((_) {});
 
     if (_currentExerciseIndex < _exerciseSet.exercises.length - 1) {
       // Next exercise after brief pause
