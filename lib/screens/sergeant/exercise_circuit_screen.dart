@@ -211,7 +211,11 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     _session = null;
 
     final done = _exerciseSet.exercises[_currentExerciseIndex];
-    LedgerService.addReps(done.engineId, done.reps).catchError((_) {});
+    // Await with a short timeout — reps must persist for the Ledger to
+    // show the correct total, but a slow write must not stall the UI.
+    LedgerService.addReps(done.engineId, done.reps)
+        .timeout(const Duration(milliseconds: 800))
+        .catchError((_) {});
 
     if (_currentExerciseIndex < _exerciseSet.exercises.length - 1) {
       // Next exercise after brief pause

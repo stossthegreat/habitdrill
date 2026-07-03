@@ -99,34 +99,4 @@ class LedgerSnapshot {
   int get daysSinceStart => DateTime.now().difference(disciplineSince).inDays;
 
   int repsFor(String id) => reps[id] ?? 0;
-
-  /// Reputation score — sum of activities weighted toward completed
-  /// punishments (hardest signal) and kept promises.
-  int get disciplineScore {
-    return promisesKept * 10 +
-        punishmentsCompleted * 50 +
-        totalReps -
-        promisesBroken * 20;
-  }
-
-  /// Honour is 100 minus a penalty for the ratio of broken promises.
-  /// Clamped 0..100. Feels like a character stat.
-  int get honour {
-    if (promisesMade == 0) return 100;
-    final ratio = promisesBroken / promisesMade;
-    final score = (100 - (ratio * 400)).round();
-    return score.clamp(0, 100);
-  }
-
-  /// Rank bands. Ascending: BROKEN < WEAKLING < BUILDING < DISCIPLINED
-  /// < IRON WILL < LEGEND.
-  String get rank {
-    final s = disciplineScore;
-    if (s < 100) return 'BROKEN';
-    if (s < 500) return 'WEAKLING';
-    if (s < 2000) return 'BUILDING';
-    if (s < 5000) return 'DISCIPLINED';
-    if (s < 15000) return 'IRON WILL';
-    return 'LEGEND';
-  }
 }
