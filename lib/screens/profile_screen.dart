@@ -4,15 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 import '../design/tokens.dart';
+import '../models/violation.dart';
 import '../services/ledger_service.dart';
-import '../services/analytics_service.dart';
+import '../services/discipline_service.dart';
+import '../services/sergeant_service.dart';
 import '../services/local_storage.dart';
+import '../services/analytics_service.dart';
 import '../widgets/share_card.dart';
+import 'sergeant/punishment_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,36 +26,56 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  LedgerSnapshot? _snap;
+class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
+  LedgerSnapshot? _ledger;
+  int _score = 0;
+  SergeantRank _rank = SergeantRank.private_;
   int _currentStreak = 0;
-  int _longestContract = 0;
+  int _bestStreak = 0;
+  List<Violation> _pendingDebt = const [];
   final GlobalKey _shareKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     AnalyticsService.logScreenView('profile');
+    WidgetsBinding.instance.addObserver(this);
     _load();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
+  }
+
   Future<void> _load() async {
-    final snap = await LedgerService.read();
-    final habits = LocalStorageService.getAllHabits();
-    var streak = 0;
-    var longest = snap.longestContract;
-    for (final h in habits) {
-      if (h.streak > streak) streak = h.streak;
-      if (h.streak > longest) longest = h.streak;
+    final ledger = await LedgerService.read();
+    final score = await DisciplineService.getScore();
+    final rank = await DisciplineService.getRank();
+    final streak = await DisciplineService.getDaysControlled();
+    final best = await DisciplineService.getBestStreak();
+    // Best-effort: also fold in per-habit streaks so long-running habits
+    // contribute to "best streak."
+    for (final h in LocalStorageService.getAllHabits()) {
+      if (h.streak > best) {
+        await LedgerService.updateLongestContract(h.streak);
+      }
     }
-    if (longest > snap.longestContract) {
-      await LedgerService.updateLongestContract(longest);
-    }
+    final pending = SergeantService.getPendingViolations();
     if (!mounted) return;
     setState(() {
-      _snap = snap;
+      _ledger = ledger;
+      _score = score;
+      _rank = rank;
       _currentStreak = streak;
-      _longestContract = longest;
+      _bestStreak = best > ledger.longestContract ? best : ledger.longestContract;
+      _pendingDebt = pending;
     });
   }
 
@@ -69,49 +94,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
+  Future<void> _payDebt(Violation v) async {
+    HapticFeedback.heavyImpact();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PunishmentScreen(
+          violation: v,
+          onComplete: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
       body: SafeArea(
-        child: _snap == null
+        child: _ledger == null
             ? const Center(child: CircularProgressIndicator(color: AppColors.emerald))
-            : SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _Header(),
-                    _RankBadge(
-                      rank: _snap!.rank,
-                      daysSinceStart: _snap!.daysSinceStart,
-                    ),
-                    const SizedBox(height: 24),
-                    _StatBlock(
-                      snap: _snap!,
-                      currentStreak: _currentStreak,
-                      longestContract: _longestContract,
-                    ),
-                    const SizedBox(height: 32),
-                    _SharePreview(
-                      shareKey: _shareKey,
-                      snap: _snap!,
-                      streak: _currentStreak,
-                      longest: _longestContract,
-                    ),
-                    const SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _ShareButton(onTap: _share),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
+            : RefreshIndicator(
+                color: AppColors.emerald,
+                backgroundColor: const Color(0xFF0B0B0B),
+                onRefresh: _load,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const _Header(),
+                      if (_pendingDebt.isNotEmpty)
+                        _DebtBanner(
+                          count: _pendingDebt.length,
+                          onTap: () => _payDebt(_pendingDebt.first),
+                        ),
+                      _RankBadge(
+                        rank: _rank.title,
+                        daysSinceStart: _ledger!.daysSinceStart,
+                      ),
+                      const SizedBox(height: 20),
+                      _StreakFlame(
+                        current: _currentStreak,
+                        best: _bestStreak,
+                      ),
+                      const SizedBox(height: 24),
+                      _CoreStats(
+                        score: _score,
+                        best: _bestStreak,
+                        totalReps: _ledger!.totalReps,
+                        punishments: _ledger!.punishmentsCompleted,
+                      ),
+                      const SizedBox(height: 24),
+                      _ReputationBlock(snap: _ledger!),
+                      const SizedBox(height: 32),
+                      _SharePreview(
+                        shareKey: _shareKey,
+                        snap: _ledger!,
+                        score: _score,
+                        rank: _rank.title,
+                        streak: _currentStreak,
+                        best: _bestStreak,
+                      ),
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _ShareButton(onTap: _share),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
       ),
     );
   }
 }
+
+// ────────────────────────── Header ──────────────────────────
 
 class _Header extends StatelessWidget {
   const _Header();
@@ -163,6 +223,74 @@ class _Header extends StatelessWidget {
     ).animate().fadeIn(duration: 400.ms);
   }
 }
+
+// ────────────────────────── Debt banner ──────────────────────────
+
+class _DebtBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+  const _DebtBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.error.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.error.withOpacity(0.45), width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: [BoxShadow(color: AppColors.error.withOpacity(0.7), blurRadius: 8)],
+                ),
+              ).animate(onPlay: (c) => c.repeat(reverse: true)).fadeIn().then().fade(begin: 1, end: 0.3, duration: 700.ms),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count == 1 ? 'DEBT OUTSTANDING' : '$count DEBTS OUTSTANDING',
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tap to pay.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, color: AppColors.error.withOpacity(0.75), size: 14),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0);
+  }
+}
+
+// ────────────────────────── Rank badge ──────────────────────────
 
 class _RankBadge extends StatelessWidget {
   final String rank;
@@ -259,30 +387,24 @@ class _MonumentalRank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final words = rank.split(' ');
-    return Column(
-      children: [
-        for (int i = 0; i < words.length; i++)
-          Text(
-            words[i],
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.emerald,
-              fontSize: words.length > 1 ? 40 : 44,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 5,
-              height: 0.95,
-              shadows: [
-                Shadow(color: AppColors.emerald.withOpacity(0.6), blurRadius: 24),
-              ],
-            ),
-          ).animate(delay: (300 + i * 100).ms).fadeIn(duration: 500.ms).then().shimmer(
-                duration: 2400.ms,
-                color: Colors.white.withOpacity(0.6),
-                delay: 1200.ms,
-              ),
-      ],
-    );
+    return Text(
+      rank,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: AppColors.emerald,
+        fontSize: 44,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 5,
+        height: 0.95,
+        shadows: [
+          Shadow(color: AppColors.emerald.withOpacity(0.6), blurRadius: 24),
+        ],
+      ),
+    ).animate(delay: 300.ms).fadeIn(duration: 500.ms).then().shimmer(
+          duration: 2400.ms,
+          color: Colors.white.withOpacity(0.6),
+          delay: 1200.ms,
+        );
   }
 }
 
@@ -330,15 +452,126 @@ class _BadgeReticlePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _StatBlock extends StatelessWidget {
-  final LedgerSnapshot snap;
-  final int currentStreak;
-  final int longestContract;
+// ────────────────────────── Streak flame hero ──────────────────────────
 
-  const _StatBlock({
-    required this.snap,
-    required this.currentStreak,
-    required this.longestContract,
+class _StreakFlame extends StatelessWidget {
+  final int current;
+  final int best;
+  const _StreakFlame({required this.current, required this.best});
+
+  @override
+  Widget build(BuildContext context) {
+    final alive = current > 0;
+    final color = alive ? AppColors.fire : Colors.white.withOpacity(0.2);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        decoration: BoxDecoration(
+          color: alive ? AppColors.fire.withOpacity(0.06) : const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: alive ? AppColors.fire.withOpacity(0.35) : Colors.white.withOpacity(0.05),
+            width: 1.5,
+          ),
+          boxShadow: alive
+              ? [BoxShadow(color: AppColors.fire.withOpacity(0.18), blurRadius: 40, spreadRadius: -10)]
+              : null,
+        ),
+        child: Column(
+          children: [
+            // The flame emoji + shimmer
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                if (alive)
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          AppColors.fire.withOpacity(0.3),
+                          AppColors.fire.withOpacity(0.05),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                Text(
+                  '🔥',
+                  style: TextStyle(fontSize: 70, height: 1, color: alive ? null : Colors.white.withOpacity(0.15)),
+                ).animate(onPlay: (c) => c.repeat(reverse: true))
+                    .scaleXY(begin: 1, end: alive ? 1.06 : 1, duration: 1400.ms, curve: Curves.easeInOut),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '$current',
+              style: TextStyle(
+                color: color,
+                fontSize: 56,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                height: 1,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                shadows: alive
+                    ? [Shadow(color: AppColors.fire.withOpacity(0.7), blurRadius: 24)]
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              current == 1 ? 'DAY STREAK' : 'DAY STREAK',
+              style: TextStyle(
+                color: color.withOpacity(0.85),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ),
+            if (best > current) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'BEST · $best',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.55),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.5,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ).animate(delay: 200.ms).fadeIn(duration: 500.ms).slideY(begin: 0.06, end: 0);
+  }
+}
+
+// ────────────────────────── Core stats block ──────────────────────────
+
+class _CoreStats extends StatelessWidget {
+  final int score;
+  final int best;
+  final int totalReps;
+  final int punishments;
+
+  const _CoreStats({
+    required this.score,
+    required this.best,
+    required this.totalReps,
+    required this.punishments,
   });
 
   @override
@@ -354,11 +587,10 @@ class _StatBlock extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(
           children: [
-            _AnimatedRow(label: 'Honour', value: snap.honour, valueColor: AppColors.amber),
-            _AnimatedRow(label: 'Discipline Score', value: snap.disciplineScore, valueColor: AppColors.emerald, format: _fmt),
-            _AnimatedRow(label: 'Current Streak', value: currentStreak, suffix: ' Days'),
-            _AnimatedRow(label: 'Longest Contract', value: longestContract, suffix: ' Days'),
-            _AnimatedRow(label: 'Total Debt Paid', value: snap.totalReps, suffix: ' Reps', format: _fmt, last: true),
+            _AnimatedRow(label: 'Discipline', value: score, valueColor: AppColors.emerald, suffix: ' / 100'),
+            _AnimatedRow(label: 'Best Streak', value: best, suffix: ' Days'),
+            _AnimatedRow(label: 'Punishments', value: punishments, valueColor: AppColors.amber),
+            _AnimatedRow(label: 'Reps Paid', value: totalReps, format: _fmt, last: true),
           ],
         ),
       ),
@@ -367,12 +599,12 @@ class _StatBlock extends StatelessWidget {
 
   static String _fmt(int n) {
     final s = n.toString();
-    final buffer = StringBuffer();
+    final b = StringBuffer();
     for (int i = 0; i < s.length; i++) {
-      if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(s[i]);
+      if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+      b.write(s[i]);
     }
-    return buffer.toString();
+    return b.toString();
   }
 }
 
@@ -438,16 +670,96 @@ class _AnimatedRow extends StatelessWidget {
   }
 }
 
+// ────────────────────────── Reputation block (rep breakdown) ─────────
+
+class _ReputationBlock extends StatelessWidget {
+  final LedgerSnapshot snap;
+  const _ReputationBlock({required this.snap});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <(String, int)>[
+      ('Squats', snap.repsFor('squats')),
+      ('Burpees', snap.repsFor('burpees')),
+      ('High Knees', snap.repsFor('high_knees')),
+      ('Push-ups', snap.repsFor('push_ups')),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Row(
+              children: [
+                Text(
+                  'VERIFIED REPS',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.45),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.06))),
+                const SizedBox(width: 10),
+                Text(
+                  DateFormat('d MMM').format(snap.disciplineSince).toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B0B0B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(
+              children: [
+                for (int i = 0; i < rows.length; i++)
+                  _AnimatedRow(label: rows[i].$1, value: rows[i].$2),
+                _AnimatedRow(
+                  label: 'TOTAL',
+                  value: snap.totalReps,
+                  valueColor: AppColors.emerald,
+                  last: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate(delay: 400.ms).fadeIn(duration: 400.ms);
+  }
+}
+
+// ────────────────────────── Share preview + button ──────────────────
+
 class _SharePreview extends StatelessWidget {
   final GlobalKey shareKey;
   final LedgerSnapshot snap;
+  final int score;
+  final String rank;
   final int streak;
-  final int longest;
+  final int best;
   const _SharePreview({
     required this.shareKey,
     required this.snap,
+    required this.score,
+    required this.rank,
     required this.streak,
-    required this.longest,
+    required this.best,
   });
 
   @override
@@ -471,20 +783,18 @@ class _SharePreview extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: Container(height: 1, color: Colors.white.withOpacity(0.06)),
-                ),
+                Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.06))),
               ],
             ),
           ),
           RepaintBoundary(
             key: shareKey,
             child: ProfileShareCard(
-              rank: snap.rank,
-              honour: snap.honour,
-              disciplineScore: snap.disciplineScore,
+              rank: rank,
+              honour: score,
+              disciplineScore: score,
               currentStreak: streak,
-              longestContract: longest,
+              longestContract: best,
               totalReps: snap.totalReps,
               daysSinceStart: snap.daysSinceStart,
             ),

@@ -483,15 +483,13 @@ class _StatBlock extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _StatRow(label: 'HONOUR', value: honour.toString(), highlight: AppColors.amber),
-          const SizedBox(height: 8),
-          _StatRow(label: 'DISCIPLINE', value: _fmt(score), highlight: AppColors.emerald),
-          const SizedBox(height: 8),
-          _StatRow(label: 'STREAK', value: '$streak D'),
-          const SizedBox(height: 8),
-          _StatRow(label: 'LONGEST', value: '$longest D'),
-          const SizedBox(height: 8),
-          _StatRow(label: 'DEBT PAID', value: '${_fmt(reps)} R'),
+          _StatRow(label: 'DISCIPLINE', value: '$score / 100', highlight: AppColors.emerald),
+          const SizedBox(height: 10),
+          _StatRow(label: 'STREAK', value: '$streak D', highlight: AppColors.fire),
+          const SizedBox(height: 10),
+          _StatRow(label: 'BEST', value: '$longest D'),
+          const SizedBox(height: 10),
+          _StatRow(label: 'REPS PAID', value: _fmt(reps)),
         ],
       ),
     );

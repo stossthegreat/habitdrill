@@ -6,8 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../design/tokens.dart';
 import 'home_screen.dart';
 import 'contracts_screen.dart';
-import 'enforcement_screen.dart';
-import 'ledger_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -40,8 +38,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             children: const [
               HomeScreen(),
               ContractsScreen(),
-              EnforcementScreen(),
-              LedgerScreen(),
               ProfileScreen(),
             ],
           ),
@@ -63,8 +59,6 @@ class _NavBar extends StatelessWidget {
     const items = <_NavItemData>[
       _NavItemData(icon: LucideIcons.target, label: 'TODAY'),
       _NavItemData(icon: LucideIcons.scroll, label: 'CONTRACTS'),
-      _NavItemData(icon: LucideIcons.skull, label: 'DEBT'),
-      _NavItemData(icon: LucideIcons.bookOpen, label: 'LEDGER'),
       _NavItemData(icon: LucideIcons.user, label: 'PROFILE'),
     ];
     return Container(
