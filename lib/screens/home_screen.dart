@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
@@ -354,120 +355,224 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (habit.time.isNotEmpty) {
       try { time = DateFormat('HH:mm').format(DateTime.parse('2025-01-01 ${habit.time}:00')); } catch (_) {}
     }
+    final emoji = habit.emoji ?? '🎯';
+    final streak = habit.streak;
+
+    Future<void> toggle() async {
+      HapticFeedback.mediumImpact();
+      final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+      if (violation != null && context.mounted) {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
+      }
+      if (!isDone) {
+        await DisciplineService.onOrderCompleted();
+        await _loadDisciplineData();
+      }
+    }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () async {
-          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
-          if (violation != null && context.mounted) {
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
-          }
-          if (!isDone) {
-            await DisciplineService.onOrderCompleted();
-            await _loadDisciplineData();
-          }
-        },
+        onTap: toggle,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
           decoration: BoxDecoration(
-            color: isDone ? const Color(0xFF16A34A).withOpacity(0.06) : const Color(0xFF0D0D0D),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDone ? const Color(0xFF16A34A).withOpacity(0.25) : const Color(0xFF16A34A).withOpacity(0.1)),
+            color: const Color(0xFF0B0B0B),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDone ? AppColors.emerald.withOpacity(0.35) : Colors.white.withOpacity(0.05),
+              width: 1,
+            ),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFF16A34A).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                child: const Text('DO', style: TextStyle(color: Color(0xFF16A34A), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              ),
-              const SizedBox(width: 12),
+              Text(emoji, style: const TextStyle(fontSize: 26, height: 1)),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       habit.title.toUpperCase(),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(isDone ? 0.4 : 0.9),
-                        fontSize: 15, fontWeight: FontWeight.w700,
-                        decoration: isDone ? TextDecoration.lineThrough : null, decorationColor: Colors.white30,
+                        color: Colors.white.withOpacity(isDone ? 0.45 : 0.95),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                        height: 1.1,
+                        decoration: isDone ? TextDecoration.lineThrough : null,
+                        decorationColor: Colors.white38,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (time != null) Text('DUE $time', style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 11, fontFamily: 'monospace')),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          'ORDER',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.35),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        if (streak > 0) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                          ),
+                          Text('🔥', style: const TextStyle(fontSize: 10)),
+                          Text(
+                            ' $streak',
+                            style: TextStyle(
+                              color: AppColors.fire.withOpacity(0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                        if (time != null) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                          ),
+                          Text(
+                            time,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.35),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isDone ? const Color(0xFF16A34A) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: isDone ? const Color(0xFF16A34A) : const Color(0xFF16A34A).withOpacity(0.25), width: 2),
-                ),
-                child: isDone ? const Icon(Icons.check, color: Colors.black, size: 18) : null,
-              ),
+              const SizedBox(width: 10),
+              _TickCircle(done: isDone, onTap: toggle),
             ],
           ),
         ),
       ),
-    ).animate(delay: (index * 40).ms).fadeIn(duration: 200.ms);
+    ).animate(delay: (index * 50).ms).fadeIn(duration: 250.ms).slideY(begin: 0.04, end: 0);
   }
 
   Widget _buildRuleCard(Habit habit, bool isBroken, int index) {
+    final emoji = habit.emoji ?? '🚫';
+    final streak = habit.streak;
+
+    Future<void> confess() async {
+      if (isBroken) return;
+      if (!await _requirePro()) return;
+      HapticFeedback.heavyImpact();
+      final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+      if (violation != null && context.mounted) {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
+      }
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () async {
-          if (isBroken) return;
-          if (!await _requirePro()) return;
-          final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
-          if (violation != null && context.mounted) {
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
-          }
-        },
+        onTap: confess,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
           decoration: BoxDecoration(
-            color: isBroken ? const Color(0xFFDC2626).withOpacity(0.08) : const Color(0xFF0D0808),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isBroken ? const Color(0xFFDC2626).withOpacity(0.3) : const Color(0xFFDC2626).withOpacity(0.1)),
+            color: isBroken ? AppColors.error.withOpacity(0.06) : const Color(0xFF0B0B0B),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isBroken ? AppColors.error.withOpacity(0.35) : Colors.white.withOpacity(0.05),
+              width: 1,
+            ),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFFDC2626).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                child: const Text('AVOID', style: TextStyle(color: Color(0xFFDC2626), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              ),
-              const SizedBox(width: 12),
+              Text(emoji, style: const TextStyle(fontSize: 26, height: 1)),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(habit.title.toUpperCase(), style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 15, fontWeight: FontWeight.w700)),
-                    Text(isBroken ? 'RULE BROKEN' : 'STAY CLEAN', style: TextStyle(color: isBroken ? const Color(0xFFDC2626).withOpacity(0.6) : Colors.white.withOpacity(0.15), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                    Text(
+                      habit.title.toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(isBroken ? 0.6 : 0.95),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                        height: 1.1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(
+                          'RULE',
+                          style: TextStyle(
+                            color: (isBroken ? AppColors.error : Colors.white).withOpacity(0.5),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        if (!isBroken && streak > 0) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                          ),
+                          Text('CLEAN ', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                          Text(
+                            '$streak D',
+                            style: TextStyle(
+                              color: AppColors.emerald.withOpacity(0.85),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                        if (isBroken) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                          ),
+                          Text(
+                            'BROKEN',
+                            style: TextStyle(
+                              color: AppColors.error.withOpacity(0.75),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: isBroken ? const Color(0xFFDC2626).withOpacity(0.15) : const Color(0xFFDC2626),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isBroken ? 'FAILED' : 'I BROKE IT',
-                  style: TextStyle(color: isBroken ? const Color(0xFFDC2626) : Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1),
-                ),
-              ),
+              const SizedBox(width: 10),
+              _BrokeItButton(isBroken: isBroken, onTap: confess),
             ],
           ),
         ),
       ),
-    ).animate(delay: (index * 40).ms).fadeIn(duration: 200.ms);
+    ).animate(delay: (index * 50).ms).fadeIn(duration: 250.ms).slideY(begin: 0.04, end: 0);
   }
 
   Widget _buildHeader() {
@@ -518,3 +623,80 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 }
+
+// ────────────────────────── Tick target for daily orders ──────────
+
+class _TickCircle extends StatelessWidget {
+  final bool done;
+  final VoidCallback onTap;
+  const _TickCircle({required this.done, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          gradient: done ? AppColors.emeraldGradient : null,
+          color: done ? null : Colors.transparent,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: done ? AppColors.emerald : AppColors.emerald.withOpacity(0.4),
+            width: 2,
+          ),
+          boxShadow: done
+              ? [BoxShadow(color: AppColors.emerald.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 4))]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: done
+            ? const Icon(Icons.check, color: Colors.black, size: 22)
+            : Icon(Icons.check, color: AppColors.emerald.withOpacity(0.35), size: 20),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── "I broke it" button for rules ─────────
+
+class _BrokeItButton extends StatelessWidget {
+  final bool isBroken;
+  final VoidCallback onTap;
+  const _BrokeItButton({required this.isBroken, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: isBroken ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isBroken ? AppColors.error.withOpacity(0.12) : AppColors.error,
+          borderRadius: BorderRadius.circular(10),
+          border: isBroken
+              ? Border.all(color: AppColors.error.withOpacity(0.35), width: 1)
+              : null,
+          boxShadow: isBroken
+              ? null
+              : [BoxShadow(color: AppColors.error.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 4))],
+        ),
+        child: Text(
+          isBroken ? 'FAILED' : 'I BROKE IT',
+          style: TextStyle(
+            color: isBroken ? AppColors.error : Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
