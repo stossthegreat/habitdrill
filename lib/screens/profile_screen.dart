@@ -10,9 +10,8 @@ import 'dart:io';
 
 import '../design/tokens.dart';
 import '../services/ledger_service.dart';
-import '../services/contract_service.dart';
 import '../services/analytics_service.dart';
-import '../models/contract.dart';
+import '../services/local_storage.dart';
 import '../widgets/share_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -37,14 +36,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     final snap = await LedgerService.read();
-    final contracts = await ContractService.loadAll();
+    final habits = LocalStorageService.getAllHabits();
     var streak = 0;
     var longest = snap.longestContract;
-    for (final c in contracts) {
-      if (c.status == ContractStatus.active && c.daysCompleted > streak) {
-        streak = c.daysCompleted;
-      }
-      if (c.daysCompleted > longest) longest = c.daysCompleted;
+    for (final h in habits) {
+      if (h.streak > streak) streak = h.streak;
+      if (h.streak > longest) longest = h.streak;
     }
     if (longest > snap.longestContract) {
       await LedgerService.updateLongestContract(longest);

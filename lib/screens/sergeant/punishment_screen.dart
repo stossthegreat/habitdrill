@@ -110,19 +110,18 @@ class _PunishmentScreenState extends State<PunishmentScreen> {
 
   bool _completing = false;
 
-  void _onExercisesComplete() async {
+  void _onExercisesComplete() {
     if (_completing) return;
     _completing = true;
-    try {
-      await SergeantService.clearAllPending();
-    } catch (e) {
+    // Fire-and-forget the async work so a slow/hanging service call can
+    // never trap the user on the completion screen. onComplete pops
+    // immediately; the state cleanup happens in the background.
+    SergeantService.clearAllPending().catchError((e) {
       debugPrint('clearAllPending failed: $e');
-    }
-    try {
-      await LedgerService.recordPunishmentCompleted();
-    } catch (e) {
+    });
+    LedgerService.recordPunishmentCompleted().catchError((e) {
       debugPrint('ledger recordPunishmentCompleted failed: $e');
-    }
+    });
     if (mounted) {
       widget.onComplete();
     }
