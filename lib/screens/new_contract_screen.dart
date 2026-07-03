@@ -251,7 +251,9 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                         alarmOn: _alarmOn,
                         onToggleTime: (v) => setState(() {
                           _timeEnabled = v;
-                          if (!v) _alarmOn = false;
+                          // Enabling a time defaults the alarm ON.
+                          // Turning time off turns the alarm off too.
+                          _alarmOn = v;
                         }),
                         onPickTime: _pickTime,
                         onToggleAlarm: (v) => setState(() => _alarmOn = v),
