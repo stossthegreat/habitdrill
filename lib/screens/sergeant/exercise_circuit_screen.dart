@@ -244,7 +244,14 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
   void _finishNow() {
     if (_finished) return;
     _finished = true;
+    HapticFeedback.mediumImpact();
     widget.onComplete();
+    // Hard fallback: if onComplete didn't pop us out within a beat, force it.
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   /// Fallback: manual tap to count rep (when camera unavailable)
