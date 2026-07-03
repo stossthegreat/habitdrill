@@ -4,10 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../design/tokens.dart';
-import '../services/sergeant_service.dart';
-import '../services/contract_service.dart';
 import 'home_screen.dart';
-import 'planner_screen.dart';
 import 'contracts_screen.dart';
 import 'enforcement_screen.dart';
 import 'ledger_screen.dart';
@@ -22,30 +19,6 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   int _tab = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _tickContracts();
-  }
-
-  Future<void> _tickContracts() async {
-    try {
-      await ContractService.tickForNewDay(
-        hadViolationToday: SergeantService.hasPendingPunishment(),
-      );
-    } catch (_) {}
-  }
-
-  void _openPlanner() {
-    HapticFeedback.mediumImpact();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (context) => const PlannerScreen(),
-      ),
-    );
-  }
 
   void _selectTab(int i) {
     if (i == _tab) return;
@@ -74,20 +47,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ),
         ),
       ),
-      floatingActionButton: _tab == 0 ? _buildFAB() : null,
       bottomNavigationBar: _NavBar(current: _tab, onSelect: _selectTab),
-    );
-  }
-
-  Widget _buildFAB() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: FloatingActionButton(
-        onPressed: _openPlanner,
-        backgroundColor: AppColors.emerald,
-        elevation: 8,
-        child: const Icon(LucideIcons.plus, color: Colors.black, size: 26),
-      ),
     );
   }
 }
@@ -118,7 +78,6 @@ class _NavBar extends StatelessWidget {
           height: 66,
           child: Stack(
             children: [
-              // Animated top indicator that slides between items
               AnimatedAlign(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
