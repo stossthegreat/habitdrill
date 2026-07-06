@@ -4,10 +4,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:uuid/uuid.dart';
 
 import '../models/habit.dart';
 import '../models/violation.dart';
 import '../models/escalation_config.dart';
+import 'alarmkit_service.dart';
 
 class AlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -41,6 +43,18 @@ class AlarmService {
       if (Platform.isAndroid) {
         final alarmStatus = await Permission.scheduleExactAlarm.request();
         debugPrint('Exact alarm permission: $alarmStatus');
+      }
+
+      // AlarmKit permission is iOS 26+ only. Bridge returns "unsupported"
+      // on older iOS, so this is a safe no-op there.
+      if (Platform.isIOS && await AlarmKitService.isAvailable()) {
+        final status = await AlarmKitService.authorizationStatus();
+        if (status == 'notDetermined') {
+          final result = await AlarmKitService.requestAuthorization();
+          debugPrint('AlarmKit permission: $result');
+        } else {
+          debugPrint('AlarmKit permission (existing): $status');
+        }
       }
 
       // Initialize notification plugin
@@ -192,10 +206,34 @@ class AlarmService {
       int successCount = 0;
       int failCount = 0;
 
-      // Schedule for each repeat day. We fire a burst of 5 notifications
-      // 8 seconds apart so the phone keeps beeping for ~40 seconds even
-      // if iOS throttles one of them or the user misses the first ping.
-      // This is the "alarm feel" without needing Critical Alerts.
+      // On iOS 26+ we ALSO schedule via AlarmKit — real system alarms that
+      // ring through the silent switch and Focus modes by design. On older
+      // iOS this returns false and we rely on the notification burst below.
+      final bool alarmKitAvailable = await AlarmKitService.isAvailable();
+      if (alarmKitAvailable) {
+        // AlarmKit needs UUIDs. We derive a stable one per (habit, day) from
+        // the same alarm ID so re-scheduling replaces cleanly.
+        for (final day in habit.repeatDays) {
+          final baseAlarmId = _getAlarmId(habit.id, day);
+          final akId = _uuidFromInt(baseAlarmId);
+          final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
+          try {
+            await AlarmKitService.cancel(akId);
+            final ok = await AlarmKitService.schedule(
+              id: akId,
+              title: 'ORDER: ${habit.title.toUpperCase()}',
+              fireAt: fireDate.toLocal(),
+            );
+            debugPrint('   🛎️ AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}');
+          } catch (e) {
+            debugPrint('   ❌ AlarmKit ${_getDayName(day)}: $e');
+          }
+        }
+      }
+
+      // Schedule a burst of 5 notifications 8 seconds apart as a fallback
+      // (and belt-and-suspenders on iOS 26 too — never rely on a single
+      // path for waking someone up).
       const int burstCount = 5;
       const Duration burstSpacing = Duration(seconds: 8);
 
@@ -286,6 +324,15 @@ class AlarmService {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('🗑️ CANCELLING ALARMS for habit: $habitId');
 
+    // AlarmKit path — quietly cancel every derived UUID. Safe on old iOS
+    // because AlarmKitService returns false without erroring.
+    for (int day = 0; day < 7; day++) {
+      final akId = _uuidFromInt(_getAlarmId(habitId, day));
+      try {
+        await AlarmKitService.cancel(akId);
+      } catch (_) {}
+    }
+
     // Get pending notifications BEFORE cancellation
     final pendingBefore = await _notifications.pendingNotificationRequests();
     final habitAlarmIds = <int>[];
@@ -371,6 +418,13 @@ class AlarmService {
   /// Generate unique alarm ID
   static int _getAlarmId(String habitId, int day) {
     return ((habitId.hashCode.abs() % 900000) + 100000) * 10 + day;
+  }
+
+  /// Deterministic UUID from an int — used to give AlarmKit a stable ID
+  /// per (habit, day) so re-scheduling replaces cleanly.
+  static String _uuidFromInt(int seed) {
+    const uuid = Uuid();
+    return uuid.v5(Uuid.NAMESPACE_URL, 'habitdrill.alarm.$seed');
   }
 
   /// Get day name for logging

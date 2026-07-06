@@ -32,6 +32,8 @@
 	<string>HabitDrill may use microphone for workout audio features.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>HabitDrill needs notifications to remind you about your orders and enforce discipline.</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>HabitDrill uses alarms to wake you up and enforce your morning discipline. Alarms ring through Silent and Focus modes so you cannot ignore them.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
