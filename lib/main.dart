@@ -22,7 +22,7 @@ import 'services/retention_service.dart';
 import 'services/premium_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
-import 'screens/onboarding_screen.dart';
+import 'screens/onboarding/onboarding_flow.dart';
 import 'screens/sergeant/punishment_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/terms_screen.dart';
@@ -187,7 +187,7 @@ class _AppRouterState extends State<AppRouter> {
     }
 
     if (_needsOnboarding) {
-      return const OnboardingScreen();
+      return const OnboardingFlow();
     }
 
     return const PunishmentGate();
