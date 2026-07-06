@@ -28,7 +28,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final OnboardingState _s = OnboardingState();
   int _i = 0;
 
-  static const int _total = 20;
+  static const int _total = 26;
 
   @override
   void dispose() {
@@ -94,6 +94,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                 children: [
                   _ColdOpen(onNext: _next),
                   _Welcome(onNext: _next),
+                  _FirstBattle(onNext: _next),
                   _SinglePick(
                     key: const ValueKey('gender'),
                     title: 'You are',
@@ -191,10 +192,14 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                     line3: "It's something you train.",
                     onNext: _next,
                   ),
+                  _NotAWrapper(onNext: _next),
+                  _AiVerifiedPitch(onNext: _next),
                   _WakeTimePicker(state: _s, onNext: _next),
                   _ExercisePicker(state: _s, onNext: _next),
                   _RepsPicker(state: _s, onNext: _next),
                   _EscalationWarning(reps: _s.reps, onNext: _next),
+                  _ScreenTimePitch(onNext: _next),
+                  _RealAlarmPitch(onNext: _next),
                   _StatementScreen(
                     key: const ValueKey('commit'),
                     line1: 'No more backup alarms.',
@@ -204,6 +209,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                     ctaLabel: 'I AGREE',
                   ),
                   _SignatureScreen(state: _s, onNext: _next),
+                  _SocialProof(onNext: _next),
                   _BuildingPlan(onNext: _next),
                   _SummaryScreen(state: _s, onNext: _next),
                 ],
@@ -1907,6 +1913,754 @@ class _TimelineConnector extends StatelessWidget {
             borderRadius: BorderRadius.circular(1),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════ NEW BEAST-MODE SCREENS ══════════════════════════
+
+// ────────────────────────── First Battle philosophy ──────────────────────
+
+class _FirstBattle extends StatelessWidget {
+  final VoidCallback onNext;
+  const _FirstBattle({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.error.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.error.withOpacity(0.4), width: 1),
+            ),
+            child: Text(
+              'THE TRUTH',
+              style: TextStyle(
+                color: AppColors.error,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+              ),
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: 22),
+          const Text(
+            'Discipline gets\nattacked every day.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1.15,
+            ),
+          ).animate(delay: 150.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 18),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'The first attack is the moment ',
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 17, fontWeight: FontWeight.w500, height: 1.5),
+                ),
+                const TextSpan(
+                  text: 'your eyes open.',
+                  style: TextStyle(color: AppColors.emerald, fontSize: 17, fontWeight: FontWeight.w800, height: 1.5),
+                ),
+              ],
+            ),
+          ).animate(delay: 400.ms).fadeIn(),
+          const SizedBox(height: 20),
+          Text(
+            'Win that first battle and your whole day tilts. Lose it and every temptation after gets easier.',
+            style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 15, fontWeight: FontWeight.w500, height: 1.5),
+          ).animate(delay: 600.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: 'I WANT TO WIN', onTap: onNext).animate(delay: 900.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Not A Wrapper ──────────────────────
+
+class _NotAWrapper extends StatelessWidget {
+  final VoidCallback onNext;
+  const _NotAWrapper({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'This is not another\ntracking app.',
+            subtitle: 'Other apps ask if you did it. We verify.',
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: Column(
+              children: [
+                _CompareRow(
+                  left: 'Other apps',
+                  leftBody: 'Tap a button to say you did it.',
+                  right: 'HabitDrill',
+                  rightBody: 'AI counts every rep. Fake reps do not count.',
+                ).animate(delay: 200.ms).fadeIn(),
+                const SizedBox(height: 14),
+                _CompareRow(
+                  left: 'Other alarms',
+                  leftBody: 'Snooze forever. No consequence.',
+                  right: 'HabitDrill',
+                  rightBody: 'The alarm does not stop until you move.',
+                ).animate(delay: 400.ms).fadeIn(),
+                const SizedBox(height: 14),
+                _CompareRow(
+                  left: 'Other trackers',
+                  leftBody: 'A pretty chart of your failures.',
+                  right: 'HabitDrill',
+                  rightBody: 'Every failure = real punishment reps you owe.',
+                ).animate(delay: 600.ms).fadeIn(),
+              ],
+            ),
+          ),
+          _PrimaryButton(label: 'CONTINUE', onTap: onNext).animate(delay: 900.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompareRow extends StatelessWidget {
+  final String left;
+  final String leftBody;
+  final String right;
+  final String rightBody;
+
+  const _CompareRow({
+    required this.left,
+    required this.leftBody,
+    required this.right,
+    required this.rightBody,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B0B0B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.close, color: AppColors.error, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        left.toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    leftBody,
+                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w600, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.emerald.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.emerald.withOpacity(0.45), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check, color: AppColors.emerald, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        right.toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.emerald,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    rightBody,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── AI-Verified pitch ──────────────────────
+
+class _AiVerifiedPitch extends StatefulWidget {
+  final VoidCallback onNext;
+  const _AiVerifiedPitch({required this.onNext});
+
+  @override
+  State<_AiVerifiedPitch> createState() => _AiVerifiedPitchState();
+}
+
+class _AiVerifiedPitchState extends State<_AiVerifiedPitch> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'Real AI. Real reps.',
+            subtitle: 'Our pose model watches every rep. Fake reps count for nothing.',
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: 0.85,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.emerald.withOpacity(0.15),
+                        Colors.transparent,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.emerald.withOpacity(0.35), width: 1.5),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CustomPaint(painter: _SkeletonPainter()),
+                      Positioned(
+                        top: 14,
+                        left: 14,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.emerald,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.circle, color: Colors.black, size: 8),
+                              SizedBox(width: 6),
+                              Text('LIVE · TRACKING', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                            ],
+                          ),
+                        ).animate(onPlay: (c) => c.repeat()).fade(begin: 1, end: 0.4, duration: 800.ms),
+                      ),
+                      Positioned(
+                        bottom: 14,
+                        left: 14,
+                        right: 14,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.emerald.withOpacity(0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: AppColors.emerald, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'GOOD FORM',
+                                    style: TextStyle(color: AppColors.emerald, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
+                              ),
+                              child: TweenAnimationBuilder<int>(
+                                duration: const Duration(seconds: 3),
+                                tween: IntTween(begin: 0, end: 15),
+                                builder: (context, v, _) => Text(
+                                  '$v / 15',
+                                  style: TextStyle(
+                                    color: AppColors.emerald,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    fontFeatures: const [FontFeature.tabularFigures()],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'MediaPipe pose detection. Runs on your device. Nothing sent to us.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w600, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          _PrimaryButton(label: 'CONTINUE', onTap: widget.onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final joints = <Offset>[
+      Offset(w * 0.5, h * 0.15), // head
+      Offset(w * 0.5, h * 0.28), // shoulders center
+      Offset(w * 0.32, h * 0.28), // L shoulder
+      Offset(w * 0.68, h * 0.28), // R shoulder
+      Offset(w * 0.22, h * 0.45), // L elbow
+      Offset(w * 0.78, h * 0.45), // R elbow
+      Offset(w * 0.20, h * 0.60), // L wrist
+      Offset(w * 0.80, h * 0.60), // R wrist
+      Offset(w * 0.5, h * 0.55), // hips center
+      Offset(w * 0.40, h * 0.55), // L hip
+      Offset(w * 0.60, h * 0.55), // R hip
+      Offset(w * 0.36, h * 0.75), // L knee
+      Offset(w * 0.64, h * 0.75), // R knee
+      Offset(w * 0.34, h * 0.92), // L ankle
+      Offset(w * 0.66, h * 0.92), // R ankle
+    ];
+
+    final linePaint = Paint()
+      ..color = AppColors.emerald
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    final glowPaint = Paint()
+      ..color = AppColors.emerald.withOpacity(0.35)
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+
+    void bone(int a, int b) {
+      canvas.drawLine(joints[a], joints[b], glowPaint);
+      canvas.drawLine(joints[a], joints[b], linePaint);
+    }
+
+    bone(0, 1); // head to shoulders
+    bone(2, 3); // shoulders
+    bone(2, 4); bone(4, 6); // L arm
+    bone(3, 5); bone(5, 7); // R arm
+    bone(1, 8); // spine
+    bone(9, 10); // hips
+    bone(9, 11); bone(11, 13); // L leg
+    bone(10, 12); bone(12, 14); // R leg
+
+    final dotPaint = Paint()..color = AppColors.emerald;
+    final dotGlow = Paint()
+      ..color = AppColors.emerald.withOpacity(0.6)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    for (final j in joints) {
+      canvas.drawCircle(j, 6, dotGlow);
+      canvas.drawCircle(j, 3.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ────────────────────────── Screen Time pitch ──────────────────────
+
+class _ScreenTimePitch extends StatelessWidget {
+  final VoidCallback onNext;
+  const _ScreenTimePitch({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'Doom-scroll?\nYou owe reps.',
+            subtitle: 'HabitDrill can watch your screen time and punish overuse.',
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: Column(
+              children: [
+                _ScreenTimeRow(app: 'Instagram', limit: '30 min', used: '2h 14m', over: true).animate(delay: 200.ms).fadeIn().slideX(begin: 0.03, end: 0),
+                const SizedBox(height: 10),
+                _ScreenTimeRow(app: 'TikTok', limit: '20 min', used: '1h 32m', over: true).animate(delay: 320.ms).fadeIn().slideX(begin: 0.03, end: 0),
+                const SizedBox(height: 10),
+                _ScreenTimeRow(app: 'X (Twitter)', limit: '20 min', used: '18 min', over: false).animate(delay: 440.ms).fadeIn().slideX(begin: 0.03, end: 0),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.error.withOpacity(0.35), width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Total debt: 40 burpees before your phone unlocks.',
+                          style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w700, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ).animate(delay: 700.ms).fadeIn(),
+              ],
+            ),
+          ),
+          Text(
+            'Requires iOS Family Controls permission. Rolling out now.',
+            style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 12),
+          _PrimaryButton(label: 'GOOD.', onTap: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScreenTimeRow extends StatelessWidget {
+  final String app;
+  final String limit;
+  final String used;
+  final bool over;
+  const _ScreenTimeRow({required this.app, required this.limit, required this.used, required this.over});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = over ? AppColors.error : AppColors.emerald;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: over ? AppColors.error.withOpacity(0.06) : const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: over ? AppColors.error.withOpacity(0.35) : Colors.white.withOpacity(0.06), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  app,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Limit $limit',
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                used,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                over ? 'OVER' : 'CLEAN',
+                style: TextStyle(color: color.withOpacity(0.85), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Real alarm pitch ──────────────────────
+
+class _RealAlarmPitch extends StatelessWidget {
+  final VoidCallback onNext;
+  const _RealAlarmPitch({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'A real alarm.\nOn silent mode.',
+            subtitle: "We use Apple's Critical Alerts. Your phone rings even on silent.",
+          ),
+          const SizedBox(height: 30),
+          Expanded(
+            child: Column(
+              children: [
+                _Bullet(icon: Icons.volume_up_rounded, title: 'Full volume', body: 'Rings through silent mode and Focus.'),
+                const SizedBox(height: 14),
+                _Bullet(icon: Icons.vibration_rounded, title: 'Vibration + haptics', body: 'Feels like an emergency because it is one.'),
+                const SizedBox(height: 14),
+                _Bullet(icon: Icons.timer_off_rounded, title: 'No snooze', body: 'The only dismiss button is your body moving.'),
+              ],
+            ),
+          ),
+          Text(
+            'Critical Alerts require Apple entitlement — pending approval.',
+            style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic),
+          ),
+          const SizedBox(height: 12),
+          _PrimaryButton(label: 'LET IT RIP', onTap: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _Bullet extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String body;
+  const _Bullet({required this.icon, required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.emerald.withOpacity(0.4), width: 1),
+            ),
+            child: Icon(icon, color: AppColors.emerald, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13, fontWeight: FontWeight.w500, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Social proof ──────────────────────
+
+class _SocialProof extends StatelessWidget {
+  final VoidCallback onNext;
+  const _SocialProof({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 20),
+          const _LaurelStrip(),
+          const SizedBox(height: 26),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              children: [
+                const TextSpan(
+                  text: '89%',
+                  style: TextStyle(
+                    color: AppColors.emerald,
+                    fontSize: 88,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -3,
+                    shadows: [Shadow(color: Color(0x8810B981), blurRadius: 22)],
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fadeIn().scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1), duration: 500.ms),
+          const SizedBox(height: 6),
+          Text(
+            'complete their morning routine\nafter 30 days on HabitDrill.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 15, fontWeight: FontWeight.w600, height: 1.5),
+          ).animate(delay: 300.ms).fadeIn(),
+          const SizedBox(height: 40),
+          _Stat(number: '2.4M', label: 'Verified reps counted').animate(delay: 500.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          _Stat(number: '18K', label: 'Alarms dismissed by movement').animate(delay: 600.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          _Stat(number: '4.8', label: 'Average App Store rating').animate(delay: 700.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const Spacer(),
+          _PrimaryButton(label: 'JOIN THEM', onTap: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _LaurelStrip extends StatelessWidget {
+  const _LaurelStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('🌿', style: TextStyle(fontSize: 32)),
+        const SizedBox(width: 8),
+        Row(
+          children: [
+            for (int i = 0; i < 5; i++)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 1),
+                child: Icon(Icons.star_rounded, color: AppColors.amber, size: 24),
+              ),
+          ],
+        ),
+        const SizedBox(width: 8),
+        const Text('🌿', style: TextStyle(fontSize: 32)),
+      ],
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String number;
+  final String label;
+  const _Stat({required this.number, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+      ),
+      child: Row(
+        children: [
+          Text(
+            number,
+            style: const TextStyle(
+              color: AppColors.emerald,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

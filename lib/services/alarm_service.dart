@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../models/habit.dart';
@@ -111,8 +112,56 @@ class AlarmService {
     }
   }
 
+  /// Where MainScreen picks up a fresh alarm tap (habitId + tap time).
+  static const String _kLastAlarmHabit = 'last_alarm_tapped_habit';
+  static const String _kLastAlarmAt = 'last_alarm_tapped_at';
+
+  static Future<void> _saveAlarmTap(String? habitId) async {
+    if (habitId == null || habitId.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kLastAlarmHabit, habitId);
+      await prefs.setInt(_kLastAlarmAt, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('saveAlarmTap failed: $e');
+    }
+  }
+
+  /// Returns the habit id the user just tapped an alarm for, if the tap
+  /// happened within the last 5 minutes. Otherwise returns null. Consumes
+  /// the flag so the same tap can't fire twice.
+  static Future<String?> consumeRecentAlarmTap() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final habitId = prefs.getString(_kLastAlarmHabit);
+      final at = prefs.getInt(_kLastAlarmAt);
+      if (habitId == null || at == null) return null;
+      final ageMs = DateTime.now().millisecondsSinceEpoch - at;
+      await prefs.remove(_kLastAlarmHabit);
+      await prefs.remove(_kLastAlarmAt);
+      if (ageMs > const Duration(minutes: 5).inMilliseconds) return null;
+      return habitId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Check if the app was launched by a notification tap (cold start).
+  /// Call this from main() before runApp so we can route to the alarm screen.
+  static Future<void> handleColdStartAlarm() async {
+    try {
+      final details = await _notifications.getNotificationAppLaunchDetails();
+      if (details?.didNotificationLaunchApp ?? false) {
+        await _saveAlarmTap(details?.notificationResponse?.payload);
+      }
+    } catch (e) {
+      debugPrint('handleColdStartAlarm failed: $e');
+    }
+  }
+
   static void _onNotificationTapped(NotificationResponse response) {
     debugPrint('🔔 Notification tapped: ${response.payload}');
+    _saveAlarmTap(response.payload);
   }
 
   /// Schedule weekly alarms for a habit using local notifications only
@@ -177,6 +226,12 @@ class AlarmService {
                 presentAlert: true,
                 presentSound: true,
                 presentBadge: true,
+                // Time-sensitive bypasses Focus modes and DND. Rings at the
+                // user's ringer volume even when Focus is on. This is the
+                // best we can ship without Apple's Critical Alerts entitlement.
+                // Once that's approved, upgrade to InterruptionLevel.critical.
+                interruptionLevel: InterruptionLevel.timeSensitive,
+                sound: 'alarm.caf',
               ),
             ),
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,

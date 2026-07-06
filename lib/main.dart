@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 // Timezone init
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -17,6 +18,7 @@ import 'models/habit.dart';
 import 'models/violation.dart';
 import 'services/local_storage.dart';
 import 'services/alarm_service.dart';
+// LocalStorageService import already covers Habit lookup by id.
 import 'services/sergeant_service.dart';
 import 'services/retention_service.dart';
 import 'services/premium_service.dart';
@@ -24,6 +26,7 @@ import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding/onboarding_flow.dart';
 import 'screens/sergeant/punishment_screen.dart';
+import 'screens/morning_alarm_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/privacy_screen.dart';
@@ -80,8 +83,40 @@ Future<void> main() async {
 
     try {
       await AlarmService.initialize();
+      // If the app was launched by the user tapping a scheduled alarm,
+      // AlarmService stashes the habit id so PunishmentGate can route to
+      // the MorningAlarm screen instead of home.
+      await AlarmService.handleColdStartAlarm();
     } catch (e) {
       debugPrint('AlarmService init failed: $e');
+    }
+
+    // Configure iOS audio session so alarm + sergeant audio play at full
+    // volume even when the phone is on silent. This is what Alarmy /
+    // Sleep Cycle do — AVAudioSessionCategory.playback overrides the
+    // physical silent switch for our session.
+    try {
+      await AudioPlayer.global.setAudioContext(
+        const AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: {
+              AVAudioSessionOptions.mixWithOthers,
+              AVAudioSessionOptions.duckOthers,
+            },
+          ),
+          android: AudioContextAndroid(
+            isSpeakerphoneOn: false,
+            stayAwake: true,
+            contentType: AndroidContentType.music,
+            usageType: AndroidUsageType.alarm,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+        ),
+      );
+      debugPrint('✅ Audio session set to playback (bypasses silent switch)');
+    } catch (e) {
+      debugPrint('AudioContext setup failed: $e');
     }
 
     try {
@@ -210,6 +245,7 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkForAlarmTap();
     _checkForPunishment();
   }
 
@@ -222,8 +258,22 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _checkForAlarmTap();
       _checkForPunishment();
     }
+  }
+
+  Future<void> _checkForAlarmTap() async {
+    final habitId = await AlarmService.consumeRecentAlarmTap();
+    if (habitId == null || !mounted) return;
+    final habit = LocalStorageService.getAllHabits().where((h) => h.id == habitId).firstOrNull;
+    if (habit == null) return;
+    await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => MorningAlarmScreen(habit: habit),
+      ),
+    );
   }
 
   void _checkForPunishment() async {

@@ -124,8 +124,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
                 child: Row(
                   children: [
-                    _planOption('MONTHLY', '\$4.99/mo', false),
-                    _planOption('YEARLY', '\$29.99/yr', true),
+                    _planOption('MONTHLY', '£7.99/mo', false),
+                    _planOption('YEARLY', '£34.99/yr', true),
                   ],
                 ),
               ),
@@ -142,8 +142,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
               // title, length, price, and auto-renew terms must be visible.
               Text(
                 _yearly
-                    ? 'HabitDrill Pro — Annual Subscription\n12 months • \$29.99 (\$2.50/month) • auto-renews yearly'
-                    : 'HabitDrill Pro — Monthly Subscription\n1 month • \$4.99 • auto-renews monthly',
+                    ? 'HabitDrill Pro — Annual Subscription\n12 months • £34.99 (£2.92/month) • auto-renews yearly'
+                    : 'HabitDrill Pro — Monthly Subscription\n1 month • £7.99 • auto-renews monthly',
                 style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, height: 1.4),
                 textAlign: TextAlign.center,
               ),
