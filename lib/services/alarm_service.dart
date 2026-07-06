@@ -192,69 +192,81 @@ class AlarmService {
       int successCount = 0;
       int failCount = 0;
 
-      // Schedule for each repeat day
+      // Schedule for each repeat day. We fire a burst of 5 notifications
+      // 8 seconds apart so the phone keeps beeping for ~40 seconds even
+      // if iOS throttles one of them or the user misses the first ping.
+      // This is the "alarm feel" without needing Critical Alerts.
+      const int burstCount = 5;
+      const Duration burstSpacing = Duration(seconds: 8);
+
       for (final day in habit.repeatDays) {
-        final alarmId = _getAlarmId(habit.id, day);
+        final baseAlarmId = _getAlarmId(habit.id, day);
         final scheduledTime = _getNextAlarmTime(day, habit.timeOfDay);
 
-        debugPrint('📅 Scheduling alarm for ${_getDayName(day)}:');
-        debugPrint('   - alarmId: $alarmId');
+        debugPrint('📅 Scheduling alarm burst for ${_getDayName(day)}:');
+        debugPrint('   - baseAlarmId: $baseAlarmId');
         debugPrint('   - time: ${habit.time}');
-        debugPrint('   - next occurrence: $scheduledTime');
+        debugPrint('   - first ping: $scheduledTime');
+        debugPrint('   - burst: ${burstCount}x every ${burstSpacing.inSeconds}s');
 
-        try {
-          await _notifications.zonedSchedule(
-            alarmId,
-            'ORDER: ${habit.title.toUpperCase()}',
-            _getAlarmMessage(),
-            scheduledTime,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                _channelId,
-                _channelName,
-                channelDescription: _channelDescription,
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                enableLights: true,
-                fullScreenIntent: true,
-                ongoing: false,
-                autoCancel: true,
+        for (int i = 0; i < burstCount; i++) {
+          // Each burst notification gets a unique id (base * 10 + burst index).
+          // Burst i=0 fires at scheduledTime; i=1 at +8s; etc.
+          final burstId = baseAlarmId * 10 + i;
+          final fireTime = scheduledTime.add(burstSpacing * i);
+
+          try {
+            await _notifications.zonedSchedule(
+              burstId,
+              'ORDER: ${habit.title.toUpperCase()}',
+              _getAlarmMessage(),
+              fireTime,
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _channelId,
+                  _channelName,
+                  channelDescription: _channelDescription,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                  enableLights: true,
+                  fullScreenIntent: true,
+                  ongoing: false,
+                  autoCancel: true,
+                ),
+                iOS: DarwinNotificationDetails(
+                  presentAlert: true,
+                  presentSound: true,
+                  presentBadge: true,
+                  interruptionLevel: InterruptionLevel.timeSensitive,
+                  sound: 'alarm.caf',
+                ),
               ),
-              iOS: DarwinNotificationDetails(
-                presentAlert: true,
-                presentSound: true,
-                presentBadge: true,
-                // Time-sensitive bypasses Focus modes and DND. Rings at the
-                // user's ringer volume even when Focus is on. This is the
-                // best we can ship without Apple's Critical Alerts entitlement.
-                // Once that's approved, upgrade to InterruptionLevel.critical.
-                interruptionLevel: InterruptionLevel.timeSensitive,
-                sound: 'alarm.caf',
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            payload: habit.id,
-          );
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              // Only the FIRST ping in the burst matches weekly. The follow-up
+              // pings are one-shots — they'll fire once when we schedule them
+              // and be re-created for next week when the first ping fires and
+              // scheduleAlarm runs again on the returning weekday.
+              matchDateTimeComponents: i == 0 ? DateTimeComponents.dayOfWeekAndTime : null,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              payload: habit.id,
+            );
 
-          successCount++;
-          debugPrint('   ✅ SUCCESS for ${_getDayName(day)}');
-
-          // 🔥 Track this alarm for the debugger screen
-          _scheduledAlarms[alarmId] = {
-            'habitTitle': habit.title,
-            'habitId': habit.id,
-            'day': day,
-            'time': habit.time,
-            'scheduledAt': scheduledTime.toIso8601String(),
-          };
-        } catch (e) {
-          failCount++;
-          debugPrint('   ❌ ERROR for ${_getDayName(day)}: $e');
+            successCount++;
+            _scheduledAlarms[burstId] = {
+              'habitTitle': habit.title,
+              'habitId': habit.id,
+              'day': day,
+              'time': habit.time,
+              'burst': i,
+              'scheduledAt': fireTime.toIso8601String(),
+            };
+          } catch (e) {
+            failCount++;
+            debugPrint('   ❌ ERROR burst $i for ${_getDayName(day)}: $e');
+          }
         }
       }
 
@@ -273,14 +285,17 @@ class AlarmService {
   static Future<void> cancelAlarm(String habitId) async {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('🗑️ CANCELLING ALARMS for habit: $habitId');
-    
+
     // Get pending notifications BEFORE cancellation
     final pendingBefore = await _notifications.pendingNotificationRequests();
     final habitAlarmIds = <int>[];
-    
+
+    // Burst of 5 per day, 7 days a week → 35 ids per habit.
     for (int day = 0; day < 7; day++) {
-      final id = _getAlarmId(habitId, day);
-      habitAlarmIds.add(id);
+      final baseId = _getAlarmId(habitId, day);
+      for (int i = 0; i < 5; i++) {
+        habitAlarmIds.add(baseId * 10 + i);
+      }
     }
     
     final relevantBefore = pendingBefore.where((n) => habitAlarmIds.contains(n.id)).toList();
@@ -291,15 +306,18 @@ class AlarmService {
     int failCount = 0;
     
     for (int day = 0; day < 7; day++) {
-      final id = _getAlarmId(habitId, day);
-      try {
-        await _notifications.cancel(id);
-        _scheduledAlarms.remove(id); // 🔥 keep map in sync
-        successCount++;
-        debugPrint('   ✅ Cancelled alarm ID $id (${_getDayName(day)})');
-      } catch (e) {
-        failCount++;
-        debugPrint('   ❌ Failed to cancel alarm ID $id (${_getDayName(day)}): $e');
+      final baseId = _getAlarmId(habitId, day);
+      // Cancel every burst notification (i = 0..4) for this day.
+      for (int i = 0; i < 5; i++) {
+        final id = baseId * 10 + i;
+        try {
+          await _notifications.cancel(id);
+          _scheduledAlarms.remove(id);
+          successCount++;
+        } catch (e) {
+          failCount++;
+          debugPrint('   ❌ Failed to cancel alarm ID $id (${_getDayName(day)} burst $i): $e');
+        }
       }
     }
     
@@ -450,7 +468,10 @@ class AlarmService {
   static Future<bool> verifyAlarmCancelled(String habitId) async {
     final habitAlarmIds = <int>[];
     for (int day = 0; day < 7; day++) {
-      habitAlarmIds.add(_getAlarmId(habitId, day));
+      final baseId = _getAlarmId(habitId, day);
+      for (int i = 0; i < 5; i++) {
+        habitAlarmIds.add(baseId * 10 + i);
+      }
     }
     
     final pending = await _notifications.pendingNotificationRequests();
