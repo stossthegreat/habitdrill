@@ -100,10 +100,10 @@ Future<void> main() async {
         const AudioContext(
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: {
+            options: [
               AVAudioSessionOptions.mixWithOthers,
               AVAudioSessionOptions.duckOthers,
-            },
+            ],
           ),
           android: AudioContextAndroid(
             isSpeakerphoneOn: false,
