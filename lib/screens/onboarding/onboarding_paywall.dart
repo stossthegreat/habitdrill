@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../design/tokens.dart';
 import '../../services/premium_service.dart';
@@ -103,7 +104,16 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
     await InAppPurchase.instance.restorePurchases();
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
+    // Only mark onboarding as seen AFTER the user actually exits the
+    // paywall — either by purchasing, restoring, or declining the rescue
+    // offer. This prevents the paywall from being skipped forever if the
+    // app is quit between the summary screen and the paywall.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('seen_onboarding', true);
+    } catch (_) {}
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MainScreen()),
       (_) => false,

@@ -52,9 +52,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   }
 
   Future<void> _finishOnboarding() async {
-    // Persist onboarding-done and create the Morning Rise habit.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('seen_onboarding', true);
+    // NOTE: We do NOT set seen_onboarding=true here. That happens inside
+    // OnboardingPaywall._goHome after the paywall is dismissed (purchase
+    // success or OTO decline). Otherwise a user who closes the app between
+    // the summary screen and the paywall would skip the paywall forever
+    // on next launch.
     try {
       final wakeTimeStr =
           '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
@@ -71,10 +73,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
           );
     } catch (_) {}
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => OnboardingPaywall(state: _s),
-      ),
+    // pushAndRemoveUntil forces the paywall as root — pushReplacement
+    // was silently no-op'ing when we're the home widget of MaterialApp.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => OnboardingPaywall(state: _s)),
+      (route) => false,
     );
   }
 
