@@ -51,30 +51,35 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     _pc.previousPage(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
   }
 
-  Future<void> _finishOnboarding() async {
-    // NOTE: We do NOT set seen_onboarding=true here. That happens inside
-    // OnboardingPaywall._goHome after the paywall is dismissed (purchase
-    // success or OTO decline). Otherwise a user who closes the app between
-    // the summary screen and the paywall would skip the paywall forever
-    // on next launch.
-    try {
-      final wakeTimeStr =
-          '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
-      await ref.read(habitEngineProvider).createHabit(
-            title: 'Morning Rise',
-            type: 'habit',
-            time: wakeTimeStr,
-            startDate: DateTime.now(),
-            endDate: DateTime.now().add(const Duration(days: 365)),
-            repeatDays: const [0, 1, 2, 3, 4, 5, 6],
-            reminderOn: true,
-            color: AppColors.emerald,
-            emoji: '☀️',
-          );
-    } catch (_) {}
+  void _finishOnboarding() {
+    // Route to paywall FIRST. Don't await anything — a slow createHabit
+    // or a permission-prompt hang was hiding the paywall on some devices.
+    // Habit creation is fire-and-forget in the background. If the user
+    // grants notification permission, alarms schedule for their next
+    // wake time. If they deny, the paywall still shows and they can
+    // fix perms in Settings later.
+    final wakeTimeStr =
+        '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
+    Future(() async {
+      try {
+        await ref.read(habitEngineProvider).createHabit(
+              title: 'Morning Rise',
+              type: 'habit',
+              time: wakeTimeStr,
+              startDate: DateTime.now(),
+              endDate: DateTime.now().add(const Duration(days: 365)),
+              repeatDays: const [0, 1, 2, 3, 4, 5, 6],
+              reminderOn: true,
+              color: AppColors.emerald,
+              emoji: '☀️',
+            );
+      } catch (e) {
+        debugPrint('Morning Rise habit creation failed: $e');
+      }
+    });
+    // NOTE: seen_onboarding is set inside OnboardingPaywall._goHome, so
+    // closing the app mid-paywall means they see it again on next launch.
     if (!mounted) return;
-    // pushAndRemoveUntil forces the paywall as root — pushReplacement
-    // was silently no-op'ing when we're the home widget of MaterialApp.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => OnboardingPaywall(state: _s)),
       (route) => false,
