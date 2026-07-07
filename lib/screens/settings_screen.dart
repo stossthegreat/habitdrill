@@ -1,222 +1,244 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../design/tokens.dart';
-import '../widgets/glass_card.dart';
-import '../widgets/glass_button.dart';
-import '../services/local_storage.dart';
 import '../services/analytics_service.dart';
+import 'terms_screen.dart';
+import 'privacy_screen.dart';
+import 'support_screen.dart';
 import 'paywall_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+/// Erly-style clean list. This is BOTH the standalone Settings screen
+/// (when opened from a link) and the SETTINGS tab in the bottom nav.
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    AnalyticsService.logScreenView('settings');
-  }
-
-  Future<void> _resetAllData() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.baseDark2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppBorderRadius.lg),
-          side: BorderSide(color: AppColors.error.withOpacity(0.5)),
-        ),
-        title: Text('Reset All Data', style: AppTextStyles.h3.copyWith(color: AppColors.error)),
-        content: Text('This will delete ALL orders, rules, and progress. Cannot be undone.', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textTertiary)),
-          ),
-          GlassButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            backgroundColor: AppColors.error.withOpacity(0.2),
-            borderColor: AppColors.error.withOpacity(0.3),
-            child: Text('Reset', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    ) ?? false;
-
-    if (confirmed) {
-      await LocalStorageService.clearAllHabits();
-      await LocalStorageService.clearAllSettings();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All data reset.'), backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    AnalyticsService.logScreenView('settings');
     return Scaffold(
-      backgroundColor: AppColors.baseDark1,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Settings', style: AppTextStyles.h2.copyWith(fontWeight: FontWeight.w700)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            // HabitDrill Pro
-            GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen())),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.emerald.withOpacity(0.2), AppColors.emerald.withOpacity(0.05)],
+      backgroundColor: const Color(0xFF050505),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(AppBorderRadius.xl),
-                  border: Border.all(color: AppColors.emerald.withOpacity(0.4), width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(gradient: AppColors.emeraldGradient, borderRadius: BorderRadius.circular(AppBorderRadius.md)),
-                      child: const Icon(LucideIcons.crown, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'SETTINGS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 4,
+                      height: 1,
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('HABITDRILL PRO', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700, color: AppColors.emerald, letterSpacing: 1)),
-                          Text('Unlock full enforcement', style: AppTextStyles.captionSmall.copyWith(color: AppColors.textSecondary)),
-                        ],
-                      ),
-                    ),
-                    const Icon(LucideIcons.chevronRight, color: AppColors.emerald, size: 20),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _SettingsRow(
+                icon: LucideIcons.creditCard,
+                label: 'Manage Subscription',
+                onTap: () => _openManageSubscription(),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.crown,
+                label: 'Unlock Pro',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    fullscreenDialog: true,
+                    builder: (_) => const PaywallScreen(),
+                  ),
                 ),
               ),
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            // Data
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(LucideIcons.database, size: 20, color: AppColors.emerald),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text('Data', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  SizedBox(
-                    width: double.infinity,
-                    child: GlassButton(
-                      onPressed: _resetAllData,
-                      backgroundColor: AppColors.error.withOpacity(0.1),
-                      borderColor: AppColors.error.withOpacity(0.3),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(LucideIcons.trash2, size: 16, color: AppColors.error),
-                          const SizedBox(width: 8),
-                          Text('Reset All Data', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+              _SettingsRow(
+                icon: LucideIcons.bell,
+                label: 'Notifications',
+                onTap: () => _openAppSettings(),
               ),
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            // Legal & Support
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(LucideIcons.fileText, size: 20, color: AppColors.emerald),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text('Legal & Support', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildNavItem('Terms & Conditions', LucideIcons.fileText, () => Navigator.pushNamed(context, '/terms')),
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildNavItem('Privacy Policy', LucideIcons.shield, () => Navigator.pushNamed(context, '/privacy')),
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildNavItem('Help & Support', LucideIcons.helpCircle, () => Navigator.pushNamed(context, '/support')),
-                ],
+              _SettingsRow(
+                icon: LucideIcons.alarmClock,
+                label: 'Alarm Settings',
+                onTap: () => _openAppSettings(),
               ),
-            ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            // About
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.asset('assets/icon/app_icon.png', width: 28, height: 28, fit: BoxFit.cover)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Text('HabitDrill', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Discipline enforcement system. v1.0.0', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
-                ],
+              _SettingsRow(
+                icon: LucideIcons.helpCircle,
+                label: 'Support',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SupportScreen()),
+                ),
               ),
-            ),
-
-            const SizedBox(height: 100),
-          ],
+              _SettingsRow(
+                icon: LucideIcons.star,
+                label: 'Leave a Review',
+                onTap: () => _leaveReview(),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.lock,
+                label: 'Privacy Policy',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+                ),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.fileText,
+                label: 'Terms of Service',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TermsScreen()),
+                ),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.info,
+                label: 'About',
+                onTap: () => _showAbout(context),
+              ),
+              const SizedBox(height: 32),
+              const _Footer(),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(String title, IconData icon, VoidCallback onTap) {
+  Future<void> _openManageSubscription() async {
+    // Deep link straight to the App Store subscriptions management page.
+    final uri = Uri.parse('https://apps.apple.com/account/subscriptions');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openAppSettings() async {
+    // Deep link to the app's iOS Settings page — Notifications live there,
+    // alarm-related settings live under the Notifications section, so one
+    // entry point covers both.
+    final uri = Uri.parse('app-settings:');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _leaveReview() async {
+    final uri = Uri.parse(
+      'https://apps.apple.com/app/id0000000000?action=write-review',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showAbout(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'HabitDrill',
+      applicationVersion: '1.0.2',
+      applicationLegalese: 'Discipline enforcement system.',
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SettingsRow({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: AppColors.glassBackground,
-          borderRadius: BorderRadius.circular(AppBorderRadius.md),
-          border: Border.all(color: AppColors.glassBorder),
+          color: const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.emerald),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(child: Text(title, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary))),
-            const Icon(LucideIcons.chevronRight, size: 20, color: AppColors.textTertiary),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: Colors.white.withOpacity(0.75), size: 18),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronRight,
+              color: Colors.white.withOpacity(0.35),
+              size: 18,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _Footer extends StatelessWidget {
+  const _Footer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        children: [
+          Text(
+            'HABITDRILL',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.25),
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'v1.0.2',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.2),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
