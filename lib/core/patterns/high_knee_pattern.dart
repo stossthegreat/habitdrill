@@ -65,6 +65,15 @@ class HighKneePattern extends BasePattern {
   bool processFrame(Map<PoseLandmarkType, PoseLandmark> landmarks) {
     _justHitTrigger = false;
 
+    // Anti-cheat: full-body visible, upright, camera still.
+    lastFormResult = formGate.check(landmarks);
+    if (!lastFormResult.ok) {
+      _feedback = lastFormResult.uiMessage;
+      _leftActive = false;
+      _rightActive = false;
+      return false;
+    }
+
     final lH = landmarks[PoseLandmarkType.leftHip];
     final rH = landmarks[PoseLandmarkType.rightHip];
     final lK = landmarks[PoseLandmarkType.leftKnee];

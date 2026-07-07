@@ -118,6 +118,14 @@ class PushPattern extends BasePattern {
 
     _justHitTrigger = false;
 
+    // Anti-cheat: full-body visible, camera still. Skip the upright
+    // geometry check because push-ups are horizontal.
+    lastFormResult = formGate.check(map, requireUpright: false);
+    if (!lastFormResult.ok) {
+      _feedback = lastFormResult.uiMessage;
+      return false;
+    }
+
     // =======================================================
     // PUSH LOGIC (Angle Based)
     // =======================================================
