@@ -7,6 +7,7 @@ import '../../providers/habit_provider.dart';
 import '../../services/alarm_service.dart';
 import '../../services/discipline_service.dart';
 import '../../services/wake_debt_service.dart';
+import '../../services/wake_mission_prefs.dart';
 import 'exercise_circuit_screen.dart';
 
 /// Wake-alarm exercise flow. Wraps ExerciseCircuitScreen with a squats-only
@@ -23,24 +24,40 @@ class WakeExerciseScreen extends ConsumerStatefulWidget {
 }
 
 class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
-  late final ExerciseSet _set;
+  ExerciseSet? _set;
 
   @override
   void initState() {
     super.initState();
-    final reps = WakeDebtService.totalRepsFor(widget.habit);
-    _set = ExerciseSet(
-      exercises: [
-        Exercise(
-          name: 'Squats',
-          engineId: 'squats',
-          emoji: '\u{1F9CE}',
-          reps: reps,
-        ),
-      ],
-      escalationLevel: 0,
-      offenseNumber: 0,
-    );
+    _buildSet();
+  }
+
+  /// Build the ExerciseSet by combining the user's chosen mission (from
+  /// WakeMissionPrefs) with the pledged rep count, plus escalating debt
+  /// reps accumulated while they stalled. Fallback: squats.
+  Future<void> _buildSet() async {
+    final mission = await WakeMissionPrefs.getMission(widget.habit.id);
+    final pledged = await WakeMissionPrefs.getReps(widget.habit.id);
+    final debt = WakeDebtService.minutesLate(widget.habit) *
+        WakeDebtService.repsPerMinute;
+    final total = pledged +
+        debt.clamp(0, WakeDebtService.maxDebtReps);
+
+    if (!mounted) return;
+    setState(() {
+      _set = ExerciseSet(
+        exercises: [
+          Exercise(
+            name: mission.name,
+            engineId: mission.engineId,
+            emoji: mission.emoji,
+            reps: total,
+          ),
+        ],
+        escalationLevel: 0,
+        offenseNumber: 0,
+      );
+    });
   }
 
   Future<void> _onWakeComplete() async {
@@ -69,8 +86,19 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // While the mission is loading from SharedPreferences (single frame),
+    // show a black holding screen so we don't flash a broken ExerciseSet.
+    final set = _set;
+    if (set == null) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
     return ExerciseCircuitScreen(
-      overrideSet: _set,
+      overrideSet: set,
       onComplete: _onWakeComplete,
     );
   }

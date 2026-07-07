@@ -6,9 +6,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../providers/habit_provider.dart';
+import '../services/alarm_service.dart';
 import '../services/analytics_service.dart';
 import 'new_contract_screen.dart';
 import 'new_contract_templates_screen.dart';
+import 'new_wake_alarm_screen.dart';
 
 class ContractsScreen extends ConsumerStatefulWidget {
   const ContractsScreen({super.key});
@@ -44,6 +46,41 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
     );
   }
 
+  Future<void> _openNewWakeAlarm({Habit? edit}) async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => NewWakeAlarmScreen(edit: edit),
+      ),
+    );
+  }
+
+  Future<void> _showAddSheet() async {
+    HapticFeedback.mediumImpact();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AddSheet(),
+    );
+    if (choice == 'alarm') {
+      await _openNewWakeAlarm();
+    } else if (choice == 'contract') {
+      await _openTemplates();
+    }
+  }
+
+  Future<void> _toggleAlarm(Habit h, bool on) async {
+    HapticFeedback.selectionClick();
+    final updated = h.copyWith(reminderOn: on);
+    await ref.read(habitEngineProvider).updateHabit(updated);
+    if (on && updated.time.isNotEmpty) {
+      await AlarmService.scheduleAlarm(updated);
+    } else {
+      await AlarmService.cancelAlarm(h.id);
+    }
+  }
+
   Future<void> _confirmDelete(Habit h) async {
     HapticFeedback.mediumImpact();
     final confirmed = await showDialog<bool>(
@@ -73,6 +110,12 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
       return end.isBefore(today);
     }).toList();
 
+    // Wake alarms = active habits with a scheduled time. Everything else
+    // is a plain contract. Two visually distinct sections so users see
+    // what's ringing them at what time before they see their promises.
+    final wakeAlarms = active.where((h) => h.time.isNotEmpty).toList();
+    final contracts = active.where((h) => h.time.isEmpty).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
       body: SafeArea(
@@ -84,33 +127,52 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               const SliverToBoxAdapter(child: _Header()),
-              SliverToBoxAdapter(child: _SectionLabel(label: 'ACTIVE', count: active.length)),
-              if (active.isEmpty)
+              if (wakeAlarms.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: _SectionLabel(label: 'ALARMS', count: wakeAlarms.length),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverList.builder(
+                    itemCount: wakeAlarms.length,
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _WakeAlarmCard(
+                        habit: wakeAlarms[i],
+                        index: i,
+                        onEdit: () => _openNewWakeAlarm(edit: wakeAlarms[i]),
+                        onToggle: (v) => _toggleAlarm(wakeAlarms[i], v),
+                        onLongPress: () => _confirmDelete(wakeAlarms[i]),
+                      ),
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
+              SliverToBoxAdapter(
+                child: _SectionLabel(
+                  label: 'CONTRACTS',
+                  count: contracts.length,
+                ),
+              ),
+              if (contracts.isEmpty)
                 const SliverToBoxAdapter(child: _EmptyState())
               else
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   sliver: SliverList.builder(
-                    itemCount: active.length,
+                    itemCount: contracts.length,
                     itemBuilder: (context, i) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _ContractCard(
-                        habit: active[i],
+                        habit: contracts[i],
                         index: i,
-                        onTap: () => _openEdit(active[i]),
-                        onLongPress: () => _confirmDelete(active[i]),
+                        onTap: () => _openEdit(contracts[i]),
+                        onLongPress: () => _confirmDelete(contracts[i]),
                       ),
                     ),
                   ),
                 ),
-              // Big + New Contract button that opens the templates screen.
-              // NO template grid here — that's on its own screen now.
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                sliver: SliverToBoxAdapter(
-                  child: _NewContractButton(onTap: _openTemplates),
-                ),
-              ),
               if (history.isNotEmpty) ...[
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 SliverToBoxAdapter(child: _SectionLabel(label: 'HISTORY', count: history.length)),
@@ -125,12 +187,307 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                   ),
                 ),
               ],
-              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              // Bottom padding — leave room for the FAB + the nav bar.
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),
         ),
       ),
+      floatingActionButton: _AddFab(onTap: _showAddSheet),
     );
+  }
+}
+
+// ────────────────────────── Small + FAB ──────────────────────────
+
+class _AddFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 70),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: AppColors.emeraldGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.emerald.withOpacity(0.45),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: const Icon(
+            LucideIcons.plus,
+            color: Colors.black,
+            size: 26,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── FAB action sheet ────────────────────────
+
+class _AddSheet extends StatelessWidget {
+  const _AddSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        top: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _SheetOption(
+            icon: LucideIcons.alarmClock,
+            title: 'NEW WAKE ALARM',
+            subtitle: 'Fires at a set time. You pick the reps.',
+            onTap: () => Navigator.of(context).pop('alarm'),
+          ),
+          _SheetOption(
+            icon: LucideIcons.scroll,
+            title: 'NEW CONTRACT',
+            subtitle: 'A promise. We pick the punishment if you break it.',
+            onTap: () => Navigator.of(context).pop('contract'),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _SheetOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.emerald.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.emerald.withOpacity(0.3)),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.emerald, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.45),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronRight,
+              color: Colors.white.withOpacity(0.35),
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Wake alarm card ─────────────────────────
+
+class _WakeAlarmCard extends StatelessWidget {
+  final Habit habit;
+  final int index;
+  final VoidCallback onEdit;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onLongPress;
+
+  const _WakeAlarmCard({
+    required this.habit,
+    required this.index,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onEdit,
+      onLongPress: onLongPress,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: habit.reminderOn
+                ? AppColors.emerald.withOpacity(0.25)
+                : Colors.white.withOpacity(0.05),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  habit.time,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  habit.title.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _daysLabel(habit.repeatDays),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Switch.adaptive(
+                  value: habit.reminderOn,
+                  onChanged: onToggle,
+                  activeColor: AppColors.emerald,
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: onEdit,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          LucideIcons.pencil,
+                          color: Colors.white.withOpacity(0.6),
+                          size: 12,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'EDIT',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate(delay: (index * 60).ms)
+        .fadeIn(duration: 300.ms)
+        .slideY(begin: 0.04, end: 0);
+  }
+
+  String _daysLabel(List<int> days) {
+    if (days.length == 7) return 'EVERY DAY';
+    if (days.length == 5 &&
+        days.contains(1) &&
+        days.contains(2) &&
+        days.contains(3) &&
+        days.contains(4) &&
+        days.contains(5)) {
+      return 'WEEKDAYS';
+    }
+    if (days.length == 2 && days.contains(0) && days.contains(6)) {
+      return 'WEEKENDS';
+    }
+    const labels = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    return days.map((d) => labels[d]).join(' · ');
   }
 }
 
