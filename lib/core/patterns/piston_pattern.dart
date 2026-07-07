@@ -125,6 +125,13 @@ class PistonPattern extends BasePattern {
     }
     _justHitTrigger = false;
 
+    // Anti-cheat: full-body visible, upright, camera still.
+    lastFormResult = formGate.check(map);
+    if (!lastFormResult.ok) {
+      _feedback = lastFormResult.uiMessage;
+      return false;
+    }
+
     double dist = _calcDistance(map);
     if (dist < 0) {
       _feedback = "Stay in frame";

@@ -63,10 +63,20 @@ class SquatPattern extends BasePattern {
   bool processFrame(Map<PoseLandmarkType, PoseLandmark> map) {
     _justHitTrigger = false;
 
+    // Anti-cheat gate. Rejects partial-body / hallucinated / phone-swing
+    // frames BEFORE we ever look at knee angles.
+    lastFormResult = formGate.check(map);
+    if (!lastFormResult.ok) {
+      _feedback = lastFormResult.uiMessage;
+      _leftActive = false;
+      _rightActive = false;
+      return false;
+    }
+
     final lH = map[PoseLandmarkType.leftHip];
     final lK = map[PoseLandmarkType.leftKnee];
     final lA = map[PoseLandmarkType.leftAnkle];
-    
+
     final rH = map[PoseLandmarkType.rightHip];
     final rK = map[PoseLandmarkType.rightKnee];
     final rA = map[PoseLandmarkType.rightAnkle];
