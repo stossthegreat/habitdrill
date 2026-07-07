@@ -265,11 +265,18 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   Future<void> _checkForAlarmTap() async {
-    // First look for a fresh notification tap. If none, fall back to any
-    // unfinished wake alarm the user closed the app on — that debt is
-    // still owed and the app should re-open straight into it.
+    // Priority 1: fresh notification tap payload (local-notification path).
     var habitId = await AlarmService.consumeRecentAlarmTap();
+    // Priority 2: unfinished wake the user closed the app on.
     habitId ??= await WakeDebtService.getActiveHabitId();
+    // Priority 3: AlarmKit (iOS 26+) fires a system-level alert that
+    // dismisses when the user taps Stop, foregrounding the app WITHOUT
+    // a payload. Fall back to whichever wake habit was scheduled to
+    // fire in the last 30 minutes — that's almost certainly the one
+    // they just dismissed.
+    if (habitId == null) {
+      habitId = _findRecentlyFiredWakeHabitId();
+    }
     if (habitId == null || !mounted) return;
     final habit = LocalStorageService.getAllHabits()
         .where((h) => h.id == habitId)
@@ -281,6 +288,26 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
         builder: (_) => MorningAlarmScreen(habit: habit),
       ),
     );
+  }
+
+  /// Find a wake habit whose scheduled fire happened in the last 30 min.
+  /// Used when AlarmKit fires a system alert and the user taps Stop —
+  /// we don't get a notification payload, so we infer.
+  String? _findRecentlyFiredWakeHabitId() {
+    final now = DateTime.now();
+    final today = now.weekday == 7 ? 0 : now.weekday; // 0=Sun..6=Sat
+    for (final h in LocalStorageService.getAllHabits()) {
+      if (!h.reminderOn || h.time.isEmpty) continue;
+      if (!h.repeatDays.contains(today)) continue;
+      try {
+        final parts = h.time.split(':');
+        final fire = DateTime(now.year, now.month, now.day,
+            int.parse(parts[0]), int.parse(parts[1]));
+        final diff = now.difference(fire);
+        if (diff.inSeconds >= 0 && diff.inMinutes <= 30) return h.id;
+      } catch (_) {}
+    }
+    return null;
   }
 
   void _checkForPunishment() async {

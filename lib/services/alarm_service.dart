@@ -223,6 +223,7 @@ class AlarmService {
               id: akId,
               title: 'ORDER: ${habit.title.toUpperCase()}',
               fireAt: fireDate.toLocal(),
+              habitId: habit.id,
             );
             debugPrint('   🛎️ AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}');
           } catch (e) {

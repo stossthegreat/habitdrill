@@ -44,17 +44,21 @@ class AlarmKitService {
 
   /// Schedules a one-shot alarm at `fireAt`. Returns true on success.
   /// `id` MUST be a UUID string (native side parses it as UUID).
+  /// `habitId` is the Habit.id — carried through the AppIntent so that
+  /// tapping the alarm routes into the correct wake screen on resume.
   static Future<bool> schedule({
     required String id,
     required String title,
     required DateTime fireAt,
+    String habitId = '',
   }) async {
     if (!Platform.isIOS) return false;
     try {
       final res = await _channel.invokeMethod<bool>('schedule', {
         'id': id,
         'title': title,
-        'fireAtEpochSeconds': fireAt.millisecondsSinceEpoch / 1000.0,
+        'fireAtMs': fireAt.millisecondsSinceEpoch,
+        'habitId': habitId,
       });
       return res == true;
     } catch (e) {
