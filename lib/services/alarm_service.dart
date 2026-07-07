@@ -231,11 +231,11 @@ class AlarmService {
         }
       }
 
-      // Schedule a burst of 5 notifications 8 seconds apart as a fallback
-      // (and belt-and-suspenders on iOS 26 too — never rely on a single
-      // path for waking someone up).
-      const int burstCount = 5;
-      const Duration burstSpacing = Duration(seconds: 8);
+      // Pound them awake. 10 back-to-back time-sensitive notifications
+      // 4 seconds apart = 40 seconds of relentless ringing. Every ping is
+      // a Sound file play + banner + vibration. No mercy.
+      const int burstCount = 10;
+      const Duration burstSpacing = Duration(seconds: 4);
 
       for (final day in habit.repeatDays) {
         final baseAlarmId = _getAlarmId(habit.id, day);
@@ -278,7 +278,10 @@ class AlarmService {
                   presentSound: true,
                   presentBadge: true,
                   interruptionLevel: InterruptionLevel.timeSensitive,
-                  sound: 'alarm.caf',
+                  // sound: 'alarm.caf' — REMOVED. Referencing a missing sound
+                  // file in the bundle causes iOS to silently drop the
+                  // notification. Using default alert sound until we ship a
+                  // real alarm.caf asset.
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -337,10 +340,10 @@ class AlarmService {
     final pendingBefore = await _notifications.pendingNotificationRequests();
     final habitAlarmIds = <int>[];
 
-    // Burst of 5 per day, 7 days a week → 35 ids per habit.
+    // Burst of 10 per day, 7 days a week → 70 ids per habit.
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 10; i++) {
         habitAlarmIds.add(baseId * 10 + i);
       }
     }
@@ -355,7 +358,7 @@ class AlarmService {
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
       // Cancel every burst notification (i = 0..4) for this day.
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 10; i++) {
         final id = baseId * 10 + i;
         try {
           await _notifications.cancel(id);
@@ -523,7 +526,7 @@ class AlarmService {
     final habitAlarmIds = <int>[];
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 10; i++) {
         habitAlarmIds.add(baseId * 10 + i);
       }
     }
