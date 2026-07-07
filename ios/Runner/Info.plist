@@ -27,13 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>HabitDrill needs camera access for AI exercise tracking during workouts.</string>
+	<string>HabitDrill's AI drill sergeant watches every rep of your punishment. No camera, no way to prove you did it, no way to clear your debt.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>HabitDrill may use microphone for workout audio features.</string>
+	<string>HabitDrill uses your microphone during drill sergeant training sessions.</string>
 	<key>NSUserNotificationsUsageDescription</key>
-	<string>HabitDrill needs notifications to remind you about your orders and enforce discipline.</string>
+	<string>HabitDrill is your drill sergeant. It shouts your orders when they are due, and refuses to shut up until you complete the punishment. Turn this on.</string>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>HabitDrill uses alarms to wake you up and enforce your morning discipline. Alarms ring through Silent and Focus modes so you cannot ignore them.</string>
+	<string>Your morning alarm will hunt you down. It rings through Silent and Focus modes and does not stop until you complete the reps. Break a promise, pay the price.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

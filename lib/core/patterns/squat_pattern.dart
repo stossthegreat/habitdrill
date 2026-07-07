@@ -63,13 +63,13 @@ class SquatPattern extends BasePattern {
   bool processFrame(Map<PoseLandmarkType, PoseLandmark> map) {
     _justHitTrigger = false;
 
-    // Anti-cheat gate. Rejects partial-body / hallucinated / phone-swing
-    // frames BEFORE we ever look at knee angles.
+    // Anti-cheat gate. Rejects partial-body / hallucinated frames BEFORE
+    // we look at knee angles. DO NOT reset _active flags on failure —
+    // burpees legitimately go through a non-upright plank phase, and
+    // resetting would kill the rep count on the way back up.
     lastFormResult = formGate.check(map);
     if (!lastFormResult.ok) {
       _feedback = lastFormResult.uiMessage;
-      _leftActive = false;
-      _rightActive = false;
       return false;
     }
 

@@ -110,14 +110,13 @@ class FormGate {
       }
     }
 
-    // 5. Camera-shake detection. Track the nose over the last N frames.
-    // If it moves more than the shake threshold per frame (in normalized
-    // image units), the CAMERA is moving, not the person. Phone-swinging
-    // cheat rejected here.
-    _pushNose(nose, imageWidth ?? 1, imageHeight ?? 1);
-    if (_isShaking()) {
-      return const FormResult(FormReject.cameraShaking, 'HOLD PHONE STILL');
-    }
+    // Camera-shake detection was here — removed because it tracked nose
+    // position, which naturally moves ~50% of frame height during real
+    // burpees / jumps. It was killing legitimate reps. Landmark visibility,
+    // confidence, and body geometry are enough to catch phone-lying-flat
+    // cheats. If we need shake detection later, we'll do it by comparing
+    // motion of ALL landmarks — camera motion moves them together, body
+    // motion moves them relative to each other.
 
     return const FormResult(FormReject.ok, '');
   }

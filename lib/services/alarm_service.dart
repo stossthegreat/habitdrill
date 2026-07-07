@@ -278,7 +278,10 @@ class AlarmService {
                   presentSound: true,
                   presentBadge: true,
                   interruptionLevel: InterruptionLevel.timeSensitive,
-                  sound: 'alarm.caf',
+                  // sound: 'alarm.caf' — REMOVED. Referencing a missing sound
+                  // file in the bundle causes iOS to silently drop the
+                  // notification. Using default alert sound until we ship a
+                  // real alarm.caf asset.
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
