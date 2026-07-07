@@ -7,7 +7,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/share_card.dart';
-import '../screens/settings_screen.dart';
 import '../screens/achievements_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
 import '../screens/sergeant/tempted_screen.dart';
@@ -580,7 +579,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Wordmark — mixed case, small, no icon
           Text.rich(
             TextSpan(
               children: [
@@ -606,22 +604,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             ),
           ),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               _HeaderIcon(
                 icon: LucideIcons.flame,
                 color: AppColors.fire,
-                badge: _daysControlled > 0 ? _daysControlled.toString() : null,
-                onTap: () {},
+                badge: _bestStreak > 0 ? '$_bestStreak' : null,
+                onTap: _showShareCard,
               ),
-              const SizedBox(width: 2),
               _HeaderIcon(
                 icon: LucideIcons.award,
-                color: AppColors.amber,
+                color: const Color(0xFFF59E0B),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                 ),
               ),
-              const SizedBox(width: 2),
               _HeaderIcon(
                 icon: LucideIcons.share2,
                 color: Colors.white.withOpacity(0.7),
