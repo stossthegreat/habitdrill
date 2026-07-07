@@ -235,10 +235,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
       SergeantAudioService.playCircuitComplete();
       setState(() => _showComplete = true);
       Future.delayed(const Duration(seconds: 3), () {
-        if (mounted && !_finished) {
-          _finished = true;
-          widget.onComplete();
-        }
+        if (mounted && !_finished) _finishNow();
       });
     }
   }
@@ -249,13 +246,15 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     if (_finished) return;
     _finished = true;
     HapticFeedback.mediumImpact();
+    // Fire callback for state cleanup — do NOT wait for it. Async writes
+    // can hang and have burned us before.
     widget.onComplete();
-    // Hard fallback: if onComplete didn't pop us out within a beat, force it.
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    });
+    // Pop the punishment route DIRECTLY, right now. This is the fix.
+    // popUntil(isFirst) unwinds every pushed route on top of the home
+    // (AppRouter). No callback chain to depend on. No race conditions.
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   /// Fallback: manual tap to count rep (when camera unavailable)
