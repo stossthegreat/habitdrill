@@ -7,7 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/share_card.dart';
-import '../screens/settings_screen.dart';
+import '../screens/achievements_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
 import '../screens/sergeant/tempted_screen.dart';
 import '../screens/paywall_screen.dart';
@@ -217,62 +217,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
             ),
 
-            const SizedBox(height: AppSpacing.md),
-
-            // ===== DISCIPLINE SCORE + STREAK (tappable for share) =====
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: GestureDetector(
-                onTap: _showShareCard,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A0A0A),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.06)),
-                  ),
-                  child: Row(
-                    children: [
-                      // Score
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'DISCIPLINE',
-                            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 3),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$_score',
-                            style: TextStyle(color: scoreColor, fontSize: 42, fontWeight: FontWeight.w900, height: 1),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      // Days controlled
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'DAYS CONTROLLED',
-                            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$_daysControlled',
-                            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900, height: 1),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: AppSpacing.md),
-
-            // Date strip
+            // Date strip pushed right up under AT RISK banner
+            const SizedBox(height: 6),
             DateStrip(
               selectedDate: _selectedDate,
               onDateSelected: _onDateSelected,
@@ -342,6 +288,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 32, AppSpacing.lg, 0),
                 child: Text('NO ORDERS SET', style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 3), textAlign: TextAlign.center),
               ),
+
+            const SizedBox(height: 24),
+
+            // ===== DISCIPLINE SCORE + DAYS CONTROLLED — now at the bottom =====
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: GestureDetector(
+                onTap: _showShareCard,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0A0A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.06)),
+                  ),
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DISCIPLINE',
+                            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 3),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_score',
+                            style: TextStyle(color: scoreColor, fontSize: 42, fontWeight: FontWeight.w900, height: 1),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'DAYS CONTROLLED',
+                            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$_daysControlled',
+                            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900, height: 1),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 120),
           ],
@@ -577,48 +574,108 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.md, 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.asset('assets/icon/app_icon.png', width: 36, height: 36, fit: BoxFit.cover)),
-              const SizedBox(width: 8),
-              const Text('HABITDRILL', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2)),
-            ],
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Habit',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Drill',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.emerald,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
           ),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
+              _HeaderIcon(
+                icon: LucideIcons.flame,
+                color: AppColors.fire,
+                badge: _bestStreak > 0 ? '$_bestStreak' : null,
                 onTap: _showShareCard,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(LucideIcons.share2, color: Colors.white.withOpacity(0.4), size: 22),
+              ),
+              _HeaderIcon(
+                icon: LucideIcons.award,
+                color: const Color(0xFFF59E0B),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                 ),
               ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PaywallScreen())),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(gradient: AppColors.emeraldGradient, borderRadius: BorderRadius.circular(8)),
-                  child: const Text('PRO', style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w800)),
-                ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(LucideIcons.settings, color: Colors.white.withOpacity(0.35), size: 22),
-                ),
+              _HeaderIcon(
+                icon: LucideIcons.share2,
+                color: Colors.white.withOpacity(0.7),
+                onTap: _showShareCard,
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HeaderIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String? badge;
+  final VoidCallback onTap;
+  const _HeaderIcon({required this.icon, required this.color, this.badge, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, color: color, size: 22),
+            if (badge != null)
+              Positioned(
+                right: -6,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF050505), width: 1.5),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16),
+                  alignment: Alignment.center,
+                  child: Text(
+                    badge!,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

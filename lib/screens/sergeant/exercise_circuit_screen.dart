@@ -19,14 +19,23 @@ import '../../services/analytics_service.dart';
 import '../../services/ledger_service.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
-  final Violation violation;
+  /// Punishment flow: violation drives the exercise set.
+  final Violation? violation;
+
+  /// Wake flow (or any caller): pre-built set. When present, `violation`
+  /// is ignored for set derivation. The caller's `onComplete` is
+  /// responsible for whatever cleanup that flow needs.
+  final ExerciseSet? overrideSet;
+
   final VoidCallback onComplete;
 
   const ExerciseCircuitScreen({
     super.key,
-    required this.violation,
+    this.violation,
+    this.overrideSet,
     required this.onComplete,
-  });
+  }) : assert(violation != null || overrideSet != null,
+            'Provide either violation or overrideSet');
 
   @override
   State<ExerciseCircuitScreen> createState() => _ExerciseCircuitScreenState();
@@ -61,7 +70,8 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     AnalyticsService.logScreenView('exercise_circuit');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WakelockPlus.enable();
-    _exerciseSet = SergeantService.getExerciseSet(widget.violation);
+    _exerciseSet = widget.overrideSet
+        ?? SergeantService.getExerciseSet(widget.violation!);
   }
 
   @override

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../providers/habit_provider.dart';
 import '../services/analytics_service.dart';
 import 'new_contract_screen.dart';
+import 'new_contract_templates_screen.dart';
 
 class ContractsScreen extends ConsumerStatefulWidget {
   const ContractsScreen({super.key});
@@ -22,12 +24,22 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
     AnalyticsService.logScreenView('contracts');
   }
 
-  Future<void> _openNewContract({Habit? edit, _Preset? preset}) async {
+  Future<void> _openEdit(Habit habit) async {
     HapticFeedback.selectionClick();
     await Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => NewContractScreen(edit: edit, preset: preset?.toParams()),
+        builder: (_) => NewContractScreen(edit: habit),
+      ),
+    );
+  }
+
+  Future<void> _openTemplates() async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const NewContractTemplatesScreen(),
       ),
     );
   }
@@ -85,21 +97,18 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                       child: _ContractCard(
                         habit: active[i],
                         index: i,
-                        onTap: () => _openNewContract(edit: active[i]),
+                        onTap: () => _openEdit(active[i]),
                         onLongPress: () => _confirmDelete(active[i]),
                       ),
                     ),
                   ),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              const SliverToBoxAdapter(child: _SectionLabel(label: 'NEW CONTRACT')),
+              // Big + New Contract button that opens the templates screen.
+              // NO template grid here — that's on its own screen now.
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                 sliver: SliverToBoxAdapter(
-                  child: _NewContractGrid(
-                    onPreset: (p) => _openNewContract(preset: p),
-                    onBuildOwn: () => _openNewContract(),
-                  ),
+                  child: _NewContractButton(onTap: _openTemplates),
                 ),
               ),
               if (history.isNotEmpty) ...[
@@ -553,6 +562,50 @@ class _HistoryRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NewContractButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NewContractButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          gradient: AppColors.emeraldGradient,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.emerald.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(LucideIcons.plus, color: Colors.black, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'NEW CONTRACT',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

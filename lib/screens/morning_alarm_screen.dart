@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -10,11 +9,17 @@ import 'package:intl/intl.dart';
 
 import '../design/tokens.dart';
 import '../models/habit.dart';
-import '../providers/habit_provider.dart';
+import '../services/wake_debt_service.dart';
+import 'sergeant/wake_exercise_screen.dart';
 
-/// Full-screen "you set an alarm, it's time" experience. Loops audio at
-/// full volume (bypasses silent switch via the AVAudioSession.playback
-/// category we set globally in main.dart). Only way out is hold-to-dismiss.
+/// The morning wake alarm — Erly-killer.
+///
+/// Full-black screen. Massive time. Order title. A red pill showing the
+/// debt owed right now. The ONLY exit is a slide-to-punishment bar that
+/// hands off to the wake exercise. No dismiss. No snooze. No mercy.
+///
+/// Audio blasts from AVAudioSession playback category (bypasses silent
+/// switch) and the phone vibrates every second until the user slides.
 class MorningAlarmScreen extends ConsumerStatefulWidget {
   final Habit habit;
   const MorningAlarmScreen({super.key, required this.habit});
@@ -26,22 +31,22 @@ class MorningAlarmScreen extends ConsumerStatefulWidget {
 class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   final AudioPlayer _player = AudioPlayer();
   Timer? _hapticTimer;
-  Timer? _holdTimer;
-  double _holdProgress = 0;
-  bool _dismissing = false;
-
-  static const _holdDuration = Duration(seconds: 3);
+  Timer? _tickTimer;
+  bool _handingOff = false;
 
   @override
   void initState() {
     super.initState();
+    WakeDebtService.markActive(widget.habit.id);
     _startAlarm();
+    // Tick every 10s so the debt counter climbs live in front of them.
+    _tickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _startAlarm() async {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // Blast the sergeant intro on loop — placeholder until you drop
-    // an actual alarm.caf into assets. Volume forced to 1.0.
     try {
       await _player.setReleaseMode(ReleaseMode.loop);
       await _player.setVolume(1.0);
@@ -49,52 +54,31 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     } catch (e) {
       debugPrint('alarm audio failed: $e');
     }
-    // Vibrate every second.
     _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
       HapticFeedback.heavyImpact();
     });
   }
 
-  void _holdStart() {
-    HapticFeedback.mediumImpact();
-    _holdTimer?.cancel();
-    _holdTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
-      setState(() {
-        _holdProgress += 50 / _holdDuration.inMilliseconds;
-        if (_holdProgress >= 1) {
-          _holdProgress = 1;
-          _dismiss();
-          t.cancel();
-        }
-      });
-    });
-  }
-
-  void _holdEnd() {
-    if (_holdProgress >= 1) return;
-    _holdTimer?.cancel();
-    setState(() => _holdProgress = 0);
-  }
-
-  Future<void> _dismiss() async {
-    if (_dismissing) return;
-    _dismissing = true;
+  Future<void> _handoffToExercise() async {
+    if (_handingOff) return;
+    _handingOff = true;
     _hapticTimer?.cancel();
+    _tickTimer?.cancel();
     await _player.stop();
     HapticFeedback.heavyImpact();
-    // Mark the habit done for today (so the streak advances).
-    try {
-      await ref.read(habitEngineProvider).toggleHabitCompletion(widget.habit.id);
-    } catch (_) {}
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (!mounted) return;
-    Navigator.of(context).pop();
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => WakeExerciseScreen(habit: widget.habit),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _hapticTimer?.cancel();
-    _holdTimer?.cancel();
+    _tickTimer?.cancel();
     _player.stop();
     _player.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -104,82 +88,48 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   @override
   Widget build(BuildContext context) {
     final t = TimeOfDay.now();
-    final timeStr = DateFormat('h:mm').format(DateTime(2025, 1, 1, t.hour, t.minute));
-    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    final timeStr = DateFormat('HH:mm').format(DateTime(2025, 1, 1, t.hour, t.minute));
+    final reps = WakeDebtService.totalRepsFor(widget.habit);
+    final late = WakeDebtService.minutesLate(widget.habit);
+
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // Angry red pulse background
-            Positioned.fill(
-              child: _AngryPulse(),
-            ),
+            const Positioned.fill(child: _AngryPulse()),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
+                    const SizedBox(height: 32),
+                    _AlarmBadge(late: late),
                     const Spacer(),
-                    // Big time
                     Text(
                       timeStr,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 96,
+                        fontSize: 108,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: -4,
+                        letterSpacing: -6,
                         height: 1,
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ).animate(onPlay: (c) => c.repeat(reverse: true))
-                        .fade(begin: 1, end: 0.75, duration: 900.ms),
-                    const SizedBox(height: 4),
+                        .fade(begin: 1, end: 0.72, duration: 900.ms),
+                    const SizedBox(height: 8),
                     Text(
-                      period,
+                      'HABITDRILL',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
-                        fontSize: 20,
+                        color: Colors.white.withOpacity(0.4),
+                        fontSize: 12,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 6,
                       ),
                     ),
-                    const SizedBox(height: 26),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.error, width: 1.5),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              borderRadius: BorderRadius.circular(4),
-                              boxShadow: [BoxShadow(color: AppColors.error.withOpacity(0.9), blurRadius: 8)],
-                            ),
-                          ).animate(onPlay: (c) => c.repeat(reverse: true))
-                              .fade(begin: 1, end: 0.3, duration: 500.ms),
-                          const SizedBox(width: 8),
-                          Text(
-                            'ALARM',
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 28),
                     Text(
                       widget.habit.title.toUpperCase(),
                       textAlign: TextAlign.center,
@@ -190,34 +140,11 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
                         letterSpacing: 2,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Get up. Punch the day in the face.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                    const SizedBox(height: 20),
+                    _RepsPill(reps: reps),
                     const Spacer(flex: 2),
-                    _HoldToDismiss(
-                      progress: _holdProgress,
-                      onStart: _holdStart,
-                      onEnd: _holdEnd,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'HOLD TO DISMISS',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    _SlideToPunish(onCompleted: _handoffToExercise),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -229,7 +156,10 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   }
 }
 
+// ────────────────────────── Angry red pulse ──────────────────────────
+
 class _AngryPulse extends StatelessWidget {
+  const _AngryPulse();
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -250,105 +180,198 @@ class _AngryPulse extends StatelessWidget {
   }
 }
 
-class _HoldToDismiss extends StatelessWidget {
-  final double progress;
-  final VoidCallback onStart;
-  final VoidCallback onEnd;
+// ────────────────────────── ALARM badge with minutes-late ──────────
 
-  const _HoldToDismiss({
-    required this.progress,
-    required this.onStart,
-    required this.onEnd,
-  });
+class _AlarmBadge extends StatelessWidget {
+  final int late;
+  const _AlarmBadge({required this.late});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => onStart(),
-      onTapUp: (_) => onEnd(),
-      onTapCancel: onEnd,
-      onLongPressStart: (_) => onStart(),
-      onLongPressEnd: (_) => onEnd(),
-      child: SizedBox(
-        width: 200,
-        height: 200,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Outer ring
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.15), width: 2),
-              ),
+    final label = late <= 0 ? 'ALARM' : '$late MIN LATE';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.error, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: AppColors.error,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [BoxShadow(color: AppColors.error.withOpacity(0.9), blurRadius: 8)],
             ),
-            // Fill ring
-            SizedBox(
-              width: 200,
-              height: 200,
-              child: CustomPaint(painter: _RingProgressPainter(progress: progress)),
+          ).animate(onPlay: (c) => c.repeat(reverse: true))
+              .fade(begin: 1, end: 0.3, duration: 500.ms),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.error,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 3,
             ),
-            // Center pulse
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 130 + (progress * 10),
-              height: 130 + (progress * 10),
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.emerald.withOpacity(0.7 + progress * 0.3),
-                    AppColors.emerald.withOpacity(0.4),
-                  ],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.emerald.withOpacity(0.4 + progress * 0.4),
-                    blurRadius: 32 + progress * 20,
-                    spreadRadius: progress * 6,
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                progress >= 1 ? Icons.check : Icons.notifications_off_rounded,
-                color: Colors.black,
-                size: 44,
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Reps-to-escape pill ──────────────────────
+
+class _RepsPill extends StatelessWidget {
+  final int reps;
+  const _RepsPill({required this.reps});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEA580C), Color(0xFFDC2626)],
+        ),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.error.withOpacity(0.45),
+            blurRadius: 24,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Text(
+        '$reps SQUATS TO ESCAPE',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2,
         ),
       ),
     );
   }
 }
 
-class _RingProgressPainter extends CustomPainter {
-  final double progress;
-  _RingProgressPainter({required this.progress});
+// ────────────────────────── Slide-to-punish bar ──────────────────────
+
+class _SlideToPunish extends StatefulWidget {
+  final VoidCallback onCompleted;
+  const _SlideToPunish({required this.onCompleted});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 1;
-    final paint = Paint()
-      ..color = AppColors.emerald
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final glowPaint = Paint()
-      ..color = AppColors.emerald.withOpacity(0.6)
-      ..strokeWidth = 8
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, glowPaint);
-    canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, paint);
+  State<_SlideToPunish> createState() => _SlideToPunishState();
+}
+
+class _SlideToPunishState extends State<_SlideToPunish> {
+  double _drag = 0;
+  bool _fired = false;
+
+  static const double _thumbSize = 62;
+  static const double _height = 74;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final maxDrag = c.maxWidth - _thumbSize - 6;
+      return Container(
+        height: _height,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(_height / 2),
+          border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+        ),
+        child: Stack(
+          children: [
+            // Fill trail behind the thumb.
+            Positioned(
+              left: 3,
+              top: 3,
+              bottom: 3,
+              width: _thumbSize + _drag,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.emerald.withOpacity(0.9),
+                      AppColors.emerald.withOpacity(0.4),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(_height / 2),
+                ),
+              ),
+            ),
+            // Center hint text — dims as thumb travels.
+            Positioned.fill(
+              child: Center(
+                child: Opacity(
+                  opacity: (1 - (_drag / maxDrag).clamp(0.0, 1.0)).clamp(0.15, 1.0),
+                  child: Text(
+                    'SLIDE TO PUNISHMENT ▶',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.75),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Draggable thumb.
+            Positioned(
+              left: 3 + _drag,
+              top: 3,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (d) {
+                  if (_fired) return;
+                  setState(() {
+                    _drag = (_drag + d.delta.dx).clamp(0.0, maxDrag);
+                  });
+                },
+                onHorizontalDragEnd: (_) {
+                  if (_fired) return;
+                  if (_drag >= maxDrag - 4) {
+                    _fired = true;
+                    widget.onCompleted();
+                  } else {
+                    setState(() => _drag = 0);
+                  }
+                },
+                child: Container(
+                  width: _thumbSize,
+                  height: _thumbSize,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.25),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.black,
+                    size: 30,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
-
-  @override
-  bool shouldRepaint(covariant _RingProgressPainter old) => old.progress != progress;
 }

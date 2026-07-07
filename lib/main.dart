@@ -22,6 +22,7 @@ import 'services/alarm_service.dart';
 import 'services/sergeant_service.dart';
 import 'services/retention_service.dart';
 import 'services/premium_service.dart';
+import 'services/wake_debt_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding/onboarding_flow.dart';
@@ -264,9 +265,15 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   Future<void> _checkForAlarmTap() async {
-    final habitId = await AlarmService.consumeRecentAlarmTap();
+    // First look for a fresh notification tap. If none, fall back to any
+    // unfinished wake alarm the user closed the app on — that debt is
+    // still owed and the app should re-open straight into it.
+    var habitId = await AlarmService.consumeRecentAlarmTap();
+    habitId ??= await WakeDebtService.getActiveHabitId();
     if (habitId == null || !mounted) return;
-    final habit = LocalStorageService.getAllHabits().where((h) => h.id == habitId).firstOrNull;
+    final habit = LocalStorageService.getAllHabits()
+        .where((h) => h.id == habitId)
+        .firstOrNull;
     if (habit == null) return;
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(

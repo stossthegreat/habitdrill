@@ -231,33 +231,45 @@ class AlarmService {
         }
       }
 
-      // Pound them awake. 10 back-to-back time-sensitive notifications
-      // 4 seconds apart = 40 seconds of relentless ringing. Every ping is
-      // a Sound file play + banner + vibration. No mercy.
-      const int burstCount = 10;
-      const Duration burstSpacing = Duration(seconds: 4);
+      // TWO-STAGE NO-MERCY LOOP.
+      //
+      // Stage 1 — WAKE BURST (5 pings @ 4s apart, i=0..4):
+      //   Bold red "⚠️ WAKE UP!" pings hammer the lock screen back-to-back
+      //   for ~20 seconds. Time-sensitive so they punch through Focus/DND.
+      //
+      // Stage 2 — REPS ESCALATION (3 pings, i=5..7):
+      //   If the user doesn't tap in and finish their reps, the phone keeps
+      //   ringing. At +1min, +5min, +15min a new ping fires announcing the
+      //   growing rep debt ("😡 +5 REPS", "🔥 +25 REPS", "💀 +75 REPS").
+      //   These get cancelled the moment the user completes reps —
+      //   see cancelWakeEscalations().
+      //
+      // 8 pings × 7 weekdays = 56 pending — under iOS's 64-slot cap.
+      // Only i=0 repeats weekly; the rest are one-shots that get re-created
+      // when the weekly ping fires and scheduleAlarm re-runs.
+
+      final wakeSchedule = _wakePingSchedule();
 
       for (final day in habit.repeatDays) {
         final baseAlarmId = _getAlarmId(habit.id, day);
         final scheduledTime = _getNextAlarmTime(day, habit.timeOfDay);
 
-        debugPrint('📅 Scheduling alarm burst for ${_getDayName(day)}:');
+        debugPrint('📅 Scheduling wake pings for ${_getDayName(day)}:');
         debugPrint('   - baseAlarmId: $baseAlarmId');
         debugPrint('   - time: ${habit.time}');
         debugPrint('   - first ping: $scheduledTime');
-        debugPrint('   - burst: ${burstCount}x every ${burstSpacing.inSeconds}s');
+        debugPrint('   - ${wakeSchedule.length} pings total (5 burst + 3 escalation)');
 
-        for (int i = 0; i < burstCount; i++) {
-          // Each burst notification gets a unique id (base * 10 + burst index).
-          // Burst i=0 fires at scheduledTime; i=1 at +8s; etc.
-          final burstId = baseAlarmId * 10 + i;
-          final fireTime = scheduledTime.add(burstSpacing * i);
+        for (int i = 0; i < wakeSchedule.length; i++) {
+          final ping = wakeSchedule[i];
+          final pingId = baseAlarmId * 10 + i;
+          final fireTime = scheduledTime.add(ping.offset);
 
           try {
             await _notifications.zonedSchedule(
-              burstId,
-              'ORDER: ${habit.title.toUpperCase()}',
-              _getAlarmMessage(),
+              pingId,
+              ping.title,
+              ping.body,
               fireTime,
               const NotificationDetails(
                 android: AndroidNotificationDetails(
@@ -278,25 +290,20 @@ class AlarmService {
                   presentSound: true,
                   presentBadge: true,
                   interruptionLevel: InterruptionLevel.timeSensitive,
-                  // sound: 'alarm.caf' — REMOVED. Referencing a missing sound
-                  // file in the bundle causes iOS to silently drop the
-                  // notification. Using default alert sound until we ship a
-                  // real alarm.caf asset.
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              // Only the FIRST ping in the burst matches weekly. The follow-up
-              // pings are one-shots — they'll fire once when we schedule them
-              // and be re-created for next week when the first ping fires and
-              // scheduleAlarm runs again on the returning weekday.
-              matchDateTimeComponents: i == 0 ? DateTimeComponents.dayOfWeekAndTime : null,
+              // Only the first ping matches weekly — the rest re-schedule
+              // when the weekly ping fires next week.
+              matchDateTimeComponents:
+                  i == 0 ? DateTimeComponents.dayOfWeekAndTime : null,
               uiLocalNotificationDateInterpretation:
                   UILocalNotificationDateInterpretation.absoluteTime,
               payload: habit.id,
             );
 
             successCount++;
-            _scheduledAlarms[burstId] = {
+            _scheduledAlarms[pingId] = {
               'habitTitle': habit.title,
               'habitId': habit.id,
               'day': day,
@@ -306,7 +313,7 @@ class AlarmService {
             };
           } catch (e) {
             failCount++;
-            debugPrint('   ❌ ERROR burst $i for ${_getDayName(day)}: $e');
+            debugPrint('   ❌ ERROR ping $i for ${_getDayName(day)}: $e');
           }
         }
       }
@@ -340,7 +347,8 @@ class AlarmService {
     final pendingBefore = await _notifications.pendingNotificationRequests();
     final habitAlarmIds = <int>[];
 
-    // Burst of 10 per day, 7 days a week → 70 ids per habit.
+    // Up to 10 wake ping slots per day (5 burst + 3 escalation actually used;
+    // loop to 10 to catch any leftovers from older versions).
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
       for (int i = 0; i < 10; i++) {
@@ -444,20 +452,39 @@ class AlarmService {
     return days[day];
   }
 
-  /// Get drill sergeant alarm message
-  static String _getAlarmMessage() {
-    const messages = [
-      "This order is due. Execute now.",
-      "Time's up. Complete your order.",
-      "Your order is waiting. Move.",
-      "Due now. Don't make me wait.",
-      "Order due. Complete or face punishment.",
-      "This is your time. Execute.",
-      "Due now. No excuses.",
-      "Order active. Get it done.",
-    ];
-    final index = DateTime.now().minute % messages.length;
-    return messages[index];
+  /// The 8-ping wake schedule: 5 burst pings hammer the lock screen for
+  /// ~20 seconds, then 3 escalation pings nag the user with growing rep
+  /// debt if they haven't tapped in. Cancelled the moment reps complete.
+  static List<_WakePing> _wakePingSchedule() => const [
+        // Burst — 5 pings, 4 seconds apart.
+        _WakePing(Duration.zero, '⚠️ WAKE UP!', "Time's up. Do it now."),
+        _WakePing(Duration(seconds: 4), '⚠️ WAKE UP!', 'Get up. Move.'),
+        _WakePing(Duration(seconds: 8), '⚠️ WAKE UP!', 'This is not a suggestion.'),
+        _WakePing(Duration(seconds: 12), '⚠️ WAKE UP!', 'Move.'),
+        _WakePing(Duration(seconds: 16), '⚠️ WAKE UP!', 'Last chance before punishment.'),
+        // Escalation — nag the rep debt while they lie in bed.
+        _WakePing(Duration(minutes: 1), '😡 +5 REPS', 'You are late. Get up.'),
+        _WakePing(Duration(minutes: 5), '🔥 +25 REPS', 'This is embarrassing. Get up.'),
+        _WakePing(Duration(minutes: 15), '💀 +75 REPS', 'You broke the contract. Move.'),
+      ];
+
+  /// Cancel only the escalation pings (indices 5–7) for a habit's wake.
+  /// Called from the wake-exercise screen the instant reps complete — the
+  /// initial burst is done by that point but any queued escalation pings
+  /// need to stop RIGHT NOW so the user isn't punished after success.
+  static Future<void> cancelWakeEscalations(String habitId) async {
+    int cancelled = 0;
+    for (int day = 0; day < 7; day++) {
+      final baseId = _getAlarmId(habitId, day);
+      for (int i = 5; i < 10; i++) {
+        try {
+          await _notifications.cancel(baseId * 10 + i);
+          _scheduledAlarms.remove(baseId * 10 + i);
+          cancelled++;
+        } catch (_) {}
+      }
+    }
+    debugPrint('🛑 Cancelled $cancelled wake escalation pings for $habitId');
   }
 
   /// Schedule a test alarm (fires in 1 minute)
@@ -647,4 +674,13 @@ class AlarmService {
   static int _getSergeantNotifId(String violationId, int index) {
     return (violationId.hashCode.abs() % 90000) + 700000 + index;
   }
+}
+
+/// A single scheduled wake-alarm ping: what to show, and when after the
+/// scheduled fire time to fire it.
+class _WakePing {
+  final Duration offset;
+  final String title;
+  final String body;
+  const _WakePing(this.offset, this.title, this.body);
 }
