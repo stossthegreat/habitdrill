@@ -28,7 +28,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final OnboardingState _s = OnboardingState();
   int _i = 0;
 
-  static const int _total = 26;
+  static const int _total = 21;
 
   @override
   void dispose() {
@@ -200,14 +200,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                     line3: "It's something you train.",
                     onNext: _next,
                   ),
-                  _NotAWrapper(onNext: _next),
-                  _AiVerifiedPitch(onNext: _next),
                   _WakeTimePicker(state: _s, onNext: _next),
                   _ExercisePicker(state: _s, onNext: _next),
                   _RepsPicker(state: _s, onNext: _next),
                   _EscalationWarning(reps: _s.reps, onNext: _next),
-                  _ScreenTimePitch(onNext: _next),
-                  _RealAlarmPitch(onNext: _next),
                   _StatementScreen(
                     key: const ValueKey('commit'),
                     line1: 'No more backup alarms.',
@@ -217,7 +213,6 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                     ctaLabel: 'I AGREE',
                   ),
                   _SignatureScreen(state: _s, onNext: _next),
-                  _SocialProof(onNext: _next),
                   _BuildingPlan(onNext: _next),
                   _SummaryScreen(state: _s, onNext: _next),
                 ],
@@ -1016,48 +1011,137 @@ class _WakeTimePickerState extends State<_WakeTimePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final h12 = _dt.hour == 0 ? 12 : (_dt.hour > 12 ? _dt.hour - 12 : _dt.hour);
+    final ampm = _dt.hour < 12 ? 'AM' : 'PM';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _Hero(
-            title: 'When do you wake up?',
-            subtitle: 'This is when the drill starts.',
+            title: 'Set your alarm.',
+            subtitle: 'This is when we come after you.',
           ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: Center(
-              child: SizedBox(
-                height: 220,
-                child: CupertinoTheme(
-                  data: const CupertinoThemeData(
-                    brightness: Brightness.dark,
-                    primaryColor: AppColors.emerald,
-                    textTheme: CupertinoTextThemeData(
-                      dateTimePickerTextStyle: TextStyle(
+          const SizedBox(height: 20),
+          // Live preview — huge digital clock face
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.emerald.withOpacity(0.18), AppColors.emerald.withOpacity(0.02)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.emerald.withOpacity(0.4), width: 1.5),
+              boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.2), blurRadius: 30, spreadRadius: -8)],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      h12.toString(),
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 84,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -4,
+                        height: 1,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 24)],
                       ),
                     ),
-                  ),
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.time,
-                    initialDateTime: _dt,
-                    use24hFormat: false,
-                    onDateTimeChanged: (dt) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _dt = dt);
-                    },
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        ':',
+                        style: TextStyle(
+                          color: AppColors.emerald,
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _dt.minute.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 84,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -4,
+                        height: 1,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 24)],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: Text(
+                        ampm,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.shield_rounded, size: 12, color: AppColors.emerald.withOpacity(0.85)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'PROTECTED — RINGS THROUGH FOCUS',
+                      style: TextStyle(
+                        color: AppColors.emerald.withOpacity(0.85),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: CupertinoTheme(
+              data: const CupertinoThemeData(
+                brightness: Brightness.dark,
+                primaryColor: AppColors.emerald,
+                textTheme: CupertinoTextThemeData(
+                  dateTimePickerTextStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.time,
+                initialDateTime: _dt,
+                use24hFormat: false,
+                onDateTimeChanged: (dt) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _dt = dt);
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _PrimaryButton(
-            label: 'SET WAKE TIME',
+            label: 'ARM MY ALARM',
             onTap: () {
               widget.state.wakeTime = TimeOfDay(hour: _dt.hour, minute: _dt.minute);
               widget.onNext();
