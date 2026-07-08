@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 #if canImport(AlarmKit)
 import AlarmKit
+import AppIntents
 #endif
 
 /// Bridges Flutter → AlarmKit (iOS 26+).
@@ -126,18 +127,29 @@ import AlarmKit
   @available(iOS 26.0, *)
   private func schedule(uuid: UUID, title: String, fireAt: Date, habitId: String, result: @escaping FlutterResult) async {
     do {
-      // Fire once at fireAt — the Flutter side already handles weekly
-      // repeat by re-scheduling next week's fire when the app opens.
+      // Fire once at fireAt. Weekly repeat + retries are handled by the
+      // Flutter side scheduling multiple AlarmKit alarms per weekday.
       let schedule = Alarm.Schedule.fixed(fireAt)
 
-      // Non-snoozable: only a Stop button, no secondary.
+      // Two-button alert:
+      //   • STOP (X)     — dismisses ringing.
+      //   • OPEN (arrow) — custom secondary that runs an AppIntent to
+      //     hand the user directly into the wake exercise. Erly-style.
+      let stopButton = AlarmButton(
+        text: "STOP",
+        textColor: .white,
+        systemImageName: "xmark.circle.fill"
+      )
+      let openButton = AlarmButton(
+        text: "OPEN",
+        textColor: .white,
+        systemImageName: "arrow.right.circle.fill"
+      )
       let alert = AlarmPresentation.Alert(
         title: LocalizedStringResource(stringLiteral: title),
-        stopButton: AlarmButton(
-          text: "PUNISHMENT",
-          textColor: .white,
-          systemImageName: "figure.strengthtraining.functional"
-        )
+        stopButton: stopButton,
+        secondaryButton: openButton,
+        secondaryButtonBehavior: .custom
       )
       let presentation = AlarmPresentation(alert: alert)
 
@@ -147,14 +159,11 @@ import AlarmKit
         tintColor: .red
       )
 
-      // Non-snoozable: no countdown, no secondary button, no secondary
-      // intent. Tapping Stop dismisses the alert and foregrounds the
-      // app, at which point PunishmentGate re-runs _checkForAlarmTap and
-      // routes into the wake screen via WakeDebtService.getActiveHabitId.
       let config = AlarmManager.AlarmConfiguration(
-        countdownDuration: nil,
+        countdownDuration: nil,      // no snooze / pre-alert
         schedule: schedule,
         attributes: attributes,
+        secondaryIntent: OpenWakeIntent(habitId: habitId),
         sound: .default
       )
 
@@ -174,5 +183,30 @@ import AlarmKit
 struct HabitDrillMetadata: AlarmMetadata {
   let habitId: String
   init(habitId: String = "") { self.habitId = habitId }
+}
+
+/// AppIntent invoked when the user taps the OPEN button on the alarm.
+/// Opens the app (openAppWhenRun) and drops the fired habit ID into the
+/// same UserDefaults keys that AlarmService.consumeRecentAlarmTap reads
+/// (SharedPreferences on the Dart side lives under the "flutter." prefix).
+/// PunishmentGate picks it up on resume and pushes MorningAlarmScreen.
+@available(iOS 26.0, *)
+struct OpenWakeIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Open Wake"
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Habit ID")
+  var habitId: String
+
+  init() { self.habitId = "" }
+  init(habitId: String) { self.habitId = habitId }
+
+  func perform() async throws -> some IntentResult {
+    let defaults = UserDefaults.standard
+    defaults.set(habitId, forKey: "flutter.last_alarm_tapped_habit")
+    defaults.set(Int(Date().timeIntervalSince1970 * 1000),
+                 forKey: "flutter.last_alarm_tapped_at")
+    return .result()
+  }
 }
 #endif

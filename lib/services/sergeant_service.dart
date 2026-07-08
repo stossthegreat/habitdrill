@@ -130,6 +130,11 @@ class SergeantService {
       if (!habit.isScheduledForDate(now)) continue;
       if (habit.isDoneOn(now)) continue;
       if (habit.time.isEmpty) continue; // No time set = check at end of day
+      // Wake alarms handle their own enforcement via the wake flow
+      // (MorningAlarmScreen → WakeExerciseScreen). Never create a
+      // "video punishment" violation for them — that path is only for
+      // untimed contract habits the user missed.
+      if (habit.reminderOn) continue;
 
       // Parse the due time
       try {

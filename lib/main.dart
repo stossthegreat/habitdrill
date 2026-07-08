@@ -246,8 +246,7 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkForAlarmTap();
-    _checkForPunishment();
+    _onEnter();
   }
 
   @override
@@ -259,12 +258,36 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _checkForAlarmTap();
-      _checkForPunishment();
+      _onEnter();
     }
   }
 
-  Future<void> _checkForAlarmTap() async {
+  /// One entry-point for every "app is now in foreground" event.
+  /// Order matters:
+  ///   1. Wake-alarm check — if the user just dismissed a system alarm
+  ///      or opened the app on an unfinished wake, route straight into
+  ///      MorningAlarmScreen and STOP. The video-punishment path must
+  ///      never win when a wake is active.
+  ///   2. Only then check the sergeant violation queue (untimed missed
+  ///      habits).
+  ///   3. Regardless: refresh the escalation pings for tomorrow's fire.
+  Future<void> _onEnter() async {
+    final routedToWake = await _checkForAlarmTap();
+    if (!routedToWake) {
+      _checkForPunishment();
+    }
+    // Escalation pings are one-shots — top up the ladder for the next
+    // upcoming fire so notifications keep firing tomorrow too.
+    try {
+      await AlarmService.rescheduleWakeAlarms(
+        LocalStorageService.getAllHabits(),
+      );
+    } catch (_) {}
+  }
+
+  /// Returns true if we routed into the wake flow — caller should skip
+  /// the video-punishment path in that case.
+  Future<bool> _checkForAlarmTap() async {
     // Priority 1: fresh notification tap payload (local-notification path).
     var habitId = await AlarmService.consumeRecentAlarmTap();
     // Priority 2: unfinished wake the user closed the app on.
@@ -274,20 +297,19 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     // a payload. Fall back to whichever wake habit was scheduled to
     // fire in the last 30 minutes — that's almost certainly the one
     // they just dismissed.
-    if (habitId == null) {
-      habitId = _findRecentlyFiredWakeHabitId();
-    }
-    if (habitId == null || !mounted) return;
+    habitId ??= _findRecentlyFiredWakeHabitId();
+    if (habitId == null || !mounted) return false;
     final habit = LocalStorageService.getAllHabits()
         .where((h) => h.id == habitId)
         .firstOrNull;
-    if (habit == null) return;
+    if (habit == null) return false;
     await Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => MorningAlarmScreen(habit: habit),
       ),
     );
+    return true;
   }
 
   /// Find a wake habit whose scheduled fire happened in the last 30 min.

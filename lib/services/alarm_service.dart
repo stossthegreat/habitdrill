@@ -211,59 +211,84 @@ class AlarmService {
       // iOS this returns false and we rely on the notification burst below.
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       if (alarmKitAvailable) {
-        // AlarmKit needs UUIDs. We derive a stable one per (habit, day) from
-        // the same alarm ID so re-scheduling replaces cleanly.
+        // For each weekday's fire, pre-schedule the initial ring PLUS
+        // retries at 3, 7, 13, and 20 minutes later. If the user X's the
+        // first ring the next one hammers them 3 minutes on — pressing
+        // X is not an escape. Every retry gets a stable UUID so
+        // cancelWakeAlarmKitRetries can clean up on success.
         for (final day in habit.repeatDays) {
           final baseAlarmId = _getAlarmId(habit.id, day);
-          final akId = _uuidFromInt(baseAlarmId);
           final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
-          try {
-            await AlarmKitService.cancel(akId);
-            final ok = await AlarmKitService.schedule(
-              id: akId,
-              title: 'ORDER: ${habit.title.toUpperCase()}',
-              fireAt: fireDate.toLocal(),
-              habitId: habit.id,
-            );
-            debugPrint('   🛎️ AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}');
-          } catch (e) {
-            debugPrint('   ❌ AlarmKit ${_getDayName(day)}: $e');
+          for (int r = 0; r < _akRetryOffsets.length; r++) {
+            final akId = _uuidFromInt(baseAlarmId * 100 + r);
+            final fireAt = fireDate.add(_akRetryOffsets[r]).toLocal();
+            try {
+              await AlarmKitService.cancel(akId);
+              final ok = await AlarmKitService.schedule(
+                id: akId,
+                title: r == 0
+                    ? 'ORDER: ${habit.title.toUpperCase()}'
+                    : 'RETRY: ${habit.title.toUpperCase()}',
+                fireAt: fireAt,
+                habitId: habit.id,
+              );
+              debugPrint('   🛎️ AlarmKit ${_getDayName(day)} retry $r: ${ok ? "scheduled" : "failed"}');
+            } catch (e) {
+              debugPrint('   ❌ AlarmKit ${_getDayName(day)} retry $r: $e');
+            }
           }
         }
       }
 
       // TWO-STAGE NO-MERCY LOOP.
       //
-      // Stage 1 — WAKE BURST (5 pings @ 4s apart, i=0..4):
-      //   Bold red "⚠️ WAKE UP!" pings hammer the lock screen back-to-back
-      //   for ~20 seconds. Time-sensitive so they punch through Focus/DND.
+      // Stage 1 — BURST (3 pings @ 8s apart, i=0..2):
+      //   First ping is green "🟢 WAKE UP OR PAY" offering a choice, then
+      //   two red "⚠️ WAKE UP!" pings hammer the lock screen back-to-back.
+      //   Time-sensitive so they punch through Focus/DND. Repeats weekly
+      //   on every one of the habit's scheduled weekdays.
       //
-      // Stage 2 — REPS ESCALATION (3 pings, i=5..7):
-      //   If the user doesn't tap in and finish their reps, the phone keeps
-      //   ringing. At +1min, +5min, +15min a new ping fires announcing the
-      //   growing rep debt ("😡 +5 REPS", "🔥 +25 REPS", "💀 +75 REPS").
-      //   These get cancelled the moment the user completes reps —
-      //   see cancelWakeEscalations().
-      //
-      // 8 pings × 7 weekdays = 56 pending — under iOS's 64-slot cap.
-      // Only i=0 repeats weekly; the rest are one-shots that get re-created
-      // when the weekly ping fires and scheduleAlarm re-runs.
+      // Stage 2 — REPS ESCALATION (15 pings, i=3..17):
+      //   Once per minute for 15 minutes, a new notification announces the
+      //   growing rep debt ("😡 +5 REPS", "🔥 +15 REPS", "💀 +75 REPS").
+      //   ONLY scheduled for the next upcoming fire — refreshed on every
+      //   app resume via rescheduleWakeAlarms(). This keeps us under
+      //   iOS's 64 pending-notification cap: 3 burst × 7 weekdays + 15
+      //   escalations = 36 pending per wake habit.
 
       final wakeSchedule = _wakePingSchedule();
+      // Find the earliest upcoming fire across all this habit's weekdays —
+      // that's the only fire whose escalation pings we schedule.
+      // Empty repeatDays defensively means "no fires" — we've validated
+      // above but guard anyway so a bad Habit can't crash us.
+      if (habit.repeatDays.isEmpty) {
+        debugPrint('   ⚠️ habit has no repeatDays; nothing to schedule');
+        return;
+      }
+      final tz.TZDateTime nextFire = habit.repeatDays
+          .map((d) => _getNextAlarmTime(d, habit.timeOfDay))
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final int nextFireDay = _dayForTz(nextFire);
 
       for (final day in habit.repeatDays) {
         final baseAlarmId = _getAlarmId(habit.id, day);
         final scheduledTime = _getNextAlarmTime(day, habit.timeOfDay);
+        final bool isNextFire = day == nextFireDay
+            && scheduledTime.millisecondsSinceEpoch
+                == nextFire.millisecondsSinceEpoch;
 
         debugPrint('📅 Scheduling wake pings for ${_getDayName(day)}:');
         debugPrint('   - baseAlarmId: $baseAlarmId');
         debugPrint('   - time: ${habit.time}');
         debugPrint('   - first ping: $scheduledTime');
-        debugPrint('   - ${wakeSchedule.length} pings total (5 burst + 3 escalation)');
+        debugPrint('   - isNextFire: $isNextFire');
 
         for (int i = 0; i < wakeSchedule.length; i++) {
+          // Escalation pings are one-shots for the SOONEST fire only.
+          if (i >= _escalationStart && !isNextFire) continue;
+
           final ping = wakeSchedule[i];
-          final pingId = baseAlarmId * 10 + i;
+          final pingId = baseAlarmId * 100 + i;
           final fireTime = scheduledTime.add(ping.offset);
 
           try {
@@ -294,8 +319,9 @@ class AlarmService {
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              // Only the first ping matches weekly — the rest re-schedule
-              // when the weekly ping fires next week.
+              // Only the first BURST ping matches weekly — everything
+              // else is a one-shot. Escalation pings get re-scheduled
+              // on every app resume via rescheduleWakeAlarms().
               matchDateTimeComponents:
                   i == 0 ? DateTimeComponents.dayOfWeekAndTime : null,
               uiLocalNotificationDateInterpretation:
@@ -335,12 +361,20 @@ class AlarmService {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('🗑️ CANCELLING ALARMS for habit: $habitId');
 
-    // AlarmKit path — quietly cancel every derived UUID. Safe on old iOS
-    // because AlarmKitService returns false without erroring.
+    // AlarmKit path — quietly cancel every derived UUID for every
+    // retry slot. Safe on old iOS because AlarmKitService returns
+    // false without erroring.
     for (int day = 0; day < 7; day++) {
-      final akId = _uuidFromInt(_getAlarmId(habitId, day));
+      final baseId = _getAlarmId(habitId, day);
+      for (int r = 0; r < _akRetryOffsets.length; r++) {
+        final akId = _uuidFromInt(baseId * 100 + r);
+        try {
+          await AlarmKitService.cancel(akId);
+        } catch (_) {}
+      }
+      // Also try the pre-retry legacy UUID (single alarm per day).
       try {
-        await AlarmKitService.cancel(akId);
+        await AlarmKitService.cancel(_uuidFromInt(baseId));
       } catch (_) {}
     }
 
@@ -348,12 +382,15 @@ class AlarmService {
     final pendingBefore = await _notifications.pendingNotificationRequests();
     final habitAlarmIds = <int>[];
 
-    // Up to 10 wake ping slots per day (5 burst + 3 escalation actually used;
-    // loop to 10 to catch any leftovers from older versions).
+    // Up to 100 wake ping slots per day (3 burst + 15 escalation actually
+    // used; loop to 100 to catch any leftovers from older versions and
+    // legacy *10 IDs).
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      for (int i = 0; i < 10; i++) {
-        habitAlarmIds.add(baseId * 10 + i);
+      for (int i = 0; i < 100; i++) {
+        habitAlarmIds.add(baseId * 100 + i);
+        // Legacy *10 scheme — earlier builds; ensure they're captured too.
+        if (i < 10) habitAlarmIds.add(baseId * 10 + i);
       }
     }
     
@@ -366,16 +403,24 @@ class AlarmService {
     
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      // Cancel every burst notification (i = 0..4) for this day.
-      for (int i = 0; i < 10; i++) {
-        final id = baseId * 10 + i;
+      // Cancel every ping slot for this day — new *100 IDs plus any
+      // legacy *10 IDs left behind by earlier builds.
+      for (int i = 0; i < 100; i++) {
+        final newId = baseId * 100 + i;
         try {
-          await _notifications.cancel(id);
-          _scheduledAlarms.remove(id);
+          await _notifications.cancel(newId);
+          _scheduledAlarms.remove(newId);
           successCount++;
         } catch (e) {
           failCount++;
-          debugPrint('   ❌ Failed to cancel alarm ID $id (${_getDayName(day)} burst $i): $e');
+          debugPrint('   ❌ Failed to cancel alarm ID $newId (${_getDayName(day)} slot $i): $e');
+        }
+        if (i < 10) {
+          final legacyId = baseId * 10 + i;
+          try {
+            await _notifications.cancel(legacyId);
+            _scheduledAlarms.remove(legacyId);
+          } catch (_) {}
         }
       }
     }
@@ -432,6 +477,10 @@ class AlarmService {
     return ((habitId.hashCode.abs() % 900000) + 100000) * 10 + day;
   }
 
+  /// Weekday encoding matching our repeatDays convention (0=Sun..6=Sat)
+  /// derived from a timezone-aware date.
+  static int _dayForTz(tz.TZDateTime d) => d.weekday == 7 ? 0 : d.weekday;
+
   /// Deterministic UUID from an int — used to give AlarmKit a stable ID
   /// per (habit, day) so re-scheduling replaces cleanly.
   static String _uuidFromInt(int seed) {
@@ -453,40 +502,113 @@ class AlarmService {
     return days[day];
   }
 
-  /// The 8-ping wake schedule: 5 burst pings hammer the lock screen for
-  /// ~20 seconds, then 3 escalation pings nag the user with growing rep
-  /// debt if they haven't tapped in. Cancelled the moment reps complete.
+  /// The wake schedule: 3 burst pings hit the lock screen at t+0/8/16s,
+  /// then 15 escalation pings hammer once per minute from t+60s through
+  /// t+900s. Total 18 pings per fire. The debt in each escalation title
+  /// matches WakeDebtService (base 10 + 5×min_late) so what the user
+  /// sees on their lock screen == what they actually owe.
+  ///
+  /// Only the burst pings repeat weekly. The 15 escalation pings are
+  /// one-shots scheduled for the NEXT upcoming fire and re-generated on
+  /// every app resume — see `rescheduleWakeAlarms()`. This dance keeps
+  /// us under iOS's 64-slot pending-notification cap even with 3 burst
+  /// × 7 weekdays + 15 escalations = 36 pending per habit.
   static List<_WakePing> _wakePingSchedule() => const [
-        // Burst — 5 pings, 4 seconds apart.
-        _WakePing(Duration.zero, '⚠️ WAKE UP!', "Time's up. Do it now."),
-        _WakePing(Duration(seconds: 4), '⚠️ WAKE UP!', 'Get up. Move.'),
-        _WakePing(Duration(seconds: 8), '⚠️ WAKE UP!', 'This is not a suggestion.'),
-        _WakePing(Duration(seconds: 12), '⚠️ WAKE UP!', 'Move.'),
-        _WakePing(Duration(seconds: 16), '⚠️ WAKE UP!', 'Last chance before punishment.'),
-        // Escalation — nag the rep debt while they lie in bed.
-        _WakePing(Duration(minutes: 1), '😡 +5 REPS', 'You are late. Get up.'),
-        _WakePing(Duration(minutes: 5), '🔥 +25 REPS', 'This is embarrassing. Get up.'),
-        _WakePing(Duration(minutes: 15), '💀 +75 REPS', 'You broke the contract. Move.'),
+        // Burst — 3 pings, 8 seconds apart. First one is intentionally
+        // green ("WAKE UP OR PAY") to offer a choice; the follow-ups
+        // switch to red urgency.
+        _WakePing(Duration.zero,           '🟢 WAKE UP OR PAY',
+            'Get up now. Or pay in reps.'),
+        _WakePing(Duration(seconds: 8),    '⚠️ WAKE UP!',
+            "Time's up. Do it now."),
+        _WakePing(Duration(seconds: 16),   '🚨 WAKE UP!',
+            'Move. Now.'),
+        // Escalation — every minute, growing debt, tone escalates.
+        _WakePing(Duration(minutes: 1),    '😡 +5 REPS',   'You are late. Get up.'),
+        _WakePing(Duration(minutes: 2),    '😡 +10 REPS',  'Still in bed?'),
+        _WakePing(Duration(minutes: 3),    '🔥 +15 REPS',  'Get up.'),
+        _WakePing(Duration(minutes: 4),    '🔥 +20 REPS',  'This is embarrassing.'),
+        _WakePing(Duration(minutes: 5),    '😤 +25 REPS',  'Move. NOW.'),
+        _WakePing(Duration(minutes: 6),    '😤 +30 REPS',  'You broke the promise.'),
+        _WakePing(Duration(minutes: 7),    '🔥 +35 REPS',  'Enough.'),
+        _WakePing(Duration(minutes: 8),    '🔥 +40 REPS',  'Get up.'),
+        _WakePing(Duration(minutes: 9),    '💀 +45 REPS',  'Contract failing.'),
+        _WakePing(Duration(minutes: 10),   '💀 +50 REPS',  'You are still late.'),
+        _WakePing(Duration(minutes: 11),   '💀 +55 REPS',  'Move.'),
+        _WakePing(Duration(minutes: 12),   '💀 +60 REPS',  "You're failing."),
+        _WakePing(Duration(minutes: 13),   '💀 +65 REPS',  'Final warning.'),
+        _WakePing(Duration(minutes: 14),   '💀 +70 REPS',  'Move.'),
+        _WakePing(Duration(minutes: 15),   '💀 +75 REPS',  'You broke the contract.'),
       ];
 
-  /// Cancel only the escalation pings (indices 5–7) for a habit's wake.
-  /// Called from the wake-exercise screen the instant reps complete — the
-  /// initial burst is done by that point but any queued escalation pings
-  /// need to stop RIGHT NOW so the user isn't punished after success.
+  /// Which indices in [_wakePingSchedule] are the escalation pings.
+  static const int _escalationStart = 3;
+  static const int _escalationEnd = 18; // exclusive
+
+  /// Cancel every escalation ping across all days for a habit's wake.
+  /// Called the instant wake reps complete — any queued escalation
+  /// notification needs to disappear before it can nag a user who
+  /// already did the work.
   static Future<void> cancelWakeEscalations(String habitId) async {
     int cancelled = 0;
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      for (int i = 5; i < 10; i++) {
+      for (int i = _escalationStart; i < 100; i++) {
         try {
-          await _notifications.cancel(baseId * 10 + i);
-          _scheduledAlarms.remove(baseId * 10 + i);
+          await _notifications.cancel(baseId * 100 + i);
+          _scheduledAlarms.remove(baseId * 100 + i);
           cancelled++;
         } catch (_) {}
       }
     }
+    // Also cancel any AlarmKit retries queued for the next fire.
+    try {
+      await cancelWakeAlarmKitRetries(habitId);
+    } catch (_) {}
     debugPrint('🛑 Cancelled $cancelled wake escalation pings for $habitId');
   }
+
+  /// Cancel every AlarmKit retry (initial + 4 retries per weekday) for a
+  /// habit. Called when reps complete so the phone stops re-ringing.
+  static Future<void> cancelWakeAlarmKitRetries(String habitId) async {
+    for (int day = 0; day < 7; day++) {
+      final baseAlarmId = _getAlarmId(habitId, day);
+      for (int r = 0; r < _akRetryOffsets.length; r++) {
+        final uuid = _uuidFromInt(baseAlarmId * 100 + r);
+        try {
+          await AlarmKitService.cancel(uuid);
+        } catch (_) {}
+      }
+    }
+  }
+
+  /// Re-schedule the wake-alarm pings + AlarmKit retries for every
+  /// habit with reminderOn. Call on app resume so the escalation loop
+  /// always covers the NEXT upcoming fire (escalation is one-shot to
+  /// stay under the 64-slot pending-notification cap; without a periodic
+  /// re-schedule the third day's wake would have no escalation).
+  static Future<void> rescheduleWakeAlarms(Iterable<Habit> habits) async {
+    for (final h in habits) {
+      if (h.reminderOn && h.time.isNotEmpty) {
+        try {
+          await scheduleAlarm(h);
+        } catch (e) {
+          debugPrint('rescheduleWakeAlarms failed for ${h.title}: $e');
+        }
+      }
+    }
+  }
+
+  /// Offsets from each weekday's scheduled fire at which the phone should
+  /// re-ring via AlarmKit. If the user X's out of the first ring, the
+  /// next one hits three minutes later; the ladder keeps them honest.
+  static const List<Duration> _akRetryOffsets = [
+    Duration.zero,
+    Duration(minutes: 3),
+    Duration(minutes: 7),
+    Duration(minutes: 13),
+    Duration(minutes: 20),
+  ];
 
   /// Schedule a test alarm (fires in 1 minute)
   static Future<void> scheduleTestAlarm() async {
