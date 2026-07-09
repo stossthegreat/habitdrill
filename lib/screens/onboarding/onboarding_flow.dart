@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
@@ -28,7 +29,10 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final OnboardingState _s = OnboardingState();
   int _i = 0;
 
-  static const int _total = 21;
+  // ACT 1 (6) + ACT 2 (7) + ACT 3 (7) + ACT 5 (2) + ACT 6 (1) + ACT 7 (2)
+  // = 25 screens. Progress bar fills against this; the counter itself
+  // is deliberately hidden (see _ProgressBar).
+  static const int _total = 25;
 
   @override
   void dispose() {
@@ -100,39 +104,96 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => _i = i),
                 children: [
+                  // ═══ ACT 1 — CONVICTION ═══
+                  // Make them believe waking up is the keystone habit.
                   _ColdOpen(onNext: _next),
                   _Welcome(onNext: _next),
-                  _FirstBattle(onNext: _next),
-                  _SinglePick(
-                    key: const ValueKey('gender'),
-                    title: 'You are',
-                    subtitle: 'This just helps us calibrate.',
-                    options: const ['Male', 'Female', 'Prefer not to say'],
-                    initial: _s.gender,
-                    onPicked: (v) => _s.gender = v,
+                  _StatementScreen(
+                    key: const ValueKey('act1_quitting'),
+                    line1: 'Quitting is',
+                    line2: 'harder here',
+                    line3: 'than succeeding.',
                     onNext: _next,
                   ),
-                  _AgePicker(state: _s, onNext: _next),
-                  _SinglePick(
-                    key: const ValueKey('source'),
-                    title: 'How did you find HabitDrill?',
-                    subtitle: 'Real answers help us reach more people like you.',
-                    options: const ['TikTok', 'Instagram', 'YouTube', 'App Store', 'Friend', 'Google', 'Other'],
-                    initial: _s.source,
-                    onPicked: (v) => _s.source = v,
+                  _StatementScreen(
+                    key: const ValueKey('act1_first_battle'),
+                    line1: 'The first battle',
+                    line2: 'every morning',
+                    line3: 'is waking up.',
                     onNext: _next,
                   ),
+                  _StatementScreen(
+                    key: const ValueKey('act1_why_mornings'),
+                    line1: 'Win the first hour,',
+                    line2: 'discipline compounds.',
+                    line3: 'Lose it. Every excuse gets stronger.',
+                    onNext: _next,
+                  ),
+                  _StatementScreen(
+                    key: const ValueKey('act1_alarm'),
+                    line1: 'Every promise starts',
+                    line2: 'with an alarm.',
+                    line3: 'Your alarm has no consequences. Yet.',
+                    onNext: _next,
+                    ctaLabel: 'GIVE IT ONE',
+                  ),
+
+                  // ═══ ACT 2 — BUILD THE WEAPON ═══
+                  // Every action is justified by the copy immediately before it.
+                  _WakeTimePicker(state: _s, onNext: _next),
+                  _PermissionAsk(
+                    key: const ValueKey('perm_notif'),
+                    icon: Icons.notifications_active_rounded,
+                    headline: "We can't wake you\nif iPhone blocks us.",
+                    body:
+                        'Turn on notifications and the sergeant can shout '
+                        'at you through Silent and Focus. Off, and the alarm '
+                        'is just a ping.',
+                    ctaLabel: 'ALLOW NOTIFICATIONS',
+                    request: () async {
+                      await Permission.notification.request();
+                    },
+                    onNext: _next,
+                  ),
+                  _ExercisePicker(state: _s, onNext: _next),
+                  _RepsPicker(state: _s, onNext: _next),
+                  _StatementScreen(
+                    key: const ValueKey('act2_ai'),
+                    line1: 'AI counts',
+                    line2: 'every rep.',
+                    line3: 'Fake reps do not count.',
+                    onNext: _next,
+                  ),
+                  _EscalationWarning(reps: _s.reps, onNext: _next),
+                  _PermissionAsk(
+                    key: const ValueKey('perm_camera'),
+                    icon: Icons.camera_alt_rounded,
+                    headline: 'The only way to stop the alarm\nis AI-verified reps.',
+                    body:
+                        "Without camera access we can't verify them. "
+                        "The camera only opens when the alarm rings. "
+                        "Nothing is recorded or sent anywhere.",
+                    ctaLabel: 'ALLOW CAMERA',
+                    request: () async {
+                      await Permission.camera.request();
+                    },
+                    onNext: _next,
+                  ),
+
+                  // ═══ ACT 3 — IDENTITY & COST ═══
+                  // NOW ask. They already built the alarm — questions become
+                  // identity reinforcement, not surveys.
                   _SinglePick(
                     key: const ValueKey('habit'),
-                    title: 'What do you want to fix first?',
-                    subtitle: 'Pick the one that costs you the most.',
+                    title: 'What are you tired of failing at?',
+                    subtitle: 'Pick the one that hurts the most.',
                     options: const [
-                      'Wake up on time',
-                      'Exercise consistently',
-                      'Stop procrastinating',
-                      'Reduce phone use',
-                      'Build discipline',
-                      'Other',
+                      'Waking up on time',
+                      'Exercising consistently',
+                      'Not procrastinating',
+                      'Reducing phone use',
+                      'Building discipline',
+                      'Something else',
                     ],
                     initial: _s.habitToFix,
                     onPicked: (v) => _s.habitToFix = v,
@@ -140,7 +201,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('struggle'),
-                    title: 'How long have you struggled with this?',
+                    title: 'How long has this been a problem?',
+                    subtitle: 'Be honest. Nobody sees this but the sergeant.',
                     options: const [
                       'Less than 1 month',
                       '1–6 months',
@@ -154,14 +216,15 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('fail'),
-                    title: 'What usually breaks you?',
+                    title: 'What actually breaks you?',
+                    subtitle: 'The truth. Not the version you tell your friends.',
                     options: const [
                       'Lack of motivation',
                       'I keep making excuses',
                       'I procrastinate',
                       'I quit after a few days',
                       'I forget',
-                      'Other',
+                      'Something else',
                     ],
                     initial: _s.failCause,
                     onPicked: (v) => _s.failCause = v,
@@ -169,7 +232,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('breakfreq'),
-                    title: 'How often do you break promises to yourself?',
+                    title: 'How often do you break a promise to yourself?',
+                    subtitle: 'Every skipped alarm counts.',
                     options: const ['Rarely', 'Sometimes', 'Often', 'Almost every day'],
                     initial: _s.breakFrequency,
                     onPicked: (v) => _s.breakFrequency = v,
@@ -177,7 +241,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SliderScreen(
                     key: const ValueKey('frustration'),
-                    title: 'How frustrated are you with yourself?',
+                    title: 'How frustrated are you with yourself right now?',
                     lowLabel: 'Not really',
                     highLabel: 'Really frustrated',
                     initial: _s.frustration,
@@ -186,35 +250,25 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SliderScreen(
                     key: const ValueKey('importance'),
-                    title: 'How important is fixing this?',
+                    title: 'How important is finally fixing this?',
                     lowLabel: 'Whatever',
                     highLabel: 'Life-changing',
                     initial: _s.importance,
                     onChanged: (v) => _s.importance = v,
                     onNext: _next,
                   ),
-                  _StatementScreen(
-                    key: const ValueKey('identity1'),
-                    line1: "Discipline isn't something",
-                    line2: "you're born with.",
-                    line3: "It's something you train.",
-                    onNext: _next,
-                  ),
-                  _WakeTimePicker(state: _s, onNext: _next),
-                  _ExercisePicker(state: _s, onNext: _next),
-                  _RepsPicker(state: _s, onNext: _next),
-                  _EscalationWarning(reps: _s.reps, onNext: _next),
-                  _StatementScreen(
-                    key: const ValueKey('commit'),
-                    line1: 'No more backup alarms.',
-                    line2: 'No more excuses.',
-                    line3: 'No more "tomorrow."',
-                    onNext: _next,
-                    ctaLabel: 'I AGREE',
-                  ),
+                  _CostAudit(state: _s, onNext: _next),
+
+                  // ═══ ACT 5 — CONTRACT ═══
+                  // (Act 4 = Laws — lands in Commit C.)
                   _SignatureScreen(state: _s, onNext: _next),
+
+                  // ═══ ACT 6 — BUILD ═══
                   _BuildingPlan(onNext: _next),
+
+                  // ═══ ACT 7 — PAYOFF → PAYWALL ═══
                   _SummaryScreen(state: _s, onNext: _next),
+                  _TrialBridge(onNext: _next),
                 ],
               ),
             ),
@@ -1597,8 +1651,8 @@ class _SignatureScreenState extends State<_SignatureScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _Hero(
-            title: 'Sign your commitment.',
-            subtitle: 'You are giving your word to yourself. Not to us.',
+            title: "You've built your protocol.",
+            subtitle: 'Last step: give yourself your word.',
           ),
           const SizedBox(height: 20),
           Container(
@@ -1609,7 +1663,7 @@ class _SignatureScreenState extends State<_SignatureScreen> {
               border: Border.all(color: AppColors.emerald.withOpacity(0.25), width: 1),
             ),
             child: Text(
-              'I commit to completing my HabitDrill every morning.',
+              'I accept the consequences of breaking my own promises.',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.85),
                 fontSize: 13,
@@ -2743,6 +2797,356 @@ class _Stat extends StatelessWidget {
               style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Contextual permission ask ─────────────
+//
+// Reusable for both notification (screen 8) and camera (screen 13).
+// Explains WHY before showing the iOS system prompt. Denial or accept,
+// user advances — we don't gate the flow on the OS answer, because they
+// can still fix it later in Settings, and blocking the funnel here
+// tanks conversion.
+
+class _PermissionAsk extends StatefulWidget {
+  final IconData icon;
+  final String headline;
+  final String body;
+  final String ctaLabel;
+  final Future<void> Function() request;
+  final VoidCallback onNext;
+
+  const _PermissionAsk({
+    super.key,
+    required this.icon,
+    required this.headline,
+    required this.body,
+    required this.ctaLabel,
+    required this.request,
+    required this.onNext,
+  });
+
+  @override
+  State<_PermissionAsk> createState() => _PermissionAskState();
+}
+
+class _PermissionAskState extends State<_PermissionAsk> {
+  bool _asking = false;
+
+  Future<void> _tap() async {
+    if (_asking) return;
+    _asking = true;
+    HapticFeedback.mediumImpact();
+    try {
+      await widget.request();
+    } catch (_) {}
+    if (mounted) widget.onNext();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withOpacity(0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.emerald.withOpacity(0.5), width: 1),
+              boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.35), blurRadius: 20)],
+            ),
+            alignment: Alignment.center,
+            child: Icon(widget.icon, color: AppColors.emerald, size: 30),
+          ).animate().fadeIn().scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1)),
+          const SizedBox(height: 26),
+          Text(
+            widget.headline,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 14),
+          Text(
+            widget.body,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ).animate(delay: 240.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: widget.ctaLabel, onTap: _tap)
+              .animate(delay: 400.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          Center(
+            child: GestureDetector(
+              onTap: widget.onNext,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  'Not now',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ).animate(delay: 500.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Cost Audit reflection ─────────────
+//
+// The single highest-conversion screen in the whole flow. Reads their
+// survey answers back to them in second person. "It sees me." This
+// resolves the emotional peak of Act 3 into a diagnosis they can't argue
+// with.
+
+class _CostAudit extends StatelessWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _CostAudit({required this.state, required this.onNext});
+
+  String _struggleLine() {
+    switch (state.struggleDuration) {
+      case 'Less than 1 month':
+        return "You've fought this for weeks.";
+      case '1–6 months':
+        return "You've fought this for months.";
+      case '1 year':
+        return "You've fought this for a year.";
+      case 'Several years':
+        return "You've fought this for years.";
+      case 'As long as I can remember':
+        return "You've fought this as long as you can remember.";
+      default:
+        return "You've been fighting this for a while.";
+    }
+  }
+
+  String _failLine() {
+    switch (state.failCause) {
+      case 'Lack of motivation':
+        return 'Motivation runs out. Every time.';
+      case 'I keep making excuses':
+        return 'The excuses win. Every time.';
+      case 'I procrastinate':
+        return 'Tomorrow becomes never.';
+      case 'I quit after a few days':
+        return 'Day four kills you.';
+      case 'I forget':
+        return 'You forget by breakfast.';
+      default:
+        return 'Something small breaks it. Every time.';
+    }
+  }
+
+  String _breakLine() {
+    switch (state.breakFrequency) {
+      case 'Rarely':
+        return "But when you do, it hurts.";
+      case 'Sometimes':
+        return "You break promises to yourself often enough to notice.";
+      case 'Often':
+        return "You break promises to yourself all the time.";
+      case 'Almost every day':
+        return "You break promises to yourself almost every day.";
+      default:
+        return "And every broken promise gets easier.";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.emerald.withOpacity(0.4)),
+            ),
+            child: Text(
+              'HERE IS WHAT YOU TOLD US',
+              style: TextStyle(
+                color: AppColors.emerald,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: 22),
+          const Text(
+            'We see it clearly now.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1.05,
+            ),
+          ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 26),
+          for (int i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(top: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      [_struggleLine(), _failLine(), _breakLine()][i],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ).animate(delay: (280 + i * 160).ms).fadeIn().slideX(begin: 0.05, end: 0),
+          const SizedBox(height: 22),
+          Text(
+            "You aren't lazy.\nYour system is broken.",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+              height: 1.15,
+            ),
+          ).animate(delay: 850.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          Text(
+            'That changes tomorrow morning.',
+            style: TextStyle(
+              color: AppColors.emerald,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ).animate(delay: 1000.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: 'INSTALL THE FIX', onTap: onNext)
+              .animate(delay: 1200.ms).fadeIn().slideY(begin: 0.05, end: 0),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Trial framing bridge ─────────────
+//
+// The last screen before the paywall. Reframes payment as "starting the
+// trial you already committed to" rather than "being asked to pay."
+// Never drop them cold into a price screen.
+
+class _TrialBridge extends StatelessWidget {
+  final VoidCallback onNext;
+  const _TrialBridge({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.emerald,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              '3 DAYS FREE',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: 22),
+          const Text(
+            'Try it free',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1,
+            ),
+          ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          Text(
+            'for 3 days.',
+            style: TextStyle(
+              color: AppColors.emerald,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1,
+              shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 20)],
+            ),
+          ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 30),
+          Text(
+            'You already signed.\nYou already picked.\nYou already know.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ).animate(delay: 400.ms).fadeIn(),
+          const SizedBox(height: 18),
+          Text(
+            '3 days to prove it to yourself.\nCancel anytime. You won\'t need to.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ).animate(delay: 600.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: 'START MY FREE TRIAL', onTap: onNext)
+              .animate(delay: 800.ms).fadeIn().slideY(begin: 0.05, end: 0),
         ],
       ),
     );
