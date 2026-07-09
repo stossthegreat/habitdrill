@@ -14,6 +14,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../design/tokens.dart';
 import '../../providers/habit_provider.dart';
+import '../../services/law_punishment_picker.dart';
 import 'onboarding_state.dart';
 import 'onboarding_paywall.dart';
 
@@ -29,10 +30,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final OnboardingState _s = OnboardingState();
   int _i = 0;
 
-  // ACT 1 (6) + ACT 2 (7) + ACT 3 (7) + ACT 5 (2) + ACT 6 (1) + ACT 7 (2)
-  // = 25 screens. Progress bar fills against this; the counter itself
-  // is deliberately hidden (see _ProgressBar).
-  static const int _total = 25;
+  // ACT 1 (6) + ACT 2 (7) + ACT 3 (7) + ACT 4 (3) + ACT 5 (1) + ACT 6 (1) +
+  // ACT 7 (2) = 27 screens. Act 5 (signature) is just the pad — the
+  // "give yourself your word" statement is embedded inside it. Progress
+  // bar fills against this; the counter itself is hidden.
+  static const int _total = 27;
 
   @override
   void dispose() {
@@ -66,19 +68,41 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
         '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
     Future(() async {
       try {
-        await ref.read(habitEngineProvider).createHabit(
-              title: 'Morning Rise',
-              type: 'habit',
-              time: wakeTimeStr,
-              startDate: DateTime.now(),
-              endDate: DateTime.now().add(const Duration(days: 365)),
-              repeatDays: const [0, 1, 2, 3, 4, 5, 6],
-              reminderOn: true,
-              color: AppColors.emerald,
-              emoji: '☀️',
-            );
+        final engine = ref.read(habitEngineProvider);
+        await engine.createHabit(
+          title: 'Morning Rise',
+          type: 'habit',
+          time: wakeTimeStr,
+          startDate: DateTime.now(),
+          endDate: DateTime.now().add(const Duration(days: 365)),
+          repeatDays: const [0, 1, 2, 3, 4, 5, 6],
+          reminderOn: true,
+          color: AppColors.emerald,
+          emoji: '☀️',
+        );
+        // Create a Habit(type='bad_habit') for every Law the user signed.
+        // These show up in Contracts under CONTRACTS immediately with the
+        // VERIFY WITH SCREEN TIME chip already available.
+        for (final lawId in _s.lawsPicked) {
+          final preset = _lawPresets.firstWhere(
+            (p) => p.id == lawId,
+            orElse: () => const _LawPreset(id: '', title: '', emoji: ''),
+          );
+          if (preset.id.isEmpty) continue;
+          await engine.createHabit(
+            title: preset.title,
+            type: 'bad_habit',
+            time: '',
+            startDate: DateTime.now(),
+            endDate: DateTime.now().add(const Duration(days: 365)),
+            repeatDays: const [0, 1, 2, 3, 4, 5, 6],
+            reminderOn: false,
+            color: AppColors.error,
+            emoji: preset.emoji,
+          );
+        }
       } catch (e) {
-        debugPrint('Morning Rise habit creation failed: $e');
+        debugPrint('Onboarding habit creation failed: $e');
       }
     });
     // NOTE: seen_onboarding is set inside OnboardingPaywall._goHome, so
@@ -259,8 +283,20 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _CostAudit(state: _s, onNext: _next),
 
+                  // ═══ ACT 4 — LAWS ═══
+                  // Randomised punishments are the deterrent. User picks
+                  // the Laws; HabitDrill picks the price.
+                  _StatementScreen(
+                    key: const ValueKey('act4_intro'),
+                    line1: "These aren't goals.",
+                    line2: "They're Laws.",
+                    line3: 'Break one. Earn a punishment. We choose it.',
+                    onNext: _next,
+                  ),
+                  _LawPicker(state: _s, onNext: _next),
+                  _PunishmentReveal(state: _s, onNext: _next),
+
                   // ═══ ACT 5 — CONTRACT ═══
-                  // (Act 4 = Laws — lands in Commit C.)
                   _SignatureScreen(state: _s, onNext: _next),
 
                   // ═══ ACT 6 — BUILD ═══
@@ -3147,6 +3183,340 @@ class _TrialBridge extends StatelessWidget {
           const Spacer(),
           _PrimaryButton(label: 'START MY FREE TRIAL', onTap: onNext)
               .animate(delay: 800.ms).fadeIn().slideY(begin: 0.05, end: 0),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Act 4 · Law picker ────────────────────
+//
+// Multi-select preset Laws. Copy is opinionated on purpose — reads like
+// a menu of things people already know they should stop doing, so the
+// friction is only "which one hurts most" not "what is this."
+
+const List<_LawPreset> _lawPresets = [
+  _LawPreset(id: 'law_vaping', title: 'No vaping', emoji: '🚭'),
+  _LawPreset(id: 'law_porn', title: 'No pornography', emoji: '🚫'),
+  _LawPreset(id: 'law_junk', title: 'No junk food', emoji: '🍔'),
+  _LawPreset(id: 'law_alcohol', title: 'No alcohol on weekdays', emoji: '🍺'),
+  _LawPreset(id: 'law_scroll', title: 'No social media before work', emoji: '📱'),
+  _LawPreset(id: 'law_snooze', title: 'No hitting snooze', emoji: '⏰'),
+];
+
+class _LawPreset {
+  final String id;
+  final String title;
+  final String emoji;
+  const _LawPreset({required this.id, required this.title, required this.emoji});
+}
+
+class _LawPicker extends StatefulWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _LawPicker({required this.state, required this.onNext});
+
+  @override
+  State<_LawPicker> createState() => _LawPickerState();
+}
+
+class _LawPickerState extends State<_LawPicker> {
+  @override
+  Widget build(BuildContext context) {
+    final picked = widget.state.lawsPicked;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'Pick your Laws.',
+            subtitle: 'Break a Law. HabitDrill picks the price.',
+          ),
+          const SizedBox(height: 22),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: _lawPresets.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final p = _lawPresets[i];
+                final isPicked = picked.contains(p.id);
+                return _LawRow(
+                  preset: p,
+                  picked: isPicked,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      if (isPicked) {
+                        picked.remove(p.id);
+                      } else {
+                        picked.add(p.id);
+                      }
+                    });
+                  },
+                ).animate(delay: (60 + i * 45).ms).fadeIn(duration: 260.ms).slideY(begin: 0.04, end: 0);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          _PrimaryButton(
+            label: picked.isEmpty ? 'SKIP FOR NOW' : 'LOCK IN ${picked.length} LAW${picked.length == 1 ? "" : "S"}',
+            onTap: widget.onNext,
+          ).animate(delay: 400.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+class _LawRow extends StatelessWidget {
+  final _LawPreset preset;
+  final bool picked;
+  final VoidCallback onTap;
+  const _LawRow({required this.preset, required this.picked, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: picked
+              ? AppColors.emerald.withOpacity(0.08)
+              : const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: picked
+                ? AppColors.emerald.withOpacity(0.55)
+                : Colors.white.withOpacity(0.06),
+            width: picked ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(preset.emoji, style: const TextStyle(fontSize: 22, height: 1)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                preset.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: picked ? AppColors.emerald : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: picked ? AppColors.emerald : Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: picked
+                  ? const Icon(Icons.check, color: Colors.black, size: 14)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Act 4 · Punishment reveal ─────────────
+//
+// Slot-machine reveal that lands on ONE punishment from the pool. The
+// user knows the pool exists, doesn't know which they'll get when they
+// break a real Law. Uncertainty of consequence beats certainty every
+// time (Kahneman's variable-ratio schedule).
+
+class _PunishmentReveal extends StatefulWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _PunishmentReveal({required this.state, required this.onNext});
+
+  @override
+  State<_PunishmentReveal> createState() => _PunishmentRevealState();
+}
+
+class _PunishmentRevealState extends State<_PunishmentReveal> {
+  Timer? _tick;
+  bool _locked = false;
+  late LawPunishment _current;
+  late final LawPunishment _target;
+  int _spinCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = LawPunishmentPicker.sample();
+    _current = LawPunishmentPicker.pool.first;
+    widget.state.revealedPunishmentId = _target.id;
+    // 65ms cycle so the label looks like it's flickering — total spin
+    // time ~2.4 seconds, ~37 cycles before it locks.
+    _tick = Timer.periodic(const Duration(milliseconds: 65), (_) {
+      if (_locked || !mounted) return;
+      setState(() {
+        _current = LawPunishmentPicker.pool[
+            (LawPunishmentPicker.pool.indexOf(_current) + 1) %
+                LawPunishmentPicker.pool.length];
+        _spinCount++;
+      });
+    });
+    // Slow down and lock at ~2.4s.
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _current = _target;
+        _locked = true;
+      });
+      _tick?.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Hero(
+            title: _locked ? 'You broke a Law.' : 'Rolling your fate…',
+            subtitle: _locked
+                ? "Here's one thing you might owe."
+                : "You won't know which one you'll get.",
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _locked
+                    ? [
+                        AppColors.error.withOpacity(0.18),
+                        AppColors.error.withOpacity(0.02),
+                      ]
+                    : [
+                        Colors.white.withOpacity(0.04),
+                        Colors.white.withOpacity(0.01),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: _locked
+                    ? AppColors.error.withOpacity(0.55)
+                    : Colors.white.withOpacity(0.08),
+                width: _locked ? 1.8 : 1,
+              ),
+              boxShadow: _locked
+                  ? [
+                      BoxShadow(
+                        color: AppColors.error.withOpacity(0.35),
+                        blurRadius: 32,
+                        offset: const Offset(0, 12),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 90),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween(
+                    begin: const Offset(0, 0.4),
+                    end: Offset.zero,
+                  ).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: Column(
+                key: ValueKey('${_current.id}_$_locked'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _current.emoji,
+                    style: const TextStyle(fontSize: 62, height: 1),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    _current.label.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _locked ? Colors.white : Colors.white.withOpacity(0.85),
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4,
+                      height: 1.05,
+                      shadows: _locked
+                          ? [Shadow(color: AppColors.error.withOpacity(0.4), blurRadius: 16)]
+                          : null,
+                    ),
+                  ),
+                  if (_locked) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _current.flavor,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: Text(
+              _locked
+                  ? 'Different Laws. Different punishments. You never know.'
+                  : 'Locking in…',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.45),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          const Spacer(flex: 2),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _locked ? 1 : 0,
+            child: _PrimaryButton(
+              label: 'I ACCEPT THE RISK',
+              enabled: _locked,
+              onTap: widget.onNext,
+            ),
+          ),
+          const SizedBox(height: 10),
         ],
       ),
     );

@@ -19,5 +19,14 @@ class OnboardingState {
   int reps = 15;
   Uint8List? signatureBytes;
 
+  /// Which Laws (bad-habit rules) the user signed. Empty is fine —
+  /// Act 4 offers "Not now" and the paywall still lands.
+  final Set<String> lawsPicked = {};
+
+  /// The one-off punishment the slot-machine reveal locked onto during
+  /// onboarding. Kept only so the Signature and Summary screens can
+  /// reference the SAME punishment the user just saw, for continuity.
+  String? revealedPunishmentId;
+
   bool get hasSignature => signatureBytes != null && signatureBytes!.isNotEmpty;
 }
