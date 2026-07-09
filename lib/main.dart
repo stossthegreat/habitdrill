@@ -252,14 +252,18 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     // this notifier so we swap the root screen instantly instead of
     // waiting for the next poll tick.
     WakeDebtService.wakeChanged.addListener(_refreshWakeState);
-    // Poll every 10 seconds. Catches the case where the alarm fires
-    // while the app is already foregrounded (no lifecycle event, no
-    // notification tap — just the wall clock crossing habit.time).
+    // Poll every 2 seconds. Catches every case the lifecycle events
+    // miss — alarm firing while foregrounded, warm-start on iOS where
+    // UIScene sometimes swallows the resumed callback, notification
+    // payload never reaching Dart because of a plugin timing issue,
+    // etc. Two seconds is unnoticeable for battery.
     _wakePoll = Timer.periodic(
-      const Duration(seconds: 10),
+      const Duration(seconds: 2),
       (_) => _refreshWakeState(),
     );
-    _onEnter();
+    // First check as soon as the first frame commits — before any tab
+    // renders behind it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onEnter());
   }
 
   @override
@@ -272,7 +276,11 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    // React to ANY non-paused/detached transition. On iOS with UIScene
+    // lifecycle, "resumed" is sometimes skipped and we go straight from
+    // inactive → active without a resumed callback. Catch inactive too.
+    if (state == AppLifecycleState.resumed
+        || state == AppLifecycleState.inactive) {
       _onEnter();
     }
   }

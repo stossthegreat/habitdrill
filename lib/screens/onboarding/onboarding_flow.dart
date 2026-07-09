@@ -276,21 +276,10 @@ class _ProgressBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 40,
-            child: Text(
-              '$current/$total',
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
+          // Symmetric spacer so the progress bar stays visually centred —
+          // we deliberately do NOT show "N/21". Users completing the flow
+          // convert better when they don't count screens.
+          const SizedBox(width: 40),
         ],
       ),
     );
@@ -573,14 +562,16 @@ class _Welcome extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Spacer(),
+          const SizedBox(height: 48),
           Text(
             'Welcome to',
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 22, fontWeight: FontWeight.w800),
           ).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 4),
           const Text(
-            'HABITDRILL.',
+            // No trailing period — with letterSpacing: 3 it wraps onto
+            // its own line as a stray dot below the wordmark. Kill it.
+            'HABITDRILL',
             style: TextStyle(
               color: Colors.white,
               fontSize: 44,
@@ -589,7 +580,7 @@ class _Welcome extends StatelessWidget {
               height: 1,
             ),
           ).animate(delay: 100.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           Container(
             width: 60,
             height: 3,
@@ -599,7 +590,7 @@ class _Welcome extends StatelessWidget {
               boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 12)],
             ),
           ).animate(delay: 300.ms).fadeIn(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Text(
             'The app that makes',
             style: TextStyle(

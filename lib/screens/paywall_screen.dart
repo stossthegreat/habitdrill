@@ -84,34 +84,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               const Spacer(flex: 2),
 
-              // Icon
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset('assets/icon/app_icon.png', width: 72, height: 72),
-              ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1)),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                'HABITDRILL PRO',
-                style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 3),
-              ).animate(delay: 200.ms).fadeIn(),
-
-              const SizedBox(height: 8),
-
-              Text(
-                'Full enforcement unlocked.',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
-              ).animate(delay: 300.ms).fadeIn(),
+              // Outcome #1 — the wake-up promise
+              _Outcome(
+                headline: 'WAKE UP.\nWHEN YOU SAY YOU WILL.',
+                body:
+                    "The alarm doesn't stop until you've done the reps. "
+                    'No snooze. No cheat. No excuse.',
+                delay: 200,
+              ),
 
               const SizedBox(height: 28),
 
-              // Features
-              _feature('Drill sergeant punishment videos', 0),
-              _feature('AI exercise tracking with camera', 1),
-              _feature('Escalating workout circuits', 2),
-              _feature('Sergeant voice during training', 3),
-              _feature('Full violation & offense tracking', 4),
+              // Outcome #2 — the quitting system
+              _Outcome(
+                headline: 'QUIT THE BAD ONES.\nOR PAY THE PRICE.',
+                body:
+                    'Vape, porn, sugar, phone. Break the contract and the '
+                    'sergeant makes you pay in reps until the debt is clear.',
+                delay: 500,
+              ),
 
               const Spacer(flex: 3),
 
@@ -233,22 +224,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
     );
   }
 
-  Widget _feature(String text, int index) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 6, height: 6,
-            decoration: BoxDecoration(color: AppColors.emerald, borderRadius: BorderRadius.circular(3)),
-          ),
-          const SizedBox(width: 14),
-          Text(text, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    ).animate(delay: (400 + index * 100).ms).fadeIn(duration: 250.ms).slideX(begin: 0.03, end: 0);
-  }
-
   Widget _planOption(String label, String price, bool isYearly) {
     final selected = _yearly == isYearly;
     return Expanded(
@@ -269,6 +244,51 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Killer-outcome block used on the in-app paywall. Two of these stack.
+/// Headline is huge, bold, tight leading; body is one supporting sentence
+/// underneath. No icons — the copy is the whole thing.
+class _Outcome extends StatelessWidget {
+  final String headline;
+  final String body;
+  final int delay;
+  const _Outcome({
+    required this.headline,
+    required this.body,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          headline,
+          textAlign: TextAlign.left,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.4,
+            height: 1.05,
+          ),
+        ).animate(delay: delay.ms).fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.55),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.45,
+          ),
+        ).animate(delay: (delay + 150).ms).fadeIn(duration: 400.ms),
+      ],
     );
   }
 }
