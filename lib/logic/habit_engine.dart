@@ -208,13 +208,16 @@ class HabitEngine extends ChangeNotifier {
   Future<Violation?> toggleHabitCompletion(String habitId) async {
     final habit = _habits.firstWhere((h) => h.id == habitId);
 
-    // Bad habits: "completing" means user indulged → trigger sergeant
+    // Bad habits: "completing" means user indulged → trigger sergeant.
+    // Streak is a CLEAN-DAYS counter for Laws; pressing "I broke it"
+    // resets it to 0. The daily check job increments it by 1 for every
+    // day a rule wasn't broken (see DisciplineService.runDailyCheck).
     if (habit.type == 'bad_habit') {
       final violation = await SergeantService.triggerBadHabitViolation(habit);
-      // Mark as "done" for today so UI shows it was logged
       final updated = habit.copyWith(
         done: true,
         completedAt: DateTime.now(),
+        streak: 0,
       );
       await LocalStorageService.saveHabit(updated);
       final idx = _habits.indexWhere((h) => h.id == habitId);
@@ -225,7 +228,14 @@ class HabitEngine extends ChangeNotifier {
       return violation;
     }
 
-    // Normal habits: toggle done/undone
+    // Normal habits: toggle done/undone.
+    //
+    // Streak rule: increment ONCE per day when we transition from
+    // undone → done. Un-ticking (done → undone, e.g. the user tapped
+    // by accident and untapped) MUST NOT wipe the streak — that
+    // regression was destroying users' progress on a mis-tap and is
+    // fixed here. Streak only resets when a day passes without a
+    // completion, and that reset is owned by the daily-check job.
     final today = DateTime.now();
     final isCurrentlyDone = habit.isDoneOn(today);
     final nowDone = !isCurrentlyDone;
@@ -233,7 +243,7 @@ class HabitEngine extends ChangeNotifier {
     final updated = habit.copyWith(
       done: nowDone,
       completedAt: nowDone ? today : null,
-      streak: nowDone ? habit.streak + 1 : 0,
+      streak: nowDone ? habit.streak + 1 : habit.streak,
       xp: nowDone ? habit.xp + 15 : habit.xp,
     );
 

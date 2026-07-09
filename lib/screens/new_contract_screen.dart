@@ -20,16 +20,20 @@ class NewContractScreen extends ConsumerStatefulWidget {
 
 class _NewContractScreenState extends ConsumerState<NewContractScreen> {
   final _titleController = TextEditingController();
-  final _emojiController = TextEditingController();
 
   String _type = 'habit';
+  // Default emoji resolved by type / preset. Not user-editable.
+  String _emoji = '🎯';
   int _durationDays = 30;
   _Frequency _frequency = _Frequency.daily;
   final List<bool> _customDays = List.filled(7, false);
   bool _timeEnabled = false;
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
   bool _alarmOn = false;
-  Color _color = AppColors.emerald;
+  // Colour is derived, not picked: bad_habit → red, everything else →
+  // emerald. Colour picker removed.
+  Color get _color =>
+      _type == 'bad_habit' ? AppColors.error : AppColors.emerald;
   bool _saving = false;
 
   bool get _isEdit => widget.edit != null;
@@ -42,23 +46,20 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       _prefillFromHabit(widget.edit!);
     } else if (widget.preset != null) {
       _prefillFromPreset(widget.preset!);
-    } else {
-      _emojiController.text = '🎯';
     }
   }
 
   void _prefillFromPreset(PresetParams p) {
     _titleController.text = p.title;
-    _emojiController.text = p.emoji;
+    _emoji = p.emoji;
     _type = p.type;
     _durationDays = p.targetDays;
     _frequency = _Frequency.daily;
-    if (p.type == 'bad_habit') _color = AppColors.error;
   }
 
   void _prefillFromHabit(Habit h) {
     _titleController.text = h.title;
-    _emojiController.text = h.emoji ?? '🎯';
+    _emoji = h.emoji ?? '🎯';
     _type = h.type;
     final total = h.endDate.difference(h.startDate).inDays;
     _durationDays = total > 0 ? total : 30;
@@ -68,7 +69,6 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       _time = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
     }
     _alarmOn = h.reminderOn;
-    _color = h.color;
     // Map repeatDays to frequency
     final rd = h.repeatDays;
     if (rd.length == 7) {
@@ -112,7 +112,6 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _emojiController.dispose();
     super.dispose();
   }
 
@@ -138,8 +137,11 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
 
-    var emoji = _emojiController.text.trim();
-    if (emoji.isEmpty) emoji = '🎯';
+    // Emoji picker removed — use the preset/edit value, falling back
+    // to a per-type default so the card never renders blank.
+    final emoji = _emoji.isNotEmpty
+        ? _emoji
+        : (_type == 'bad_habit' ? '🚫' : '🎯');
     final timeStr = _timeEnabled
         ? '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}'
         : '';
@@ -208,7 +210,9 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                     _Section(
                       label: 'TITLE',
                       child: _TitleField(
-                        emojiController: _emojiController,
+                        // Emoji picker removed — the title alone is the
+                        // brand. Default emoji is set from the preset or
+                        // type in the save handler.
                         titleController: _titleController,
                         onChanged: () => setState(() {}),
                       ),
@@ -218,10 +222,7 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                       label: 'TYPE',
                       child: _TypeSelector(
                         current: _type,
-                        onChanged: (t) => setState(() {
-                          _type = t;
-                          if (t == 'bad_habit') _color = AppColors.error;
-                        }),
+                        onChanged: (t) => setState(() => _type = t),
                       ),
                     ),
                     const SizedBox(height: 22),
@@ -259,14 +260,10 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                         onToggleAlarm: (v) => setState(() => _alarmOn = v),
                       ),
                     ),
-                    const SizedBox(height: 22),
-                    _Section(
-                      label: 'COLOUR',
-                      child: _ColorPicker(
-                        current: _color,
-                        onChanged: (c) => setState(() => _color = c),
-                      ),
-                    ),
+                    // Colour picker removed — colour is derived from the
+                    // type: bad_habit → red, everything else → emerald.
+                    // Users never asked for pastel personalisation and
+                    // the picker was making the screen too tall.
                     if (_isEdit) ...[
                       const SizedBox(height: 28),
                       _DeleteButton(onTap: () => _confirmDelete(context)),
@@ -450,65 +447,40 @@ class _FieldLabel extends StatelessWidget {
 // ────────────────────────── Title field ──────────────────────────
 
 class _TitleField extends StatelessWidget {
-  final TextEditingController emojiController;
   final TextEditingController titleController;
   final VoidCallback onChanged;
   const _TitleField({
-    required this.emojiController,
     required this.titleController,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0B0B0B),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
-          ),
-          alignment: Alignment.center,
-          child: TextField(
-            controller: emojiController,
-            textAlign: TextAlign.center,
-            maxLength: 2,
-            style: const TextStyle(fontSize: 26, height: 1),
-            decoration: const InputDecoration(isDense: true, border: InputBorder.none, counterText: ''),
-          ),
+    // Title is the whole thing — emoji picker was removed.
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
+      ),
+      alignment: Alignment.centerLeft,
+      child: TextField(
+        controller: titleController,
+        onChanged: (_) => onChanged(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1,
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0B0B),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
-            ),
-            alignment: Alignment.centerLeft,
-            child: TextField(
-              controller: titleController,
-              onChanged: (_) => onChanged(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
-              ),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: 'e.g. Quit Porn',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: 'e.g. Quit Vape',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontWeight: FontWeight.w500),
         ),
-      ],
+      ),
     );
   }
 }
@@ -604,10 +576,10 @@ class _DurationSelector extends StatelessWidget {
           onTap: () => onChanged(n),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
             decoration: BoxDecoration(
               color: selected ? AppColors.emerald.withOpacity(0.15) : const Color(0xFF0B0B0B),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: selected ? AppColors.emerald.withOpacity(0.5) : Colors.white.withOpacity(0.05),
                 width: 1,
@@ -617,9 +589,9 @@ class _DurationSelector extends StatelessWidget {
               '$n DAYS',
               style: TextStyle(
                 color: selected ? AppColors.emerald : Colors.white.withOpacity(0.55),
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
+                letterSpacing: 0.5,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
@@ -660,10 +632,10 @@ class _FrequencySelector extends StatelessWidget {
               onTap: () => onChanged(vals[i]),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                 decoration: BoxDecoration(
                   color: selected ? AppColors.emerald.withOpacity(0.15) : const Color(0xFF0B0B0B),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: selected ? AppColors.emerald.withOpacity(0.5) : Colors.white.withOpacity(0.05),
                     width: 1,
@@ -673,9 +645,9 @@ class _FrequencySelector extends StatelessWidget {
                   labels[i],
                   style: TextStyle(
                     color: selected ? AppColors.emerald : Colors.white.withOpacity(0.55),
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
+                    letterSpacing: 1.2,
                   ),
                 ),
               ),
@@ -857,52 +829,7 @@ class _TimeAndAlarm extends StatelessWidget {
   }
 }
 
-// ────────────────────────── Color picker ──────────────────────────
-
-class _ColorPicker extends StatelessWidget {
-  final Color current;
-  final ValueChanged<Color> onChanged;
-  const _ColorPicker({required this.current, required this.onChanged});
-
-  static const List<Color> swatches = [
-    AppColors.emerald,
-    AppColors.cyan,
-    AppColors.amber,
-    AppColors.error,
-    AppColors.purple,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: swatches.map((c) {
-        final selected = c.value == current.value;
-        return Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: GestureDetector(
-            onTap: () => onChanged(c),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: c,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? Colors.white : Colors.transparent,
-                  width: 2,
-                ),
-                boxShadow: selected
-                    ? [BoxShadow(color: c.withOpacity(0.5), blurRadius: 12, spreadRadius: 1)]
-                    : null,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
+// (Color picker removed — colour derives from type.)
 
 // ────────────────────────── Delete + save buttons ──────────────────────
 

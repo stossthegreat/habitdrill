@@ -179,11 +179,8 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 8),
-                    _ModeToggle(
-                      scheduled: _scheduled,
-                      onChange: (v) => setState(() => _scheduled = v),
-                    ),
-                    const SizedBox(height: 18),
+                    // Scheduled is the only mode — one-time was noise.
+                    // _ModeToggle removed.
                     _NameField(controller: _nameController, onChanged: (_) => setState(() {})),
                     const SizedBox(height: 12),
                     _RowCard(
@@ -192,8 +189,8 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
                       value: _time.format(context),
                       onTap: _pickTime,
                     ),
-                    if (_scheduled) ...[
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                    ...[
                       _DaysCard(
                         days: _days,
                         onToggle: (i) => setState(() => _days[i] = !_days[i]),

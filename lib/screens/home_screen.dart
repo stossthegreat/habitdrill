@@ -8,6 +8,7 @@ import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/share_card.dart';
 import '../screens/achievements_screen.dart';
+import '../screens/settings_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
 import '../screens/sergeant/tempted_screen.dart';
 import '../screens/paywall_screen.dart';
@@ -622,12 +623,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Streak — big fire icon with the number visible outside the
+              // badge so it reads instantly.
               _HeaderIcon(
                 icon: LucideIcons.flame,
                 color: AppColors.fire,
                 badge: _bestStreak > 0 ? '$_bestStreak' : null,
                 onTap: _showShareCard,
               ),
+              const SizedBox(width: 6),
               _HeaderIcon(
                 icon: LucideIcons.award,
                 color: const Color(0xFFF59E0B),
@@ -635,10 +639,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                 ),
               ),
+              const SizedBox(width: 6),
+              // Settings replaces Share here. Share moved to the Profile
+              // tab where the share card actually lives.
               _HeaderIcon(
-                icon: LucideIcons.share2,
+                icon: LucideIcons.settings,
                 color: Colors.white.withOpacity(0.7),
-                onTap: _showShareCard,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
               ),
             ],
           ),
@@ -661,17 +670,27 @@ class _HeaderIcon extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: color, size: 22),
+            // Bumped from 22 → 26 with a matching color glow so the
+            // streak flame and the achievement medal read as
+            // status, not decoration.
+            Icon(
+              icon,
+              color: color,
+              size: 26,
+              shadows: [
+                Shadow(color: color.withOpacity(0.55), blurRadius: 14),
+              ],
+            ),
             if (badge != null)
               Positioned(
-                right: -6,
-                top: -4,
+                right: -8,
+                top: -6,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(8),

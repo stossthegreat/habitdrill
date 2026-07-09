@@ -96,23 +96,10 @@ class _Template {
   });
 }
 
+// Two Laws + two Contracts. Kept intentionally short so POPULAR reads
+// as a menu, not a catalogue.
 const List<_Template> _templates = [
-  _Template(
-    title: 'Wake Up',
-    subtitle: 'Rise on time · 30 days',
-    icon: LucideIcons.sunrise,
-    emoji: '☀️',
-    days: 30,
-    type: 'habit',
-  ),
-  _Template(
-    title: 'Quit Porn',
-    subtitle: 'Break the loop · 90 days',
-    icon: LucideIcons.eyeOff,
-    emoji: '🚫',
-    days: 90,
-    type: 'bad_habit',
-  ),
+  // ── LAWS ──
   _Template(
     title: 'Quit Vape',
     subtitle: 'Clean lungs · 90 days',
@@ -122,26 +109,27 @@ const List<_Template> _templates = [
     type: 'bad_habit',
   ),
   _Template(
-    title: 'No Sugar',
-    subtitle: 'Cold turkey · 30 days',
-    icon: LucideIcons.ban,
-    emoji: '🍬',
-    days: 30,
+    title: 'Quit Porn',
+    subtitle: 'Break the loop · 90 days',
+    icon: LucideIcons.eyeOff,
+    emoji: '🚫',
+    days: 90,
     type: 'bad_habit',
   ),
+  // ── CONTRACTS ──
   _Template(
-    title: '75 Hard',
-    subtitle: 'Total transformation · 75 days',
-    icon: LucideIcons.flame,
-    emoji: '🔥',
-    days: 75,
+    title: 'Exercise',
+    subtitle: 'Move your body · 30 days',
+    icon: LucideIcons.dumbbell,
+    emoji: '💪',
+    days: 30,
     type: 'habit',
   ),
   _Template(
-    title: 'Monk Mode',
-    subtitle: 'Zero distraction · 30 days',
-    icon: LucideIcons.moon,
-    emoji: '🧘',
+    title: 'Study',
+    subtitle: 'Sharpen the mind · 30 days',
+    icon: LucideIcons.bookOpen,
+    emoji: '📚',
     days: 30,
     type: 'habit',
   ),

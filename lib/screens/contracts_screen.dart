@@ -87,6 +87,36 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
     if (choice == 'alarm') {
       await _openNewWakeAlarm();
     } else if (choice == 'contract') {
+      HapticFeedback.selectionClick();
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => const NewContractScreen(
+            preset: PresetParams(
+              title: 'Exercise',
+              emoji: '💪',
+              targetDays: 30,
+              type: 'habit',
+            ),
+          ),
+        ),
+      );
+    } else if (choice == 'law') {
+      HapticFeedback.selectionClick();
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => const NewContractScreen(
+            preset: PresetParams(
+              title: 'Quit Porn',
+              emoji: '🚫',
+              targetDays: 90,
+              type: 'bad_habit',
+            ),
+          ),
+        ),
+      );
+    } else if (choice == 'templates') {
       await _openTemplates();
     }
   }
@@ -230,7 +260,10 @@ class _AddFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 70),
+      // Was 70 — too close to the nav bar. 110 lifts it a real
+      // finger's width above the tab bar so the tap target is
+      // unambiguous and matches the rest of the app's floating buttons.
+      padding: const EdgeInsets.only(bottom: 110),
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -295,8 +328,20 @@ class _AddSheet extends StatelessWidget {
           _SheetOption(
             icon: LucideIcons.scroll,
             title: 'NEW CONTRACT',
-            subtitle: 'A promise. We pick the punishment if you break it.',
+            subtitle: 'A goal to build. Exercise, study, whatever compounds.',
             onTap: () => Navigator.of(context).pop('contract'),
+          ),
+          _SheetOption(
+            icon: LucideIcons.ban,
+            title: 'NEW LAW',
+            subtitle: 'A rule to break. Vape, porn, junk. We pick the price.',
+            onTap: () => Navigator.of(context).pop('law'),
+          ),
+          _SheetOption(
+            icon: LucideIcons.layoutGrid,
+            title: 'BROWSE TEMPLATES',
+            subtitle: 'Pick from the popular ones.',
+            onTap: () => Navigator.of(context).pop('templates'),
           ),
           const SizedBox(height: 4),
         ],
