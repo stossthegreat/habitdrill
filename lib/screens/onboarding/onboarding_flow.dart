@@ -174,9 +174,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                         'at you through Silent and Focus. Off, and the alarm '
                         'is just a ping.',
                     ctaLabel: 'ALLOW NOTIFICATIONS',
-                    request: () async {
-                      await Permission.notification.request();
-                    },
+                    request: () => Permission.notification.request(),
                     onNext: _next,
                   ),
                   _ExercisePicker(state: _s, onNext: _next),
@@ -198,9 +196,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                         "The camera only opens when the alarm rings. "
                         "Nothing is recorded or sent anywhere.",
                     ctaLabel: 'ALLOW CAMERA',
-                    request: () async {
-                      await Permission.camera.request();
-                    },
+                    request: () => Permission.camera.request(),
                     onNext: _next,
                   ),
 
@@ -2868,7 +2864,7 @@ class _PermissionAsk extends StatefulWidget {
   final String headline;
   final String body;
   final String ctaLabel;
-  final Future<void> Function() request;
+  final Future<PermissionStatus> Function() request;
   final VoidCallback onNext;
 
   const _PermissionAsk({
@@ -2893,7 +2889,17 @@ class _PermissionAskState extends State<_PermissionAsk> {
     _asking = true;
     HapticFeedback.mediumImpact();
     try {
-      await widget.request();
+      // First-time asks show the iOS system prompt via
+      // widget.request(). If the user previously denied, iOS won't
+      // re-prompt — permission_handler returns denied silently — so
+      // we route them to Settings instead. openAppSettings works on
+      // both platforms and is the Apple-blessed remediation path.
+      final res = await widget.request();
+      if (res == PermissionStatus.permanentlyDenied) {
+        // Hard-denied — iOS won't re-prompt. Route to Settings so
+        // they can enable it manually.
+        await openAppSettings();
+      }
     } catch (_) {}
     if (mounted) widget.onNext();
   }

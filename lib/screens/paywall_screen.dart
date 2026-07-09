@@ -67,7 +67,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
       body: SafeArea(
-        child: Padding(
+        // Whole page is one long scrollable column. Manifesto + CTA
+        // fit above the fold on every device we support; legal text
+        // scrolls in below. Previously used Spacers that made short
+        // screens cut off the CTA — no more.
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             children: [
@@ -82,29 +87,50 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
               ),
 
-              const Spacer(flex: 2),
+              const SizedBox(height: 24),
 
-              // Outcome #1 — the wake-up promise
-              _Outcome(
-                headline: 'WAKE UP.\nWHEN YOU SAY YOU WILL.',
-                body:
-                    "The alarm doesn't stop until you've done the reps. "
-                    'No snooze. No cheat. No excuse.',
-                delay: 200,
+              // The manifesto — headline + four short beats + closer.
+              // Fits on one screen with the CTA; disclosure scrolls
+              // below.
+              const Text(
+                'STOP LOSING\nTO YOURSELF.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  height: 1.02,
+                ),
+              ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0),
+
+              const SizedBox(height: 22),
+
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ManifestoBeat('Every morning.', 200),
+                  _ManifestoBeat('Every excuse.', 320),
+                  _ManifestoBeat('Every broken promise.', 440),
+                  _ManifestoBeat('Ends today.', 560),
+                ],
               ),
+
+              const SizedBox(height: 20),
+
+              Text(
+                "The Sergeant doesn't care how you feel.\nHe cares whether you did it.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.55),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
+                  height: 1.45,
+                ),
+              ).animate(delay: 700.ms).fadeIn(),
 
               const SizedBox(height: 28),
-
-              // Outcome #2 — the quitting system
-              _Outcome(
-                headline: 'QUIT THE BAD ONES.\nOR PAY THE PRICE.',
-                body:
-                    'Vape, porn, sugar, phone. Break the contract and the '
-                    'sergeant makes you pay in reps until the debt is clear.',
-                delay: 500,
-              ),
-
-              const Spacer(flex: 3),
 
               // Plan toggle
               Container(
@@ -245,6 +271,32 @@ class _PaywallScreenState extends State<PaywallScreen> {
         ),
       ),
     );
+  }
+}
+
+/// One line of the paywall manifesto — bold sans, tight centered.
+/// Staggered fade-in per line so each beat lands as its own moment.
+class _ManifestoBeat extends StatelessWidget {
+  final String text;
+  final int delay;
+  const _ManifestoBeat(this.text, this.delay);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.9),
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.2,
+          height: 1.2,
+        ),
+      ),
+    ).animate(delay: delay.ms).fadeIn(duration: 320.ms).slideY(begin: 0.06, end: 0);
   }
 }
 

@@ -8,9 +8,13 @@ import '../models/habit.dart';
 import '../providers/habit_provider.dart';
 import '../services/alarm_service.dart';
 import '../services/analytics_service.dart';
-import '../services/screen_time_prefs.dart';
-import '../services/screen_time_service.dart';
-import 'law_screen_time_setup_screen.dart';
+// Screen Time UI is dormant. Services stay in the tree so we can flip
+// the flag when the entitlement lands.
+// import '../services/screen_time_prefs.dart';
+// import '../services/screen_time_service.dart';
+// Screen Time UI is commented out — see below. Setup screen kept in the
+// tree but no route in.
+// import 'law_screen_time_setup_screen.dart';
 import 'new_contract_screen.dart';
 import 'new_contract_templates_screen.dart';
 import 'new_wake_alarm_screen.dart';
@@ -59,16 +63,19 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
     );
   }
 
-  Future<void> _openScreenTimeSetup(Habit habit) async {
-    HapticFeedback.selectionClick();
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => LawScreenTimeSetupScreen(habit: habit),
-      ),
-    );
-    if (mounted) setState(() {}); // refresh verified badges
-  }
+  // Screen Time setup is dormant. Kept as a comment so the wiring is
+  // one uncomment away when we come back to it.
+  //
+  // Future<void> _openScreenTimeSetup(Habit habit) async {
+  //   HapticFeedback.selectionClick();
+  //   await Navigator.of(context).push(
+  //     MaterialPageRoute(
+  //       fullscreenDialog: true,
+  //       builder: (_) => LawScreenTimeSetupScreen(habit: habit),
+  //     ),
+  //   );
+  //   if (mounted) setState(() {});
+  // }
 
   Future<void> _showAddSheet() async {
     HapticFeedback.mediumImpact();
@@ -183,9 +190,8 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                         index: i,
                         onTap: () => _openEdit(contracts[i]),
                         onLongPress: () => _confirmDelete(contracts[i]),
-                        onVerify: contracts[i].type == 'bad_habit'
-                            ? () => _openScreenTimeSetup(contracts[i])
-                            : null,
+                        // onVerify: Screen Time verification is dormant.
+                        onVerify: null,
                       ),
                     ),
                   ),
@@ -625,34 +631,15 @@ class _ContractCard extends StatefulWidget {
 }
 
 class _ContractCardState extends State<_ContractCard> {
-  bool _verified = false;
-  int _minutesToday = 0;
-  int _budgetMinutes = 0;
-  String _categoryLabel = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadVerificationState();
-  }
+  // Screen Time state is dormant — kept as stubs so widget.onVerify == null
+  // continues to work and we don't have to reshape the widget when we
+  // come back to it.
+  final bool _verified = false;
+  final int _minutesToday = 0;
+  final int _budgetMinutes = 0;
 
   Future<void> _loadVerificationState() async {
-    if (widget.habit.type != 'bad_habit') return;
-    final v = await ScreenTimePrefs.isVerified(widget.habit.id);
-    if (!v) {
-      if (mounted) setState(() => _verified = false);
-      return;
-    }
-    final catId = await ScreenTimePrefs.getCategory(widget.habit.id);
-    final budget = await ScreenTimePrefs.getBudget(widget.habit.id);
-    final live = await ScreenTimeService.minutesUsedToday(catId);
-    if (!mounted) return;
-    setState(() {
-      _verified = true;
-      _minutesToday = live;
-      _budgetMinutes = budget;
-      _categoryLabel = ScreenTimeCategory.byId(catId).label;
-    });
+    // no-op while Screen Time is off
   }
 
   @override
@@ -741,24 +728,15 @@ class _ContractCardState extends State<_ContractCard> {
                 ],
               ),
             ],
-            // Verify-with-Screen-Time chip — only shown for Laws (bad
-            // habits). When verified, shows live usage vs budget so the
-            // user sees the OS number instead of trusting themselves.
-            if (widget.onVerify != null) ...[
-              const SizedBox(height: 14),
-              _VerifiedChip(
-                verified: _verified,
-                minutesUsed: _minutesToday,
-                budget: _budgetMinutes,
-                categoryLabel: _categoryLabel,
-                onTap: () async {
-                  widget.onVerify!();
-                  // Reload state after the setup sheet closes.
-                  Future.delayed(const Duration(milliseconds: 300),
-                      _loadVerificationState);
-                },
-              ),
-            ],
+            // Screen Time verify chip is dormant — the whole feature is
+            // commented out until we come back to it. When it returns,
+            // wire onVerify from ContractsScreen and the block below
+            // renders again automatically.
+            //
+            // if (widget.onVerify != null) ...[
+            //   const SizedBox(height: 14),
+            //   _VerifiedChip(...)
+            // ],
           ],
         ),
       ),

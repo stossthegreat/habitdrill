@@ -156,7 +156,7 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
       case 0:
         return _StageFreeTrial(onNext: _next, onClose: _tryClose, onRestore: _restore);
       case 1:
-        return _StageReminder(onNext: _next, onClose: _tryClose);
+        return _StageReminder(onNext: _next, onClose: _tryClose, onRestore: _restore);
       case 2:
         return _StageTimeline(
           yearly: _yearly,
@@ -297,7 +297,8 @@ class _StageFreeTrial extends StatelessWidget {
       children: [
         _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,8 +373,8 @@ class _StageFreeTrial extends StatelessWidget {
                       ],
                     ).animate(delay: (300 + i * 120).ms).fadeIn(duration: 350.ms).slideX(begin: 0.04, end: 0),
                   ),
-                const Spacer(),
-                const _LaurelStars(),
+                const SizedBox(height: 24),
+                const Center(child: _LaurelStars()),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -399,7 +400,9 @@ class _StageFreeTrial extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ).animate(delay: 1100.ms).fadeIn(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -440,15 +443,21 @@ class _LaurelStars extends StatelessWidget {
 class _StageReminder extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onClose;
-  const _StageReminder({required this.onNext, required this.onClose});
+  final VoidCallback onRestore;
+  const _StageReminder({
+    required this.onNext,
+    required this.onClose,
+    required this.onRestore,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onClose),
+        _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
@@ -476,7 +485,7 @@ class _StageReminder extends StatelessWidget {
                     shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 18)],
                   ),
                 ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0),
-                const Spacer(),
+                const SizedBox(height: 40),
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -517,7 +526,7 @@ class _StageReminder extends StatelessWidget {
                     ),
                   ],
                 ).animate(delay: 400.ms).scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1), duration: 500.ms, curve: Curves.easeOutBack),
-                const Spacer(),
+                const SizedBox(height: 40),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -538,7 +547,9 @@ class _StageReminder extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -573,7 +584,8 @@ class _StageTimeline extends StatelessWidget {
       children: [
         _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,7 +651,7 @@ class _StageTimeline extends StatelessWidget {
                     ),
                   ),
                 ).animate(delay: 1000.ms).fadeIn(),
-                const Spacer(),
+                const SizedBox(height: 22),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -667,7 +679,9 @@ class _StageTimeline extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -1351,32 +1365,60 @@ class _RevealCard extends StatelessWidget {
 
 // ────────────────────────── Legal footer ───────────────────────────
 
+/// Full paywall footer used on every stage. Restore · Terms · Privacy
+/// links plus the Apple-required auto-renew disclosure (Guideline 3.1.2).
 class _LegalFooter extends StatelessWidget {
   final VoidCallback onRestore;
-  const _LegalFooter({required this.onRestore});
+  final bool showAutoRenewDisclosure;
+  const _LegalFooter({
+    required this.onRestore,
+    this.showAutoRenewDisclosure = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-          _LegalLink(label: 'Restore', onTap: onRestore),
-          _LegalDot(),
-          _LegalLink(
-            label: 'Terms',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TermsScreen()),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _LegalLink(label: 'Restore', onTap: onRestore),
+              _LegalDot(),
+              _LegalLink(
+                label: 'Terms',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TermsScreen()),
+                ),
+              ),
+              _LegalDot(),
+              _LegalLink(
+                label: 'Privacy',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+                ),
+              ),
+            ],
           ),
-          _LegalDot(),
-          _LegalLink(
-            label: 'Privacy',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+          if (showAutoRenewDisclosure) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Payment will be charged to your Apple ID at confirmation of '
+              'purchase. Subscription automatically renews unless auto-renew '
+              'is turned off at least 24 hours before the end of the current '
+              'period. Your account will be charged for renewal within 24 '
+              'hours prior to the end. You can manage and cancel subscriptions '
+              'in your App Store account settings.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 9.5,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
