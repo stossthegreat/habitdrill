@@ -7,7 +7,8 @@ import '../design/tokens.dart';
 import 'home_screen.dart';
 import 'contracts_screen.dart';
 import 'profile_screen.dart';
-import 'settings_screen.dart';
+// Settings screen still reachable via the gear icon on Home's top row.
+// import 'settings_screen.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -40,7 +41,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               HomeScreen(),
               ContractsScreen(),
               ProfileScreen(),
-              SettingsScreen(),
             ],
           ),
         ),
@@ -58,11 +58,12 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Settings tab removed — the Settings icon on the Home top row
+    // covers it now.
     const items = <_NavItemData>[
       _NavItemData(icon: LucideIcons.target, label: 'TODAY'),
       _NavItemData(icon: LucideIcons.scroll, label: 'CONTRACTS'),
       _NavItemData(icon: LucideIcons.user, label: 'PROFILE'),
-      _NavItemData(icon: LucideIcons.settings, label: 'SETTINGS'),
     ];
     return Container(
       decoration: BoxDecoration(

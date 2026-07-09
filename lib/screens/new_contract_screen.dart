@@ -209,10 +209,12 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                     _Section(
                       label: 'TITLE',
                       child: _TitleField(
-                        // Emoji picker removed — the title alone is the
-                        // brand. Default emoji is set from the preset or
-                        // type in the save handler.
+                        // Placeholder shifts with type — hollowed-out
+                        // example, never pre-typed. User fills their own.
                         titleController: _titleController,
+                        hint: _type == 'bad_habit'
+                            ? 'e.g. Quit Vape'
+                            : 'e.g. Exercise',
                         onChanged: () => setState(() {}),
                       ),
                     ),
@@ -447,15 +449,16 @@ class _FieldLabel extends StatelessWidget {
 
 class _TitleField extends StatelessWidget {
   final TextEditingController titleController;
+  final String hint;
   final VoidCallback onChanged;
   const _TitleField({
     required this.titleController,
+    required this.hint,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Title is the whole thing — emoji picker was removed.
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -476,8 +479,11 @@ class _TitleField extends StatelessWidget {
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: 'e.g. Quit Vape',
-          hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontWeight: FontWeight.w500),
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: Colors.white.withOpacity(0.2),
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
