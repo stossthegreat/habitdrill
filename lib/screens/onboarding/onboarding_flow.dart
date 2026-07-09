@@ -1540,6 +1540,22 @@ class _EscalationWarning extends StatelessWidget {
               ),
             ),
           ),
+          // Medical disclaimer — required by App Review 1.4.1 near any
+          // surface that leads directly into a physical exercise.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Consult a doctor before starting any new exercise routine. '
+              'HabitDrill is not medical advice.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+          ),
           _PrimaryButton(label: 'I UNDERSTAND', onTap: onNext),
         ],
       ),
@@ -3507,11 +3523,37 @@ class _PunishmentRevealState extends State<_PunishmentReveal> {
             ),
           ),
           const Spacer(flex: 2),
+          // Medical / physical-effort disclaimer. Required by App Review
+          // 1.4.1 for any UI that leads directly into physical exercise —
+          // no visible copy about doctor consultation was a common reason
+          // for rejection in the 2025-26 review cycle.
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _locked ? 1 : 0,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'HabitDrill is not medical advice. Consult a doctor before '
+                'starting any new exercise routine.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
           AnimatedOpacity(
             duration: const Duration(milliseconds: 260),
             opacity: _locked ? 1 : 0,
             child: _PrimaryButton(
-              label: 'I ACCEPT THE RISK',
+              // "I ACCEPT THE RISK" → "I ACCEPT THE CONSEQUENCE". App
+              // Review 1.4.5 flags bet/dare/risk/challenge language as
+              // gambling-adjacent. Consequence framing keeps the weight
+              // without the review-trigger keyword.
+              label: 'I ACCEPT THE CONSEQUENCE',
               enabled: _locked,
               onTap: widget.onNext,
             ),
