@@ -12,6 +12,9 @@ import UIKit
     // AlarmKit bridge (iOS 26+ only — internally gated with @available checks).
     if let controller = window?.rootViewController as? FlutterViewController {
       AlarmKitBridge.shared.register(with: controller.binaryMessenger)
+      // Screen Time bridge — stubbed today; passes through to Family
+      // Controls once Apple grants the entitlement (see ScreenTimeBridge).
+      ScreenTimeBridge.shared.register(with: controller.binaryMessenger)
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

@@ -8,6 +8,9 @@ import '../models/habit.dart';
 import '../providers/habit_provider.dart';
 import '../services/alarm_service.dart';
 import '../services/analytics_service.dart';
+import '../services/screen_time_prefs.dart';
+import '../services/screen_time_service.dart';
+import 'law_screen_time_setup_screen.dart';
 import 'new_contract_screen.dart';
 import 'new_contract_templates_screen.dart';
 import 'new_wake_alarm_screen.dart';
@@ -54,6 +57,17 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
         builder: (_) => NewWakeAlarmScreen(edit: edit),
       ),
     );
+  }
+
+  Future<void> _openScreenTimeSetup(Habit habit) async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => LawScreenTimeSetupScreen(habit: habit),
+      ),
+    );
+    if (mounted) setState(() {}); // refresh verified badges
   }
 
   Future<void> _showAddSheet() async {
@@ -169,6 +183,9 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                         index: i,
                         onTap: () => _openEdit(contracts[i]),
                         onLongPress: () => _confirmDelete(contracts[i]),
+                        onVerify: contracts[i].type == 'bad_habit'
+                            ? () => _openScreenTimeSetup(contracts[i])
+                            : null,
                       ),
                     ),
                   ),
@@ -588,26 +605,63 @@ class _SectionLabel extends StatelessWidget {
 
 // ────────────────────────── Contract card ──────────────────────────
 
-class _ContractCard extends StatelessWidget {
+class _ContractCard extends StatefulWidget {
   final Habit habit;
   final int index;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onVerify;
 
   const _ContractCard({
     required this.habit,
     required this.index,
     required this.onTap,
     required this.onLongPress,
+    this.onVerify,
   });
 
   @override
+  State<_ContractCard> createState() => _ContractCardState();
+}
+
+class _ContractCardState extends State<_ContractCard> {
+  bool _verified = false;
+  int _minutesToday = 0;
+  int _budgetMinutes = 0;
+  String _categoryLabel = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVerificationState();
+  }
+
+  Future<void> _loadVerificationState() async {
+    if (widget.habit.type != 'bad_habit') return;
+    final v = await ScreenTimePrefs.isVerified(widget.habit.id);
+    if (!v) {
+      if (mounted) setState(() => _verified = false);
+      return;
+    }
+    final catId = await ScreenTimePrefs.getCategory(widget.habit.id);
+    final budget = await ScreenTimePrefs.getBudget(widget.habit.id);
+    final live = await ScreenTimeService.minutesUsedToday(catId);
+    if (!mounted) return;
+    setState(() {
+      _verified = true;
+      _minutesToday = live;
+      _budgetMinutes = budget;
+      _categoryLabel = ScreenTimeCategory.byId(catId).label;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final view = _ContractView.fromHabit(habit);
+    final view = _ContractView.fromHabit(widget.habit);
     final accent = view.accent;
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF0B0B0B),
@@ -629,7 +683,7 @@ class _ContractCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        habit.title.toUpperCase(),
+                        widget.habit.title.toUpperCase(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 15,
@@ -687,10 +741,134 @@ class _ContractCard extends StatelessWidget {
                 ],
               ),
             ],
+            // Verify-with-Screen-Time chip — only shown for Laws (bad
+            // habits). When verified, shows live usage vs budget so the
+            // user sees the OS number instead of trusting themselves.
+            if (widget.onVerify != null) ...[
+              const SizedBox(height: 14),
+              _VerifiedChip(
+                verified: _verified,
+                minutesUsed: _minutesToday,
+                budget: _budgetMinutes,
+                categoryLabel: _categoryLabel,
+                onTap: () async {
+                  widget.onVerify!();
+                  // Reload state after the setup sheet closes.
+                  Future.delayed(const Duration(milliseconds: 300),
+                      _loadVerificationState);
+                },
+              ),
+            ],
           ],
         ),
       ),
-    ).animate(delay: (index * 70).ms).fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
+    ).animate(delay: (widget.index * 70).ms).fadeIn(duration: 350.ms).slideY(begin: 0.05, end: 0);
+  }
+}
+
+class _VerifiedChip extends StatelessWidget {
+  final bool verified;
+  final int minutesUsed;
+  final int budget;
+  final String categoryLabel;
+  final VoidCallback onTap;
+
+  const _VerifiedChip({
+    required this.verified,
+    required this.minutesUsed,
+    required this.budget,
+    required this.categoryLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!verified) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.eye, size: 12, color: Colors.white.withOpacity(0.5)),
+              const SizedBox(width: 6),
+              Text(
+                'VERIFY WITH SCREEN TIME',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.55),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final over = budget > 0 && minutesUsed > budget;
+    final progress = budget == 0
+        ? (minutesUsed > 0 ? 1.0 : 0.0)
+        : (minutesUsed / budget).clamp(0.0, 1.0).toDouble();
+    final chipColor = over ? AppColors.error : AppColors.emerald;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(
+          color: chipColor.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: chipColor.withOpacity(0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(LucideIcons.eye, size: 12, color: chipColor),
+                const SizedBox(width: 6),
+                Text(
+                  over ? 'BROKEN' : 'VERIFIED',
+                  style: TextStyle(
+                    color: chipColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$minutesUsed${budget > 0 ? "/$budget" : ""} MIN',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 3,
+                backgroundColor: Colors.white.withOpacity(0.06),
+                valueColor: AlwaysStoppedAnimation(chipColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
