@@ -241,16 +241,31 @@ class PunishmentGate extends StatefulWidget {
 class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObserver {
   bool _showPunishment = false;
   Violation? _activeViolation;
+  Habit? _forcedWakeHabit;
+  Timer? _wakePoll;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Listen to WakeDebtService — every markActive / clearActive nudges
+    // this notifier so we swap the root screen instantly instead of
+    // waiting for the next poll tick.
+    WakeDebtService.wakeChanged.addListener(_refreshWakeState);
+    // Poll every 10 seconds. Catches the case where the alarm fires
+    // while the app is already foregrounded (no lifecycle event, no
+    // notification tap — just the wall clock crossing habit.time).
+    _wakePoll = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _refreshWakeState(),
+    );
     _onEnter();
   }
 
   @override
   void dispose() {
+    WakeDebtService.wakeChanged.removeListener(_refreshWakeState);
+    _wakePoll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -263,17 +278,12 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   /// One entry-point for every "app is now in foreground" event.
-  /// Order matters:
-  ///   1. Wake-alarm check — if the user just dismissed a system alarm
-  ///      or opened the app on an unfinished wake, route straight into
-  ///      MorningAlarmScreen and STOP. The video-punishment path must
-  ///      never win when a wake is active.
-  ///   2. Only then check the sergeant violation queue (untimed missed
-  ///      habits).
-  ///   3. Regardless: refresh the escalation pings for tomorrow's fire.
   Future<void> _onEnter() async {
-    final routedToWake = await _checkForAlarmTap();
-    if (!routedToWake) {
+    // Consume any fresh notification-tap payload so it doesn't linger
+    // (we ignore the value — the wake state check below finds it too).
+    await AlarmService.consumeRecentAlarmTap();
+    await _refreshWakeState();
+    if (_forcedWakeHabit == null) {
       _checkForPunishment();
     }
     // Escalation pings are one-shots — top up the ladder for the next
@@ -285,51 +295,34 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     } catch (_) {}
   }
 
-  /// Returns true if we routed into the wake flow — caller should skip
-  /// the video-punishment path in that case.
-  Future<bool> _checkForAlarmTap() async {
-    // Priority 1: fresh notification tap payload (local-notification path).
-    var habitId = await AlarmService.consumeRecentAlarmTap();
-    // Priority 2: unfinished wake the user closed the app on.
-    habitId ??= await WakeDebtService.getActiveHabitId();
-    // Priority 3: AlarmKit (iOS 26+) fires a system-level alert that
-    // dismisses when the user taps Stop, foregrounding the app WITHOUT
-    // a payload. Fall back to whichever wake habit was scheduled to
-    // fire in the last 30 minutes — that's almost certainly the one
-    // they just dismissed.
-    habitId ??= _findRecentlyFiredWakeHabitId();
-    if (habitId == null || !mounted) return false;
-    final habit = LocalStorageService.getAllHabits()
-        .where((h) => h.id == habitId)
-        .firstOrNull;
-    if (habit == null) return false;
-    await Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => MorningAlarmScreen(habit: habit),
-      ),
-    );
-    return true;
-  }
-
-  /// Find a wake habit whose scheduled fire happened in the last 30 min.
-  /// Used when AlarmKit fires a system alert and the user taps Stop —
-  /// we don't get a notification payload, so we infer.
-  String? _findRecentlyFiredWakeHabitId() {
-    final now = DateTime.now();
-    final today = now.weekday == 7 ? 0 : now.weekday; // 0=Sun..6=Sat
-    for (final h in LocalStorageService.getAllHabits()) {
-      if (!h.reminderOn || h.time.isEmpty) continue;
-      if (!h.repeatDays.contains(today)) continue;
-      try {
-        final parts = h.time.split(':');
-        final fire = DateTime(now.year, now.month, now.day,
-            int.parse(parts[0]), int.parse(parts[1]));
-        final diff = now.difference(fire);
-        if (diff.inSeconds >= 0 && diff.inMinutes <= 30) return h.id;
-      } catch (_) {}
+  /// Decide whether the app should be showing MorningAlarmScreen right
+  /// now. Called from three places: the every-10s timer, the app-resume
+  /// lifecycle event, and WakeDebtService.wakeChanged. Idempotent.
+  Future<void> _refreshWakeState() async {
+    if (!mounted) return;
+    // 1. Anything explicitly marked active wins (user opened the wake
+    //    screen but didn't finish reps yet).
+    final activeId = await WakeDebtService.getActiveHabitId();
+    Habit? habit;
+    if (activeId != null) {
+      habit = LocalStorageService.getAllHabits()
+          .where((h) => h.id == activeId)
+          .firstOrNull;
     }
-    return null;
+    // 2. Otherwise, find any wake habit whose fire happened in the last
+    //    30 minutes AND that isn't already done. This catches:
+    //      • AlarmKit rang while the app was foregrounded
+    //      • User pressed the AlarmKit OPEN button (no notif payload)
+    //      • User cold-started the app after the alarm rang
+    habit ??= WakeDebtService.findDueWakeHabit();
+    if (habit != null && activeId == null) {
+      // Persist so we survive backgrounding + relaunch.
+      await WakeDebtService.markActive(habit.id);
+      return; // markActive fires wakeChanged → this method re-runs.
+    }
+    if (habit?.id != _forcedWakeHabit?.id) {
+      setState(() => _forcedWakeHabit = habit);
+    }
   }
 
   void _checkForPunishment() async {
@@ -358,6 +351,15 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
+    // WAKE FIRST. When a wake alarm is due, THE APP IS THE PUNISHMENT
+    // SCREEN. No tabs, no home, no way to browse around it. Only the
+    // reps finish this.
+    if (_forcedWakeHabit != null) {
+      return MorningAlarmScreen(
+        key: ValueKey('wake_${_forcedWakeHabit!.id}'),
+        habit: _forcedWakeHabit!,
+      );
+    }
     if (_showPunishment && _activeViolation != null) {
       return PunishmentScreen(
         violation: _activeViolation!,

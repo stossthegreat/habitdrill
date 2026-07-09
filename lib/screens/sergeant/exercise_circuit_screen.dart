@@ -32,6 +32,12 @@ class ExerciseCircuitScreen extends StatefulWidget {
   /// this because it already showed the setup instructions.
   final bool skipAdvice;
 
+  /// When true, the completion callback fully owns navigation — this
+  /// screen will NOT call popUntil(isFirst) after firing onComplete.
+  /// WakeExerciseScreen sets this so it can pushReplacement to the
+  /// share/mission-complete screen without being popped mid-flight.
+  final bool ownsNavigation;
+
   final VoidCallback onComplete;
 
   const ExerciseCircuitScreen({
@@ -39,6 +45,7 @@ class ExerciseCircuitScreen extends StatefulWidget {
     this.violation,
     this.overrideSet,
     this.skipAdvice = false,
+    this.ownsNavigation = false,
     required this.onComplete,
   }) : assert(violation != null || overrideSet != null,
             'Provide either violation or overrideSet');
@@ -274,9 +281,9 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     // Fire callback for state cleanup — do NOT wait for it. Async writes
     // can hang and have burned us before.
     widget.onComplete();
-    // Pop the punishment route DIRECTLY, right now. This is the fix.
-    // popUntil(isFirst) unwinds every pushed route on top of the home
-    // (AppRouter). No callback chain to depend on. No race conditions.
+    // When the parent flow owns navigation (wake share screen), let it
+    // route. Otherwise pop everything back to the home tree.
+    if (widget.ownsNavigation) return;
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }

@@ -15,6 +15,7 @@ import '../../services/discipline_service.dart';
 import '../../services/wake_debt_service.dart';
 import '../../services/wake_mission_prefs.dart';
 import 'exercise_circuit_screen.dart';
+import 'wake_complete_screen.dart';
 
 /// Wake-alarm exercise flow, three-phase:
 ///
@@ -156,6 +157,26 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       await AlarmService.cancelWakeEscalations(widget.habit.id);
     } catch (_) {}
     await WakeDebtService.clearActive();
+
+    // Hand off to the payoff screen — big MISSION COMPLETE + share card.
+    // The user pushed through the sergeant; make them feel like a winner
+    // and give them one tap to brag about it.
+    if (!mounted) return;
+    final set = _set;
+    final ex = set?.exercises.isNotEmpty == true ? set!.exercises.first : null;
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => WakeCompleteScreen(
+          habitTitle: widget.habit.title,
+          reps: ex?.reps ?? 0,
+          exerciseName: ex?.name ?? 'Reps',
+          onClose: () {
+            Navigator.of(context).popUntil((r) => r.isFirst);
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -340,6 +361,7 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       key: const ValueKey('reps'),
       overrideSet: set,
       skipAdvice: true,
+      ownsNavigation: true,
       onComplete: _onWakeComplete,
     );
   }

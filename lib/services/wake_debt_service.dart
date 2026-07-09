@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/habit.dart';
+import 'local_storage.dart';
 
 /// Computes the escalating rep debt for a wake alarm.
 ///
@@ -24,6 +25,13 @@ class WakeDebtService {
   /// Hard cap so total debt never exceeds this many reps.
   static const int maxDebtReps = 100;
 
+  /// Change-notifier that PunishmentGate listens to. Every markActive /
+  /// clearActive call toggles this value so the gate re-checks and
+  /// swaps MainScreen for MorningAlarmScreen (or back) immediately —
+  /// no waiting for a polling tick.
+  static final ValueNotifier<int> wakeChanged = ValueNotifier(0);
+  static void _notifyChanged() => wakeChanged.value++;
+
   /// Mark a habit as the currently-active wake target.
   ///
   /// Called by the notification-tap router the moment we open the wake
@@ -35,6 +43,7 @@ class WakeDebtService {
       _kActiveSince,
       DateTime.now().millisecondsSinceEpoch,
     );
+    _notifyChanged();
     debugPrint('WakeDebt: marked active habit $habitId');
   }
 
@@ -44,7 +53,31 @@ class WakeDebtService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kActiveHabit);
     await prefs.remove(_kActiveSince);
+    _notifyChanged();
     debugPrint('WakeDebt: cleared');
+  }
+
+  /// Find any wake habit whose scheduled fire happened in the last 30
+  /// minutes AND that isn't marked done today. If one exists, the app
+  /// should be in punishment mode — no matter what tab the user was on.
+  static Habit? findDueWakeHabit() {
+    final now = DateTime.now();
+    final today = now.weekday == 7 ? 0 : now.weekday;
+    for (final h in LocalStorageService.getAllHabits()) {
+      if (!h.reminderOn || h.time.isEmpty) continue;
+      if (!h.repeatDays.contains(today)) continue;
+      if (h.isDoneOn(now)) continue;
+      try {
+        final parts = h.time.split(':');
+        final fire = DateTime(now.year, now.month, now.day,
+            int.parse(parts[0]), int.parse(parts[1]));
+        final diff = now.difference(fire);
+        // Fire happened within the last 30 min (or is happening RIGHT
+        // now — small negative diff, up to 5s before, catches races).
+        if (diff.inSeconds >= -5 && diff.inMinutes <= 30) return h;
+      } catch (_) {}
+    }
+    return null;
   }
 
   /// The habit ID of the current active wake, or null if none.
