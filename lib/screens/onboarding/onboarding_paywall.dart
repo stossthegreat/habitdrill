@@ -287,7 +287,7 @@ class _StageFreeTrial extends StatelessWidget {
 
   static const List<(String title, String body)> _bullets = [
     ('AI-Verified Reps', 'Our computer vision watches every rep. Fake reps do not count.'),
-    ('Escalating Punishment', 'Miss a minute? +5 reps. Miss five? Do the math.'),
+    ('Quit The Bad Ones', 'Vape, porn, sugar, phone. Sign the contract, pay the debt when you break it.'),
     ('Wake Up Or Pay', 'The only way to dismiss your alarm is to actually move.'),
   ];
 
@@ -603,7 +603,7 @@ class _StageTimeline extends StatelessWidget {
                   icon: Icons.lock_open_rounded,
                   iconColor: AppColors.emerald,
                   title: 'Today',
-                  body: 'Unlock AI verification, escalating punishments, and every feature we ship.',
+                  body: 'Unlock AI verification, escalating punishments, and the quitting system that kills bad habits for good.',
                   active: true,
                 ).animate(delay: 300.ms).fadeIn().slideX(begin: 0.04, end: 0),
                 _TimelineConnector(),
@@ -769,55 +769,97 @@ class _PricePair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    // Reserved height so both cards start at the same Y. The 3-DAYS FREE
+    // badge on yearly and the STANDARD badge on monthly both live in this
+    // strip — cards below stay the same size, always.
+    return Column(
       children: [
-        Expanded(
-          child: _PlanCard(
-            title: 'Monthly',
-            price: '£7.99',
-            per: '/mo',
-            note: 'billed monthly',
-            selected: !yearly,
-            onTap: () => onPickYearly(false),
-          ),
+        Row(
+          children: const [
+            Expanded(child: Center(child: _StandardBadge())),
+            SizedBox(width: 10),
+            Expanded(child: Center(child: _FreeTrialBadge())),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Stack(
-            clipBehavior: Clip.none,
+        const SizedBox(height: 8),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _PlanCard(
-                title: 'Yearly',
-                price: '£34.99',
-                per: '/yr',
-                note: 'just £2.92/mo · save 63%',
-                selected: yearly,
-                accent: true,
-                onTap: () => onPickYearly(true),
+              Expanded(
+                child: _PlanCard(
+                  title: 'Monthly',
+                  price: '£7.99',
+                  per: '/mo',
+                  note: 'billed monthly',
+                  selected: !yearly,
+                  onTap: () => onPickYearly(false),
+                ),
               ),
-              Positioned(
-                top: -12,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.emerald,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 12)],
-                    ),
-                    child: const Text(
-                      '3-DAYS FREE',
-                      style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5),
-                    ),
-                  ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _PlanCard(
+                  title: 'Yearly',
+                  price: '£34.99',
+                  per: '/yr',
+                  note: 'just £2.92/mo · save 63%',
+                  selected: yearly,
+                  accent: true,
+                  onTap: () => onPickYearly(true),
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StandardBadge extends StatelessWidget {
+  const _StandardBadge();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+      ),
+      child: Text(
+        'STANDARD',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.55),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _FreeTrialBadge extends StatelessWidget {
+  const _FreeTrialBadge();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.emerald,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 12)],
+      ),
+      child: const Text(
+        '3-DAYS FREE',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.5,
+        ),
+      ),
     );
   }
 }
