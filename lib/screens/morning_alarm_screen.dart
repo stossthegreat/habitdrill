@@ -55,12 +55,19 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     _tickTimer?.cancel();
     HapticFeedback.heavyImpact();
     if (!mounted) return;
-    await Navigator.of(context).pushReplacement(
+    // PUSH (not pushReplacement) — we're now the app's root screen (see
+    // PunishmentGate). Replacing the root would leave the Navigator with
+    // no initial route. Pushing keeps this screen underneath and lets
+    // WakeExerciseScreen popReplace forward to the share screen.
+    await Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => WakeExerciseScreen(habit: widget.habit),
       ),
     );
+    // If we ever fall back here (user popped without completing), keep
+    // the wake screen alive by re-enabling the pulse.
+    _handingOff = false;
   }
 
   @override

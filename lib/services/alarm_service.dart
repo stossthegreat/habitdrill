@@ -207,51 +207,29 @@ class AlarmService {
       int failCount = 0;
 
       // On iOS 26+ we ALSO schedule via AlarmKit — real system alarms that
-      // ring through the silent switch and Focus modes by design. On older
-      // iOS this returns false and we rely on the notification burst below.
+      // ring through the silent switch and Focus modes by design.
+      //
+      // ONE alarm per weekday. AlarmKit alarms ring until the user
+      // dismisses them by design — no cascade needed. The app then
+      // FORCES the punishment screen (see PunishmentGate) so they can't
+      // just go back to the home screen and pretend.
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       if (alarmKitAvailable) {
-        // CASCADE: for the next upcoming fire, schedule the FULL cascade —
-        // initial ring plus retries every 3 seconds for the first minute,
-        // then wider intervals out to 25 minutes. If the user X's out the
-        // phone rings 3 seconds later. Non-negotiable.
-        //
-        // For every other weekday's fire we schedule just the initial ring
-        // (weekly repeat is implicit — the next-fire cascade rescheduling
-        // happens on every app resume, so tomorrow's cascade gets built
-        // before it needs to fire).
-        final tz.TZDateTime akNextFire = habit.repeatDays
-            .map((d) => _getNextAlarmTime(d, habit.timeOfDay))
-            .reduce((a, b) => a.isBefore(b) ? a : b);
-        final int akNextFireDay = _dayForTz(akNextFire);
-
         for (final day in habit.repeatDays) {
           final baseAlarmId = _getAlarmId(habit.id, day);
           final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
-          final isNext = day == akNextFireDay
-              && fireDate.millisecondsSinceEpoch
-                  == akNextFire.millisecondsSinceEpoch;
-          final offsets = isNext ? _akCascadeOffsets : const [Duration.zero];
-
-          for (int r = 0; r < offsets.length; r++) {
-            final akId = _uuidFromInt(baseAlarmId * 100 + r);
-            final fireAt = fireDate.add(offsets[r]).toLocal();
-            try {
-              await AlarmKitService.cancel(akId);
-              final ok = await AlarmKitService.schedule(
-                id: akId,
-                title: r == 0
-                    ? 'ORDER: ${habit.title.toUpperCase()}'
-                    : 'GET UP: ${habit.title.toUpperCase()}',
-                fireAt: fireAt,
-                habitId: habit.id,
-              );
-              if (r == 0 || r == offsets.length - 1) {
-                debugPrint('   🛎️ AlarmKit ${_getDayName(day)} retry $r: ${ok ? "scheduled" : "failed"}');
-              }
-            } catch (e) {
-              debugPrint('   ❌ AlarmKit ${_getDayName(day)} retry $r: $e');
-            }
+          final akId = _uuidFromInt(baseAlarmId * 100);
+          try {
+            await AlarmKitService.cancel(akId);
+            final ok = await AlarmKitService.schedule(
+              id: akId,
+              title: 'ORDER: ${habit.title.toUpperCase()}',
+              fireAt: fireDate.toLocal(),
+              habitId: habit.id,
+            );
+            debugPrint('   🛎️ AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}');
+          } catch (e) {
+            debugPrint('   ❌ AlarmKit ${_getDayName(day)}: $e');
           }
         }
       }
