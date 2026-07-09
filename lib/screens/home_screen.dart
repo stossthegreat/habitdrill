@@ -143,23 +143,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final allHabits = habitEngine.habits;
 
     final dayOrders = allHabits.where((h) => h.isScheduledForDate(_selectedDate)).toList();
-    final completedCount = dayOrders.where((h) => h.isDoneOn(_selectedDate)).length;
-    final total = dayOrders.length;
     final hasFailed = SergeantService.hasPendingPunishment();
 
     final orders = dayOrders.where((h) => h.type != 'bad_habit').toList();
     final rules = dayOrders.where((h) => h.type == 'bad_habit').toList();
 
+    // Orders (positive habits) count as "safe" when done.
+    // Rules (bad habits) count as "safe" when NOT pressed — the user
+    // held the line. Pressing "I broke it" is confessing a slip, so
+    // toggling a rule ON = broken state, not completed.
+    final ordersDone = orders.where((h) => h.isDoneOn(_selectedDate)).length;
+    final rulesBroken = rules.where((h) => h.isDoneOn(_selectedDate)).length;
+    final allOrdersDone = orders.isNotEmpty && ordersDone == orders.length;
+    final anyRuleBroken = rulesBroken > 0;
+
     // Status
     String status;
     Color statusColor;
-    if (hasFailed) {
-      status = 'FAILED';
+    if (hasFailed || anyRuleBroken) {
+      // Pending punishment OR a rule confessed today → broken state.
+      // hasFailed also catches the case where a rule was pressed on a
+      // prior day and the punishment is still pending.
+      status = 'BROKEN';
       statusColor = const Color(0xFFDC2626);
-    } else if (total > 0 && completedCount == total) {
+    } else if (orders.isEmpty && rules.isNotEmpty) {
+      // Rules-only day and none broken → held the line.
       status = 'CONTROLLED';
       statusColor = const Color(0xFF16A34A);
-    } else if (total > 0) {
+    } else if (allOrdersDone) {
+      // All positive orders done and no rules broken.
+      status = 'CONTROLLED';
+      statusColor = const Color(0xFF16A34A);
+    } else if (orders.isNotEmpty) {
+      // Positive orders remain undone.
       status = 'AT RISK';
       statusColor = const Color(0xFFF59E0B);
     } else {

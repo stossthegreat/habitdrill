@@ -525,7 +525,6 @@ class _TypeSelector extends StatelessWidget {
     const types = [
       _TypeOption('habit', 'ORDER'),
       _TypeOption('bad_habit', 'RULE'),
-      _TypeOption('task', 'TASK'),
     ];
     return Row(
       children: [

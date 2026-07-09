@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../design/tokens.dart';
 import '../../services/premium_service.dart';
 import '../main_screen.dart';
+import '../privacy_screen.dart';
+import '../terms_screen.dart';
 import 'onboarding_state.dart';
 
 /// Product IDs. Yearly rescue is a SEPARATE SKU that must be created in
@@ -930,7 +933,14 @@ class _PlanCard extends StatelessWidget {
 
 // ────────────────────────── STAGE D: Rescue offer ──────────────────
 
-class _RescueOffer extends StatelessWidget {
+/// Slot-machine rescue reveal. Three reels spin garbled characters for
+/// ~2.5s and then lock — one at a time, with haptics — onto "£", "19",
+/// "99". Then the reveal card fades in with the clean price and the CTA.
+///
+/// Design ethos: the price is FIXED at £19.99/yr; the slots don't gamble.
+/// They're theatre. The user WON — that's the point. Cancel / restore /
+/// terms / privacy links sit at the bottom for App Store compliance.
+class _RescueOffer extends StatefulWidget {
   final bool loading;
   final VoidCallback onPurchase;
   final VoidCallback onDecline;
@@ -943,198 +953,81 @@ class _RescueOffer extends StatelessWidget {
   });
 
   @override
+  State<_RescueOffer> createState() => _RescueOfferState();
+}
+
+class _RescueOfferState extends State<_RescueOffer> {
+  bool _revealed = false;
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onDecline, onRestore: onRestore),
+        _TopRow(onClose: widget.onDecline, onRestore: widget.onRestore),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  'One last thing.',
+                  _revealed ? 'Locked in.' : 'Spinning your rescue.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.55),
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
-                ).animate().fadeIn(),
-                const SizedBox(height: 4),
-                const Text(
-                  'Your rescue offer.',
-                  style: TextStyle(
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _revealed ? 'You got the deal.' : 'Hold on…',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 30,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
-                    height: 1,
-                  ),
-                ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.06, end: 0),
-                const SizedBox(height: 32),
-                // The badge — sleek, not gaudy
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.emerald.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.emerald.withOpacity(0.55), width: 1),
-                    ),
-                    child: const Text(
-                      '43% OFF FOREVER',
-                      style: TextStyle(
-                        color: AppColors.emerald,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                  ),
-                ).animate(delay: 200.ms).fadeIn(),
-                const SizedBox(height: 22),
-                // Price — huge, tight, with strike-through
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        '£34.99',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: Colors.white38,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '£19',
-                            style: TextStyle(
-                              color: AppColors.emerald,
-                              fontSize: 88,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -3,
-                              height: 1,
-                              shadows: [Shadow(color: AppColors.emerald.withOpacity(0.55), blurRadius: 26)],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: Text(
-                              '.99',
-                              style: TextStyle(
-                                color: AppColors.emerald,
-                                fontSize: 38,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -1,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 22, left: 4),
-                            child: Text(
-                              '/YR',
-                              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ).animate(delay: 300.ms).fadeIn().scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1)),
-                const SizedBox(height: 24),
-                // Coffee comparison — the psychological hit
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0B0B0B),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('☕', style: TextStyle(fontSize: 30)),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Less than a coffee',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'every 2 months.',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate(delay: 500.ms).fadeIn().slideX(begin: 0.03, end: 0),
-                const SizedBox(height: 10),
-                // Per-week breakdown row
-                Row(
-                  children: [
-                    Expanded(
-                      child: _RescueStat(label: 'PER MONTH', value: '£1.67'),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _RescueStat(label: 'PER WEEK', value: '£0.38', highlight: true),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _RescueStat(label: 'PER DAY', value: '£0.05'),
-                    ),
-                  ],
-                ).animate(delay: 700.ms).fadeIn().slideY(begin: 0.04, end: 0),
-                const SizedBox(height: 24),
-                Center(
-                  child: Text(
-                    'Once you close this screen,\nthe discount is gone forever.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, fontWeight: FontWeight.w600, height: 1.6),
-                  ),
-                ).animate(delay: 900.ms).fadeIn(),
-                const SizedBox(height: 24),
-                _CTA(
-                  label: 'CLAIM MY DISCOUNT',
-                  sublabel: '£19.99/YR · £0.38/WEEK',
-                  loading: loading,
-                  onTap: onPurchase,
-                ).animate(delay: 1100.ms).fadeIn().slideY(begin: 0.05, end: 0),
-                const SizedBox(height: 14),
-                Center(
-                  child: GestureDetector(
-                    onTap: onDecline,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Text(
-                        'No thanks',
-                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
+                    height: 1.05,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 380),
+                  curve: Curves.easeOutCubic,
+                  child: _revealed
+                      ? _RevealCard(
+                          loading: widget.loading,
+                          onPurchase: widget.onPurchase,
+                        )
+                      : _SlotStrip(onDone: () {
+                          if (mounted) setState(() => _revealed = true);
+                        }),
+                ),
+                const SizedBox(height: 22),
+                if (_revealed) ...[
+                  Center(
+                    child: GestureDetector(
+                      onTap: widget.onDecline,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Text(
+                          'No thanks',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.35),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _LegalFooter(onRestore: widget.onRestore),
+                ],
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -1144,45 +1037,302 @@ class _RescueOffer extends StatelessWidget {
   }
 }
 
-class _RescueStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool highlight;
-  const _RescueStat({required this.label, required this.value, this.highlight = false});
+// ────────────────────────── Slot machine strip ─────────────────────
+
+class _SlotStrip extends StatefulWidget {
+  final VoidCallback onDone;
+  const _SlotStrip({required this.onDone});
+
+  @override
+  State<_SlotStrip> createState() => _SlotStripState();
+}
+
+class _SlotStripState extends State<_SlotStrip> {
+  static const _targets = ['£', '19', '99'];
+
+  /// Garbled pool — shown while the reels spin. Deliberately meaningless
+  /// so the user's eye can't pre-read the reveal.
+  static const _pool = <String>[
+    '??', '★', '¥7', '₿', '§', '99', '01', '77', '£!', '¥%',
+    r'$$', '02', '05', '13', '20', '33', '44', '™', '№', '¤',
+  ];
+
+  final _rng = Random();
+  final List<String> _current = List.filled(3, '★');
+  final List<bool> _locked = List.filled(3, false);
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(milliseconds: 65), (_) {
+      if (!mounted) return;
+      setState(() {
+        for (int i = 0; i < 3; i++) {
+          if (!_locked[i]) _current[i] = _pool[_rng.nextInt(_pool.length)];
+        }
+      });
+    });
+    _lockAt(0, const Duration(milliseconds: 1500));
+    _lockAt(1, const Duration(milliseconds: 2100));
+    _lockAt(2, const Duration(milliseconds: 2750));
+    Future.delayed(const Duration(milliseconds: 3350), () {
+      if (mounted) widget.onDone();
+    });
+  }
+
+  void _lockAt(int reel, Duration delay) {
+    Future.delayed(delay, () {
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _current[reel] = _targets[reel];
+        _locked[reel] = true;
+      });
+      if (reel == 2) _tick?.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < 3; i++) ...[
+          _SlotReel(
+            key: ValueKey('reel_$i'),
+            character: _current[i],
+            locked: _locked[i],
+          ),
+          if (i < 2) const SizedBox(width: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _SlotReel extends StatelessWidget {
+  final String character;
+  final bool locked;
+  const _SlotReel({super.key, required this.character, required this.locked});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: 92,
+      height: 116,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: locked
+              ? AppColors.emerald.withOpacity(0.75)
+              : Colors.white.withOpacity(0.06),
+          width: locked ? 2 : 1,
+        ),
+        boxShadow: locked
+            ? [
+                BoxShadow(
+                  color: AppColors.emerald.withOpacity(0.35),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 90),
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, 0.6), end: Offset.zero).animate(anim),
+            child: child,
+          ),
+        ),
+        child: Text(
+          character,
+          key: ValueKey('${character}_$locked'),
+          style: TextStyle(
+            color: locked ? AppColors.emerald : Colors.white,
+            fontSize: 44,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1,
+            height: 1,
+            shadows: locked
+                ? [Shadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 12)]
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Reveal card ────────────────────────────
+
+class _RevealCard extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onPurchase;
+  const _RevealCard({required this.loading, required this.onPurchase});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      key: const ValueKey('reveal_card'),
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
       decoration: BoxDecoration(
-        color: highlight ? AppColors.emerald.withOpacity(0.1) : const Color(0xFF0B0B0B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: highlight ? AppColors.emerald.withOpacity(0.4) : Colors.white.withOpacity(0.05),
-          width: 1,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.emerald.withOpacity(0.18),
+            AppColors.emerald.withOpacity(0.02),
+          ],
         ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.emerald.withOpacity(0.5), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.emerald.withOpacity(0.28),
+            blurRadius: 40,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
-      alignment: Alignment.center,
       child: Column(
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: (highlight ? AppColors.emerald : Colors.white).withOpacity(0.5),
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.emerald,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'RESCUE UNLOCKED',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 18),
           Text(
-            value,
+            '£34.99',
             style: TextStyle(
-              color: highlight ? AppColors.emerald : Colors.white,
-              fontSize: 16,
+              color: Colors.white.withOpacity(0.35),
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: Colors.white38,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '£19',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 92,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -4,
+                  height: 1,
+                  shadows: [Shadow(color: AppColors.emerald.withOpacity(0.55), blurRadius: 22)],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  '.99',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1,
+                    shadows: [Shadow(color: AppColors.emerald.withOpacity(0.55), blurRadius: 22)],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'PER YEAR · LOCKED FOREVER',
+            style: TextStyle(
+              color: AppColors.emerald.withOpacity(0.9),
+              fontSize: 11,
               fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-              fontFeatures: const [FontFeature.tabularFigures()],
+              letterSpacing: 3,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            height: 1,
+            color: Colors.white.withOpacity(0.06),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Cancel anytime. Never renews at full price.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _CTA(
+            label: 'CLAIM RESCUE',
+            sublabel: '£19.99 charged today',
+            loading: loading,
+            onTap: onPurchase,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 380.ms).slideY(begin: 0.05, end: 0);
+  }
+}
+
+// ────────────────────────── Legal footer ───────────────────────────
+
+class _LegalFooter extends StatelessWidget {
+  final VoidCallback onRestore;
+  const _LegalFooter({required this.onRestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _LegalLink(label: 'Restore', onTap: onRestore),
+          _LegalDot(),
+          _LegalLink(
+            label: 'Terms',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TermsScreen()),
+            ),
+          ),
+          _LegalDot(),
+          _LegalLink(
+            label: 'Privacy',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
             ),
           ),
         ],
@@ -1190,3 +1340,44 @@ class _RescueStat extends StatelessWidget {
     );
   }
 }
+
+class _LegalLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _LegalLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.35),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: Colors.white24,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegalDot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        '·',
+        style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 12),
+      ),
+    );
+  }
+}
+

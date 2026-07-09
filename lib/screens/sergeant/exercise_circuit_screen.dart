@@ -27,12 +27,18 @@ class ExerciseCircuitScreen extends StatefulWidget {
   /// responsible for whatever cleanup that flow needs.
   final ExerciseSet? overrideSet;
 
+  /// When true, skip the "Position Yourself" advice sheet and go
+  /// straight into camera init + countdown. WakeExerciseScreen sets
+  /// this because it already showed the setup instructions.
+  final bool skipAdvice;
+
   final VoidCallback onComplete;
 
   const ExerciseCircuitScreen({
     super.key,
     this.violation,
     this.overrideSet,
+    this.skipAdvice = false,
     required this.onComplete,
   }) : assert(violation != null || overrideSet != null,
             'Provide either violation or overrideSet');
@@ -54,7 +60,7 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
 
   // State
   int _currentExerciseIndex = 0;
-  bool _showAdvice = true;
+  late bool _showAdvice;
   bool _countdown = false;
   int _countdownValue = 5;
   bool _exerciseActive = false;
@@ -72,6 +78,15 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     WakelockPlus.enable();
     _exerciseSet = widget.overrideSet
         ?? SergeantService.getExerciseSet(widget.violation!);
+    _showAdvice = !widget.skipAdvice;
+    if (widget.skipAdvice) {
+      // Kick off camera + countdown without the tap-through advice sheet.
+      // The caller (WakeExerciseScreen) already showed setup instructions.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initCamera();
+        _startCountdown();
+      });
+    }
   }
 
   @override
