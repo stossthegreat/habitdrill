@@ -156,7 +156,7 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
       case 0:
         return _StageFreeTrial(onNext: _next, onClose: _tryClose, onRestore: _restore);
       case 1:
-        return _StageReminder(onNext: _next, onClose: _tryClose);
+        return _StageReminder(onNext: _next, onClose: _tryClose, onRestore: _restore);
       case 2:
         return _StageTimeline(
           yearly: _yearly,
@@ -297,7 +297,8 @@ class _StageFreeTrial extends StatelessWidget {
       children: [
         _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,8 +373,8 @@ class _StageFreeTrial extends StatelessWidget {
                       ],
                     ).animate(delay: (300 + i * 120).ms).fadeIn(duration: 350.ms).slideX(begin: 0.04, end: 0),
                   ),
-                const Spacer(),
-                const _LaurelStars(),
+                const SizedBox(height: 24),
+                const Center(child: _LaurelStars()),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -399,7 +400,9 @@ class _StageFreeTrial extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ).animate(delay: 1100.ms).fadeIn(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -440,15 +443,21 @@ class _LaurelStars extends StatelessWidget {
 class _StageReminder extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onClose;
-  const _StageReminder({required this.onNext, required this.onClose});
+  final VoidCallback onRestore;
+  const _StageReminder({
+    required this.onNext,
+    required this.onClose,
+    required this.onRestore,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onClose),
+        _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
@@ -476,7 +485,7 @@ class _StageReminder extends StatelessWidget {
                     shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 18)],
                   ),
                 ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0),
-                const Spacer(),
+                const SizedBox(height: 40),
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -517,7 +526,7 @@ class _StageReminder extends StatelessWidget {
                     ),
                   ],
                 ).animate(delay: 400.ms).scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1), duration: 500.ms, curve: Curves.easeOutBack),
-                const Spacer(),
+                const SizedBox(height: 40),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -538,7 +547,9 @@ class _StageReminder extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -573,7 +584,8 @@ class _StageTimeline extends StatelessWidget {
       children: [
         _TopRow(onClose: onClose, onRestore: onRestore),
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,7 +651,7 @@ class _StageTimeline extends StatelessWidget {
                     ),
                   ),
                 ).animate(delay: 1000.ms).fadeIn(),
-                const Spacer(),
+                const SizedBox(height: 22),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -667,7 +679,9 @@ class _StageTimeline extends StatelessWidget {
                     style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+                _LegalFooter(onRestore: onRestore),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -1043,9 +1057,11 @@ class _RescueOfferState extends State<_RescueOffer> {
                           loading: widget.loading,
                           onPurchase: widget.onPurchase,
                         )
-                      : _SlotStrip(onDone: () {
-                          if (mounted) setState(() => _revealed = true);
-                        }),
+                      : Center(
+                          child: _SlotStrip(onDone: () {
+                            if (mounted) setState(() => _revealed = true);
+                          }),
+                        ),
                 ),
                 const SizedBox(height: 22),
                 if (_revealed) ...[
@@ -1079,7 +1095,15 @@ class _RescueOfferState extends State<_RescueOffer> {
   }
 }
 
-// ────────────────────────── Slot machine strip ─────────────────────
+// ────────────────────────── Circular roulette wheel ─────────────────
+//
+// A proper wheel of fortune: 12 pie slices around a big circle, 11 with
+// question marks, one with the prize. The wheel spins with an easing
+// deceleration and lands with the pointer at the top pointing straight
+// at the prize slice. On land: heavy haptic, brief hold, then _onDone
+// fires and the reveal card takes over.
+//
+// _SlotStrip kept as the class name so callers don't need to change.
 
 class _SlotStrip extends StatefulWidget {
   final VoidCallback onDone;
@@ -1089,134 +1113,276 @@ class _SlotStrip extends StatefulWidget {
   State<_SlotStrip> createState() => _SlotStripState();
 }
 
-class _SlotStripState extends State<_SlotStrip> {
-  static const _targets = ['£', '19', '99'];
+class _SlotStripState extends State<_SlotStrip>
+    with SingleTickerProviderStateMixin {
+  static const int _slices = 12;
+  static const int _prizeIndex = 3; // arbitrary — pointer will land here
 
-  /// Garbled pool — shown while the reels spin. Deliberately meaningless
-  /// so the user's eye can't pre-read the reveal.
-  static const _pool = <String>[
-    '??', '★', '¥7', '₿', '§', '99', '01', '77', '£!', '¥%',
-    r'$$', '02', '05', '13', '20', '33', '44', '™', '№', '¤',
-  ];
-
-  final _rng = Random();
-  final List<String> _current = List.filled(3, '★');
-  final List<bool> _locked = List.filled(3, false);
-  Timer? _tick;
+  late final AnimationController _controller;
+  late final Animation<double> _rotation;
 
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(milliseconds: 65), (_) {
-      if (!mounted) return;
-      setState(() {
-        for (int i = 0; i < 3; i++) {
-          if (!_locked[i]) _current[i] = _pool[_rng.nextInt(_pool.length)];
-        }
-      });
+    // Wheel spins 4 full turns + settles so the prize slice ends up
+    // dead-under the pointer at the top. Slice 0 is centered at 12
+    // o'clock; each slice covers 2π/_slices radians.
+    final sliceAngle = (2 * pi) / _slices;
+    // Rotate so slice _prizeIndex is at the top (which is where the
+    // pointer sits). Extra 4 full spins for drama.
+    final targetAngle = (4 * 2 * pi) - (_prizeIndex * sliceAngle);
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    );
+    _rotation = Tween<double>(begin: 0, end: targetAngle).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _controller.forward();
+    _controller.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 550), () {
+          if (mounted) widget.onDone();
+        });
+      }
     });
-    _lockAt(0, const Duration(milliseconds: 1500));
-    _lockAt(1, const Duration(milliseconds: 2100));
-    _lockAt(2, const Duration(milliseconds: 2750));
-    Future.delayed(const Duration(milliseconds: 3350), () {
-      if (mounted) widget.onDone();
-    });
+    // Rhythmic click as it spins — softens as the wheel decelerates.
+    _startTickHaptics();
   }
 
-  void _lockAt(int reel, Duration delay) {
-    Future.delayed(delay, () {
-      if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _current[reel] = _targets[reel];
-        _locked[reel] = true;
-      });
-      if (reel == 2) _tick?.cancel();
-    });
+  Future<void> _startTickHaptics() async {
+    for (int i = 0; i < 24; i++) {
+      if (!mounted || _controller.isCompleted) return;
+      HapticFeedback.selectionClick();
+      // Getting slower as we approach the end.
+      final t = _controller.value;
+      final delayMs = 60 + (t * 220).round();
+      await Future.delayed(Duration(milliseconds: delayMs));
+    }
   }
 
   @override
   void dispose() {
-    _tick?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (int i = 0; i < 3; i++) ...[
-          _SlotReel(
-            key: ValueKey('reel_$i'),
-            character: _current[i],
-            locked: _locked[i],
+    return SizedBox(
+      width: 280,
+      height: 300,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // Ambient glow behind the wheel.
+          Positioned(
+            top: 30,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.emerald.withOpacity(0.35),
+                    AppColors.emerald.withOpacity(0.02),
+                  ],
+                ),
+              ),
+            ),
           ),
-          if (i < 2) const SizedBox(width: 10),
+          // The wheel itself.
+          Positioned(
+            top: 30,
+            child: AnimatedBuilder(
+              animation: _rotation,
+              builder: (context, _) => Transform.rotate(
+                angle: _rotation.value,
+                child: CustomPaint(
+                  size: const Size(240, 240),
+                  painter: _WheelPainter(
+                    slices: _slices,
+                    prizeIndex: _prizeIndex,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Fixed center hub.
+          Positioned(
+            top: 30 + 240 / 2 - 22,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [Colors.white, Colors.white.withOpacity(0.4)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                '£',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          // Pointer / needle at the top.
+          Positioned(
+            top: 8,
+            child: SizedBox(
+              width: 34,
+              height: 42,
+              child: CustomPaint(painter: _PointerPainter()),
+            ),
+          ),
         ],
-      ],
+      ),
     );
   }
 }
 
-class _SlotReel extends StatelessWidget {
-  final String character;
-  final bool locked;
-  const _SlotReel({super.key, required this.character, required this.locked});
+class _WheelPainter extends CustomPainter {
+  final int slices;
+  final int prizeIndex;
+  _WheelPainter({required this.slices, required this.prizeIndex});
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      width: 92,
-      height: 116,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B0B0B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: locked
-              ? AppColors.emerald.withOpacity(0.75)
-              : Colors.white.withOpacity(0.06),
-          width: locked ? 2 : 1,
-        ),
-        boxShadow: locked
-            ? [
-                BoxShadow(
-                  color: AppColors.emerald.withOpacity(0.35),
-                  blurRadius: 22,
-                  offset: const Offset(0, 8),
-                ),
-              ]
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 90),
-        transitionBuilder: (child, anim) => FadeTransition(
-          opacity: anim,
-          child: SlideTransition(
-            position: Tween(begin: const Offset(0, 0.6), end: Offset.zero).animate(anim),
-            child: child,
-          ),
-        ),
-        child: Text(
-          character,
-          key: ValueKey('${character}_$locked'),
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final sliceAngle = (2 * pi) / slices;
+
+    // Slice 0 is centered at the top (12 o'clock), so start at
+    // -π/2 - sliceAngle/2 so slice 0's midpoint sits at -π/2.
+    final startAngle = -pi / 2 - (sliceAngle / 2);
+
+    for (int i = 0; i < slices; i++) {
+      final rect = Rect.fromCircle(center: center, radius: radius);
+      final sliceStart = startAngle + (i * sliceAngle);
+      final isPrize = i == prizeIndex;
+      final fill = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = SweepGradient(
+          startAngle: sliceStart,
+          endAngle: sliceStart + sliceAngle,
+          colors: isPrize
+              ? [
+                  const Color(0xFF10B981),
+                  const Color(0xFF059669),
+                ]
+              : (i.isEven
+                  ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
+                  : [const Color(0xFF141414), const Color(0xFF080808)]),
+        ).createShader(rect);
+
+      canvas.drawArc(rect, sliceStart, sliceAngle, true, fill);
+
+      // Slice divider hairlines.
+      final divider = Paint()
+        ..color = Colors.white.withOpacity(0.08)
+        ..strokeWidth = 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(
+        center,
+        center +
+            Offset(cos(sliceStart) * radius, sin(sliceStart) * radius),
+        divider,
+      );
+
+      // Label — question mark for the mystery slices, prize glyph for
+      // the winner. Rendered along the mid-angle at 60% of the radius.
+      final midAngle = sliceStart + sliceAngle / 2;
+      final labelRadius = radius * 0.65;
+      final labelPos = center +
+          Offset(cos(midAngle) * labelRadius, sin(midAngle) * labelRadius);
+      final label = isPrize ? '£' : '?';
+      final tp = TextPainter(
+        text: TextSpan(
+          text: label,
           style: TextStyle(
-            color: locked ? AppColors.emerald : Colors.white,
-            fontSize: 44,
+            color: isPrize ? Colors.white : Colors.white.withOpacity(0.4),
+            fontSize: isPrize ? 22 : 18,
             fontWeight: FontWeight.w900,
-            letterSpacing: -1,
-            height: 1,
-            shadows: locked
-                ? [Shadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 12)]
+            shadows: isPrize
+                ? [
+                    const Shadow(color: Colors.black26, blurRadius: 4),
+                  ]
                 : null,
           ),
         ),
-      ),
-    );
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      canvas.save();
+      canvas.translate(labelPos.dx, labelPos.dy);
+      // Rotate the glyph so it stands upright relative to the slice
+      // radius (readable when the wheel is spinning too, thanks to
+      // the pointer landing straight up).
+      canvas.rotate(midAngle + pi / 2);
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
+    }
+
+    // Outer emerald ring.
+    final ringOuter = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = AppColors.emerald.withOpacity(0.6);
+    canvas.drawCircle(center, radius - 1.5, ringOuter);
+
+    final ringInner = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Colors.white.withOpacity(0.12);
+    canvas.drawCircle(center, radius * 0.35, ringInner);
   }
+
+  @override
+  bool shouldRepaint(covariant _WheelPainter old) =>
+      old.prizeIndex != prizeIndex || old.slices != slices;
+}
+
+class _PointerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width / 2, size.height) // bottom tip
+      ..lineTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..close();
+    final fill = Paint()
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: const [Colors.white, Color(0xFFB0B0B0)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawPath(path, fill);
+    // Outline.
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..color = Colors.black.withOpacity(0.5);
+    canvas.drawPath(path, stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ────────────────────────── Reveal card ────────────────────────────
@@ -1351,32 +1517,60 @@ class _RevealCard extends StatelessWidget {
 
 // ────────────────────────── Legal footer ───────────────────────────
 
+/// Full paywall footer used on every stage. Restore · Terms · Privacy
+/// links plus the Apple-required auto-renew disclosure (Guideline 3.1.2).
 class _LegalFooter extends StatelessWidget {
   final VoidCallback onRestore;
-  const _LegalFooter({required this.onRestore});
+  final bool showAutoRenewDisclosure;
+  const _LegalFooter({
+    required this.onRestore,
+    this.showAutoRenewDisclosure = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
         children: [
-          _LegalLink(label: 'Restore', onTap: onRestore),
-          _LegalDot(),
-          _LegalLink(
-            label: 'Terms',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TermsScreen()),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _LegalLink(label: 'Restore', onTap: onRestore),
+              _LegalDot(),
+              _LegalLink(
+                label: 'Terms',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TermsScreen()),
+                ),
+              ),
+              _LegalDot(),
+              _LegalLink(
+                label: 'Privacy',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+                ),
+              ),
+            ],
           ),
-          _LegalDot(),
-          _LegalLink(
-            label: 'Privacy',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+          if (showAutoRenewDisclosure) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Payment will be charged to your Apple ID at confirmation of '
+              'purchase. Subscription automatically renews unless auto-renew '
+              'is turned off at least 24 hours before the end of the current '
+              'period. Your account will be charged for renewal within 24 '
+              'hours prior to the end. You can manage and cancel subscriptions '
+              'in your App Store account settings.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 9.5,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

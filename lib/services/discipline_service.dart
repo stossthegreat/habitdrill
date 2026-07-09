@@ -176,6 +176,18 @@ class DisciplineService {
 
     bool perfectDay = allOrdersDone && noRulesBroken;
 
+    // Per-rule clean-day streak. Every rule that wasn't pressed
+    // yesterday earns +1. Pressing "I broke it" resets the streak
+    // to 0 elsewhere (see HabitEngine.toggleHabitCompletion). This
+    // gives Laws a visible "N DAYS CLEAN" counter identical in
+    // spirit to habits' "N DAYS DONE" streak.
+    for (final rule in yesterdayRules) {
+      if (!rule.isDoneOn(yesterday)) {
+        final updated = rule.copyWith(streak: rule.streak + 1);
+        await LocalStorageService.saveHabit(updated);
+      }
+    }
+
     if (perfectDay) {
       await incrementDaysControlled();
       if (noRulesBroken && yesterdayRules.isNotEmpty) {

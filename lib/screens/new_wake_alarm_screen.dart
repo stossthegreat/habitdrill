@@ -9,6 +9,7 @@ import '../models/habit.dart';
 import '../providers/habit_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/wake_mission_prefs.dart';
+import '../widgets/wheel_time_picker.dart';
 
 /// New (or edit) Wake Alarm — the standalone morning-punishment builder.
 /// Structure mirrors the reference screenshot: name → time → days →
@@ -71,18 +72,10 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
 
   Future<void> _pickTime() async {
     HapticFeedback.selectionClick();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.emerald,
-            surface: Color(0xFF0B0B0B),
-          ),
-        ),
-        child: child!,
-      ),
+    final picked = await showWheelTimePicker(
+      context,
+      initial: _time,
+      title: 'WAKE TIME',
     );
     if (picked != null) setState(() => _time = picked);
   }
@@ -179,11 +172,8 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 8),
-                    _ModeToggle(
-                      scheduled: _scheduled,
-                      onChange: (v) => setState(() => _scheduled = v),
-                    ),
-                    const SizedBox(height: 18),
+                    // Scheduled is the only mode — one-time was noise.
+                    // _ModeToggle removed.
                     _NameField(controller: _nameController, onChanged: (_) => setState(() {})),
                     const SizedBox(height: 12),
                     _RowCard(
@@ -192,8 +182,8 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
                       value: _time.format(context),
                       onTap: _pickTime,
                     ),
-                    if (_scheduled) ...[
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                    ...[
                       _DaysCard(
                         days: _days,
                         onToggle: (i) => setState(() => _days[i] = !_days[i]),

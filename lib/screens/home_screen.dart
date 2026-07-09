@@ -8,6 +8,7 @@ import '../design/tokens.dart';
 import '../widgets/date_strip.dart';
 import '../widgets/share_card.dart';
 import '../screens/achievements_screen.dart';
+import '../screens/settings_screen.dart';
 import '../screens/sergeant/punishment_screen.dart';
 import '../screens/sergeant/tempted_screen.dart';
 import '../screens/paywall_screen.dart';
@@ -145,7 +146,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final dayOrders = allHabits.where((h) => h.isScheduledForDate(_selectedDate)).toList();
     final hasFailed = SergeantService.hasPendingPunishment();
 
-    final orders = dayOrders.where((h) => h.type != 'bad_habit').toList();
+    // Split the day. The wake alarm gets its own hero — different weight
+    // from a regular contract because it is the keystone habit and the
+    // one thing the whole app is built around.
+    final wakeAlarms = dayOrders
+        .where((h) => h.type == 'habit' && h.time.isNotEmpty && h.reminderOn)
+        .toList();
+    final orders = dayOrders
+        .where((h) => h.type != 'bad_habit' && !wakeAlarms.contains(h))
+        .toList();
     final rules = dayOrders.where((h) => h.type == 'bad_habit').toList();
 
     // Orders (positive habits) count as "safe" when done.
@@ -272,6 +281,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
             const SizedBox(height: AppSpacing.xl),
 
+            // ===== WAKE ALARM HERO =====
+            // Own section, above ORDERS. Different visual from the
+            // contract cards below — this is the keystone habit.
+            if (wakeAlarms.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Text(
+                  'MORNING RISE',
+                  style: TextStyle(
+                    color: AppColors.emerald.withOpacity(0.6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (int i = 0; i < wakeAlarms.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  child: _buildWakeHero(wakeAlarms[i], wakeAlarms[i].isDoneOn(_selectedDate), i),
+                ),
+              const SizedBox(height: AppSpacing.xl),
+            ],
+
             // ===== ORDERS =====
             if (orders.isNotEmpty) ...[
               Padding(
@@ -361,6 +395,150 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ),
       ),
     );
+  }
+
+  /// Big Morning Rise card. Shows the fire time huge, name, streak,
+  /// and a status pill. Deliberately different visual weight from the
+  /// contract cards below — this is the keystone habit and shouldn't
+  /// look like just another to-do.
+  Widget _buildWakeHero(Habit habit, bool isDone, int index) {
+    String time = habit.time;
+    try {
+      time = DateFormat('HH:mm').format(DateTime.parse('2025-01-01 ${habit.time}:00'));
+    } catch (_) {}
+    final streak = habit.streak;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDone
+              ? [
+                  AppColors.emerald.withOpacity(0.28),
+                  AppColors.emerald.withOpacity(0.06),
+                ]
+              : [
+                  const Color(0xFF12130A),
+                  const Color(0xFF080904),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDone
+              ? AppColors.emerald.withOpacity(0.55)
+              : AppColors.emerald.withOpacity(0.25),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.emerald.withOpacity(isDone ? 0.35 : 0.12),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Big time.
+              Text(
+                time,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 54,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -2,
+                  height: 1,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              const Spacer(),
+              // Status pill.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: (isDone ? AppColors.emerald : AppColors.fire).withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: (isDone ? AppColors.emerald : AppColors.fire).withOpacity(0.55),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  isDone ? 'DONE' : 'ARMED',
+                  style: TextStyle(
+                    color: isDone ? AppColors.emerald : AppColors.fire,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            habit.title.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                Icons.alarm_rounded,
+                color: Colors.white.withOpacity(0.4),
+                size: 12,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _daysLabel(habit.repeatDays),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.45),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              if (streak > 0) ...[
+                const SizedBox(width: 10),
+                const Text('🔥', style: TextStyle(fontSize: 11)),
+                const SizedBox(width: 2),
+                Text(
+                  '$streak',
+                  style: TextStyle(
+                    color: AppColors.fire,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    ).animate(delay: (index * 60).ms).fadeIn(duration: 300.ms).slideY(begin: 0.05, end: 0);
+  }
+
+  String _daysLabel(List<int> days) {
+    if (days.length == 7) return 'EVERY DAY';
+    if (days.length == 5 &&
+        [1, 2, 3, 4, 5].every(days.contains)) return 'WEEKDAYS';
+    if (days.length == 2 && days.contains(0) && days.contains(6)) return 'WEEKENDS';
+    const l = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    return days.map((d) => l[d]).join(' · ');
   }
 
   Widget _buildOrderCard(Habit habit, bool isDone, int index) {
@@ -622,12 +800,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Streak — big fire icon with the number visible outside the
+              // badge so it reads instantly.
               _HeaderIcon(
                 icon: LucideIcons.flame,
                 color: AppColors.fire,
                 badge: _bestStreak > 0 ? '$_bestStreak' : null,
                 onTap: _showShareCard,
               ),
+              const SizedBox(width: 6),
               _HeaderIcon(
                 icon: LucideIcons.award,
                 color: const Color(0xFFF59E0B),
@@ -635,10 +816,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                 ),
               ),
+              const SizedBox(width: 6),
+              // Settings replaces Share here. Share moved to the Profile
+              // tab where the share card actually lives.
               _HeaderIcon(
-                icon: LucideIcons.share2,
+                icon: LucideIcons.settings,
                 color: Colors.white.withOpacity(0.7),
-                onTap: _showShareCard,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
               ),
             ],
           ),
@@ -661,17 +847,37 @@ class _HeaderIcon extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(4),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: color, size: 22),
+            // Ringed disc — icons now render as status badges (36pt
+            // circle with colored border and matching glow) so the
+            // streak flame and the achievement medal command the row.
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.14),
+                shape: BoxShape.circle,
+                border: Border.all(color: color.withOpacity(0.55), width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 14,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: color, size: 19),
+            ),
             if (badge != null)
               Positioned(
                 right: -6,
                 top: -4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(8),

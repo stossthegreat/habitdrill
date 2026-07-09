@@ -61,12 +61,20 @@ class AlarmService {
         }
       }
 
-      // Initialize notification plugin
+      // Initialize notification plugin.
+      //
+      // ⚠️ CRITICAL — iOS request*Permission flags MUST all be false.
+      // flutter_local_notifications triggers the iOS system prompt the
+      // moment initialize() runs when any of these are true. That
+      // happens at app launch, BEFORE onboarding renders — silently
+      // defeating every "we ask in-context" screen we added. The
+      // onboarding permission ask (see _PermissionAsk) calls
+      // Permission.notification.request() at the right moment.
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
       );
       const initSettings = InitializationSettings(
         android: androidInit,

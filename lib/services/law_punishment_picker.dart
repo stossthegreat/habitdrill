@@ -26,6 +26,10 @@ class LawPunishment {
 /// their way out. But since offense-number is unknown at commit time,
 /// the user can't optimise around the reveal.
 class LawPunishmentPicker {
+  // ONLY exercises the pose engine can actually count. Every entry
+  // here must resolve to an engineId in ExerciseSet — squats, push_ups,
+  // burpees, or high_knees. No wall-sits, no planks, nothing the AI
+  // camera can't verify.
   static const List<LawPunishment> pool = [
     LawPunishment(
       id: 'pushups_30',
@@ -38,12 +42,6 @@ class LawPunishmentPicker {
       label: '20 Burpees',
       emoji: '💥',
       flavor: 'The exercise you hate the most.',
-    ),
-    LawPunishment(
-      id: 'wallsit_45',
-      label: '45s Wall Sit',
-      emoji: '🧱',
-      flavor: 'Just you, the wall, and your legs quitting.',
     ),
     LawPunishment(
       id: 'squats_50',
@@ -68,6 +66,12 @@ class LawPunishmentPicker {
       label: '15 Burpees + 20 Push-ups',
       emoji: '⚡',
       flavor: 'The full menu. You broke it, you eat it.',
+    ),
+    LawPunishment(
+      id: 'circuit_hp',
+      label: '40 High Knees + 25 Push-ups',
+      emoji: '🚀',
+      flavor: 'Get the heart going. Then keep going.',
     ),
   ];
 
