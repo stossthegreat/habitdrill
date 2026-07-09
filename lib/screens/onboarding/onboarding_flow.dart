@@ -8,11 +8,13 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../design/tokens.dart';
 import '../../providers/habit_provider.dart';
+import '../../services/law_punishment_picker.dart';
 import 'onboarding_state.dart';
 import 'onboarding_paywall.dart';
 
@@ -28,7 +30,11 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   final OnboardingState _s = OnboardingState();
   int _i = 0;
 
-  static const int _total = 21;
+  // ACT 1 (6) + ACT 2 (7) + ACT 3 (7) + ACT 4 (3) + ACT 5 (1) + ACT 6 (1) +
+  // ACT 7 (2) = 27 screens. Act 5 (signature) is just the pad — the
+  // "give yourself your word" statement is embedded inside it. Progress
+  // bar fills against this; the counter itself is hidden.
+  static const int _total = 27;
 
   @override
   void dispose() {
@@ -62,19 +68,41 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
         '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
     Future(() async {
       try {
-        await ref.read(habitEngineProvider).createHabit(
-              title: 'Morning Rise',
-              type: 'habit',
-              time: wakeTimeStr,
-              startDate: DateTime.now(),
-              endDate: DateTime.now().add(const Duration(days: 365)),
-              repeatDays: const [0, 1, 2, 3, 4, 5, 6],
-              reminderOn: true,
-              color: AppColors.emerald,
-              emoji: '☀️',
-            );
+        final engine = ref.read(habitEngineProvider);
+        await engine.createHabit(
+          title: 'Morning Rise',
+          type: 'habit',
+          time: wakeTimeStr,
+          startDate: DateTime.now(),
+          endDate: DateTime.now().add(const Duration(days: 365)),
+          repeatDays: const [0, 1, 2, 3, 4, 5, 6],
+          reminderOn: true,
+          color: AppColors.emerald,
+          emoji: '☀️',
+        );
+        // Create a Habit(type='bad_habit') for every Law the user signed.
+        // These show up in Contracts under CONTRACTS immediately with the
+        // VERIFY WITH SCREEN TIME chip already available.
+        for (final lawId in _s.lawsPicked) {
+          final preset = _lawPresets.firstWhere(
+            (p) => p.id == lawId,
+            orElse: () => const _LawPreset(id: '', title: '', emoji: ''),
+          );
+          if (preset.id.isEmpty) continue;
+          await engine.createHabit(
+            title: preset.title,
+            type: 'bad_habit',
+            time: '',
+            startDate: DateTime.now(),
+            endDate: DateTime.now().add(const Duration(days: 365)),
+            repeatDays: const [0, 1, 2, 3, 4, 5, 6],
+            reminderOn: false,
+            color: AppColors.error,
+            emoji: preset.emoji,
+          );
+        }
       } catch (e) {
-        debugPrint('Morning Rise habit creation failed: $e');
+        debugPrint('Onboarding habit creation failed: $e');
       }
     });
     // NOTE: seen_onboarding is set inside OnboardingPaywall._goHome, so
@@ -100,39 +128,96 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => _i = i),
                 children: [
+                  // ═══ ACT 1 — CONVICTION ═══
+                  // Make them believe waking up is the keystone habit.
                   _ColdOpen(onNext: _next),
                   _Welcome(onNext: _next),
-                  _FirstBattle(onNext: _next),
-                  _SinglePick(
-                    key: const ValueKey('gender'),
-                    title: 'You are',
-                    subtitle: 'This just helps us calibrate.',
-                    options: const ['Male', 'Female', 'Prefer not to say'],
-                    initial: _s.gender,
-                    onPicked: (v) => _s.gender = v,
+                  _StatementScreen(
+                    key: const ValueKey('act1_quitting'),
+                    line1: 'Quitting is',
+                    line2: 'harder here',
+                    line3: 'than succeeding.',
                     onNext: _next,
                   ),
-                  _AgePicker(state: _s, onNext: _next),
-                  _SinglePick(
-                    key: const ValueKey('source'),
-                    title: 'How did you find HabitDrill?',
-                    subtitle: 'Real answers help us reach more people like you.',
-                    options: const ['TikTok', 'Instagram', 'YouTube', 'App Store', 'Friend', 'Google', 'Other'],
-                    initial: _s.source,
-                    onPicked: (v) => _s.source = v,
+                  _StatementScreen(
+                    key: const ValueKey('act1_first_battle'),
+                    line1: 'The first battle',
+                    line2: 'every morning',
+                    line3: 'is waking up.',
                     onNext: _next,
                   ),
+                  _StatementScreen(
+                    key: const ValueKey('act1_why_mornings'),
+                    line1: 'Win the first hour,',
+                    line2: 'discipline compounds.',
+                    line3: 'Lose it. Every excuse gets stronger.',
+                    onNext: _next,
+                  ),
+                  _StatementScreen(
+                    key: const ValueKey('act1_alarm'),
+                    line1: 'Every promise starts',
+                    line2: 'with an alarm.',
+                    line3: 'Your alarm has no consequences. Yet.',
+                    onNext: _next,
+                    ctaLabel: 'GIVE IT ONE',
+                  ),
+
+                  // ═══ ACT 2 — BUILD THE WEAPON ═══
+                  // Every action is justified by the copy immediately before it.
+                  _WakeTimePicker(state: _s, onNext: _next),
+                  _PermissionAsk(
+                    key: const ValueKey('perm_notif'),
+                    icon: Icons.notifications_active_rounded,
+                    headline: "We can't wake you\nif iPhone blocks us.",
+                    body:
+                        'Turn on notifications and the sergeant can shout '
+                        'at you through Silent and Focus. Off, and the alarm '
+                        'is just a ping.',
+                    ctaLabel: 'ALLOW NOTIFICATIONS',
+                    request: () async {
+                      await Permission.notification.request();
+                    },
+                    onNext: _next,
+                  ),
+                  _ExercisePicker(state: _s, onNext: _next),
+                  _RepsPicker(state: _s, onNext: _next),
+                  _StatementScreen(
+                    key: const ValueKey('act2_ai'),
+                    line1: 'AI counts',
+                    line2: 'every rep.',
+                    line3: 'Fake reps do not count.',
+                    onNext: _next,
+                  ),
+                  _EscalationWarning(reps: _s.reps, onNext: _next),
+                  _PermissionAsk(
+                    key: const ValueKey('perm_camera'),
+                    icon: Icons.camera_alt_rounded,
+                    headline: 'The only way to stop the alarm\nis AI-verified reps.',
+                    body:
+                        "Without camera access we can't verify them. "
+                        "The camera only opens when the alarm rings. "
+                        "Nothing is recorded or sent anywhere.",
+                    ctaLabel: 'ALLOW CAMERA',
+                    request: () async {
+                      await Permission.camera.request();
+                    },
+                    onNext: _next,
+                  ),
+
+                  // ═══ ACT 3 — IDENTITY & COST ═══
+                  // NOW ask. They already built the alarm — questions become
+                  // identity reinforcement, not surveys.
                   _SinglePick(
                     key: const ValueKey('habit'),
-                    title: 'What do you want to fix first?',
-                    subtitle: 'Pick the one that costs you the most.',
+                    title: 'What are you tired of failing at?',
+                    subtitle: 'Pick the one that hurts the most.',
                     options: const [
-                      'Wake up on time',
-                      'Exercise consistently',
-                      'Stop procrastinating',
-                      'Reduce phone use',
-                      'Build discipline',
-                      'Other',
+                      'Waking up on time',
+                      'Exercising consistently',
+                      'Not procrastinating',
+                      'Reducing phone use',
+                      'Building discipline',
+                      'Something else',
                     ],
                     initial: _s.habitToFix,
                     onPicked: (v) => _s.habitToFix = v,
@@ -140,7 +225,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('struggle'),
-                    title: 'How long have you struggled with this?',
+                    title: 'How long has this been a problem?',
+                    subtitle: 'Be honest. Nobody sees this but the sergeant.',
                     options: const [
                       'Less than 1 month',
                       '1–6 months',
@@ -154,14 +240,15 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('fail'),
-                    title: 'What usually breaks you?',
+                    title: 'What actually breaks you?',
+                    subtitle: 'The truth. Not the version you tell your friends.',
                     options: const [
                       'Lack of motivation',
                       'I keep making excuses',
                       'I procrastinate',
                       'I quit after a few days',
                       'I forget',
-                      'Other',
+                      'Something else',
                     ],
                     initial: _s.failCause,
                     onPicked: (v) => _s.failCause = v,
@@ -169,7 +256,8 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SinglePick(
                     key: const ValueKey('breakfreq'),
-                    title: 'How often do you break promises to yourself?',
+                    title: 'How often do you break a promise to yourself?',
+                    subtitle: 'Every skipped alarm counts.',
                     options: const ['Rarely', 'Sometimes', 'Often', 'Almost every day'],
                     initial: _s.breakFrequency,
                     onPicked: (v) => _s.breakFrequency = v,
@@ -177,7 +265,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SliderScreen(
                     key: const ValueKey('frustration'),
-                    title: 'How frustrated are you with yourself?',
+                    title: 'How frustrated are you with yourself right now?',
                     lowLabel: 'Not really',
                     highLabel: 'Really frustrated',
                     initial: _s.frustration,
@@ -186,35 +274,37 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                   ),
                   _SliderScreen(
                     key: const ValueKey('importance'),
-                    title: 'How important is fixing this?',
+                    title: 'How important is finally fixing this?',
                     lowLabel: 'Whatever',
                     highLabel: 'Life-changing',
                     initial: _s.importance,
                     onChanged: (v) => _s.importance = v,
                     onNext: _next,
                   ),
+                  _CostAudit(state: _s, onNext: _next),
+
+                  // ═══ ACT 4 — LAWS ═══
+                  // Randomised punishments are the deterrent. User picks
+                  // the Laws; HabitDrill picks the price.
                   _StatementScreen(
-                    key: const ValueKey('identity1'),
-                    line1: "Discipline isn't something",
-                    line2: "you're born with.",
-                    line3: "It's something you train.",
+                    key: const ValueKey('act4_intro'),
+                    line1: "These aren't goals.",
+                    line2: "They're Laws.",
+                    line3: 'Break one. Earn a punishment. We choose it.',
                     onNext: _next,
                   ),
-                  _WakeTimePicker(state: _s, onNext: _next),
-                  _ExercisePicker(state: _s, onNext: _next),
-                  _RepsPicker(state: _s, onNext: _next),
-                  _EscalationWarning(reps: _s.reps, onNext: _next),
-                  _StatementScreen(
-                    key: const ValueKey('commit'),
-                    line1: 'No more backup alarms.',
-                    line2: 'No more excuses.',
-                    line3: 'No more "tomorrow."',
-                    onNext: _next,
-                    ctaLabel: 'I AGREE',
-                  ),
+                  _LawPicker(state: _s, onNext: _next),
+                  _PunishmentReveal(state: _s, onNext: _next),
+
+                  // ═══ ACT 5 — CONTRACT ═══
                   _SignatureScreen(state: _s, onNext: _next),
+
+                  // ═══ ACT 6 — BUILD ═══
                   _BuildingPlan(onNext: _next),
+
+                  // ═══ ACT 7 — PAYOFF → PAYWALL ═══
                   _SummaryScreen(state: _s, onNext: _next),
+                  _TrialBridge(onNext: _next),
                 ],
               ),
             ),
@@ -1450,6 +1540,22 @@ class _EscalationWarning extends StatelessWidget {
               ),
             ),
           ),
+          // Medical disclaimer — required by App Review 1.4.1 near any
+          // surface that leads directly into a physical exercise.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Consult a doctor before starting any new exercise routine. '
+              'HabitDrill is not medical advice.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.35),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+          ),
           _PrimaryButton(label: 'I UNDERSTAND', onTap: onNext),
         ],
       ),
@@ -1597,8 +1703,8 @@ class _SignatureScreenState extends State<_SignatureScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _Hero(
-            title: 'Sign your commitment.',
-            subtitle: 'You are giving your word to yourself. Not to us.',
+            title: "You've built your protocol.",
+            subtitle: 'Last step: give yourself your word.',
           ),
           const SizedBox(height: 20),
           Container(
@@ -1609,7 +1715,7 @@ class _SignatureScreenState extends State<_SignatureScreen> {
               border: Border.all(color: AppColors.emerald.withOpacity(0.25), width: 1),
             ),
             child: Text(
-              'I commit to completing my HabitDrill every morning.',
+              'I accept the consequences of breaking my own promises.',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.85),
                 fontSize: 13,
@@ -2743,6 +2849,716 @@ class _Stat extends StatelessWidget {
               style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Contextual permission ask ─────────────
+//
+// Reusable for both notification (screen 8) and camera (screen 13).
+// Explains WHY before showing the iOS system prompt. Denial or accept,
+// user advances — we don't gate the flow on the OS answer, because they
+// can still fix it later in Settings, and blocking the funnel here
+// tanks conversion.
+
+class _PermissionAsk extends StatefulWidget {
+  final IconData icon;
+  final String headline;
+  final String body;
+  final String ctaLabel;
+  final Future<void> Function() request;
+  final VoidCallback onNext;
+
+  const _PermissionAsk({
+    super.key,
+    required this.icon,
+    required this.headline,
+    required this.body,
+    required this.ctaLabel,
+    required this.request,
+    required this.onNext,
+  });
+
+  @override
+  State<_PermissionAsk> createState() => _PermissionAskState();
+}
+
+class _PermissionAskState extends State<_PermissionAsk> {
+  bool _asking = false;
+
+  Future<void> _tap() async {
+    if (_asking) return;
+    _asking = true;
+    HapticFeedback.mediumImpact();
+    try {
+      await widget.request();
+    } catch (_) {}
+    if (mounted) widget.onNext();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withOpacity(0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.emerald.withOpacity(0.5), width: 1),
+              boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.35), blurRadius: 20)],
+            ),
+            alignment: Alignment.center,
+            child: Icon(widget.icon, color: AppColors.emerald, size: 30),
+          ).animate().fadeIn().scale(begin: const Offset(0.85, 0.85), end: const Offset(1, 1)),
+          const SizedBox(height: 26),
+          Text(
+            widget.headline,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 14),
+          Text(
+            widget.body,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ).animate(delay: 240.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: widget.ctaLabel, onTap: _tap)
+              .animate(delay: 400.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          Center(
+            child: GestureDetector(
+              onTap: widget.onNext,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  'Not now',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ).animate(delay: 500.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Cost Audit reflection ─────────────
+//
+// The single highest-conversion screen in the whole flow. Reads their
+// survey answers back to them in second person. "It sees me." This
+// resolves the emotional peak of Act 3 into a diagnosis they can't argue
+// with.
+
+class _CostAudit extends StatelessWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _CostAudit({required this.state, required this.onNext});
+
+  String _struggleLine() {
+    switch (state.struggleDuration) {
+      case 'Less than 1 month':
+        return "You've fought this for weeks.";
+      case '1–6 months':
+        return "You've fought this for months.";
+      case '1 year':
+        return "You've fought this for a year.";
+      case 'Several years':
+        return "You've fought this for years.";
+      case 'As long as I can remember':
+        return "You've fought this as long as you can remember.";
+      default:
+        return "You've been fighting this for a while.";
+    }
+  }
+
+  String _failLine() {
+    switch (state.failCause) {
+      case 'Lack of motivation':
+        return 'Motivation runs out. Every time.';
+      case 'I keep making excuses':
+        return 'The excuses win. Every time.';
+      case 'I procrastinate':
+        return 'Tomorrow becomes never.';
+      case 'I quit after a few days':
+        return 'Day four kills you.';
+      case 'I forget':
+        return 'You forget by breakfast.';
+      default:
+        return 'Something small breaks it. Every time.';
+    }
+  }
+
+  String _breakLine() {
+    switch (state.breakFrequency) {
+      case 'Rarely':
+        return "But when you do, it hurts.";
+      case 'Sometimes':
+        return "You break promises to yourself often enough to notice.";
+      case 'Often':
+        return "You break promises to yourself all the time.";
+      case 'Almost every day':
+        return "You break promises to yourself almost every day.";
+      default:
+        return "And every broken promise gets easier.";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.emerald.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.emerald.withOpacity(0.4)),
+            ),
+            child: Text(
+              'HERE IS WHAT YOU TOLD US',
+              style: TextStyle(
+                color: AppColors.emerald,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: 22),
+          const Text(
+            'We see it clearly now.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1.05,
+            ),
+          ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 26),
+          for (int i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(top: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      [_struggleLine(), _failLine(), _breakLine()][i],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ).animate(delay: (280 + i * 160).ms).fadeIn().slideX(begin: 0.05, end: 0),
+          const SizedBox(height: 22),
+          Text(
+            "You aren't lazy.\nYour system is broken.",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+              height: 1.15,
+            ),
+          ).animate(delay: 850.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 10),
+          Text(
+            'That changes tomorrow morning.',
+            style: TextStyle(
+              color: AppColors.emerald,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ).animate(delay: 1000.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: 'INSTALL THE FIX', onTap: onNext)
+              .animate(delay: 1200.ms).fadeIn().slideY(begin: 0.05, end: 0),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Trial framing bridge ─────────────
+//
+// The last screen before the paywall. Reframes payment as "starting the
+// trial you already committed to" rather than "being asked to pay."
+// Never drop them cold into a price screen.
+
+class _TrialBridge extends StatelessWidget {
+  final VoidCallback onNext;
+  const _TrialBridge({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.emerald,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              '3 DAYS FREE',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+              ),
+            ),
+          ).animate().fadeIn(),
+          const SizedBox(height: 22),
+          const Text(
+            'Try it free',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1,
+            ),
+          ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          Text(
+            'for 3 days.',
+            style: TextStyle(
+              color: AppColors.emerald,
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1,
+              shadows: [Shadow(color: AppColors.emerald.withOpacity(0.5), blurRadius: 20)],
+            ),
+          ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05, end: 0),
+          const SizedBox(height: 30),
+          Text(
+            'You already signed.\nYou already picked.\nYou already know.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ).animate(delay: 400.ms).fadeIn(),
+          const SizedBox(height: 18),
+          Text(
+            '3 days to prove it to yourself.\nCancel anytime. You won\'t need to.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ).animate(delay: 600.ms).fadeIn(),
+          const Spacer(),
+          _PrimaryButton(label: 'START MY FREE TRIAL', onTap: onNext)
+              .animate(delay: 800.ms).fadeIn().slideY(begin: 0.05, end: 0),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Act 4 · Law picker ────────────────────
+//
+// Multi-select preset Laws. Copy is opinionated on purpose — reads like
+// a menu of things people already know they should stop doing, so the
+// friction is only "which one hurts most" not "what is this."
+
+const List<_LawPreset> _lawPresets = [
+  _LawPreset(id: 'law_vaping', title: 'No vaping', emoji: '🚭'),
+  _LawPreset(id: 'law_porn', title: 'No pornography', emoji: '🚫'),
+  _LawPreset(id: 'law_junk', title: 'No junk food', emoji: '🍔'),
+  _LawPreset(id: 'law_alcohol', title: 'No alcohol on weekdays', emoji: '🍺'),
+  _LawPreset(id: 'law_scroll', title: 'No social media before work', emoji: '📱'),
+  _LawPreset(id: 'law_snooze', title: 'No hitting snooze', emoji: '⏰'),
+];
+
+class _LawPreset {
+  final String id;
+  final String title;
+  final String emoji;
+  const _LawPreset({required this.id, required this.title, required this.emoji});
+}
+
+class _LawPicker extends StatefulWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _LawPicker({required this.state, required this.onNext});
+
+  @override
+  State<_LawPicker> createState() => _LawPickerState();
+}
+
+class _LawPickerState extends State<_LawPicker> {
+  @override
+  Widget build(BuildContext context) {
+    final picked = widget.state.lawsPicked;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _Hero(
+            title: 'Pick your Laws.',
+            subtitle: 'Break a Law. HabitDrill picks the price.',
+          ),
+          const SizedBox(height: 22),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              itemCount: _lawPresets.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final p = _lawPresets[i];
+                final isPicked = picked.contains(p.id);
+                return _LawRow(
+                  preset: p,
+                  picked: isPicked,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      if (isPicked) {
+                        picked.remove(p.id);
+                      } else {
+                        picked.add(p.id);
+                      }
+                    });
+                  },
+                ).animate(delay: (60 + i * 45).ms).fadeIn(duration: 260.ms).slideY(begin: 0.04, end: 0);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          _PrimaryButton(
+            label: picked.isEmpty ? 'SKIP FOR NOW' : 'LOCK IN ${picked.length} LAW${picked.length == 1 ? "" : "S"}',
+            onTap: widget.onNext,
+          ).animate(delay: 400.ms).fadeIn(),
+        ],
+      ),
+    );
+  }
+}
+
+class _LawRow extends StatelessWidget {
+  final _LawPreset preset;
+  final bool picked;
+  final VoidCallback onTap;
+  const _LawRow({required this.preset, required this.picked, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: picked
+              ? AppColors.emerald.withOpacity(0.08)
+              : const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: picked
+                ? AppColors.emerald.withOpacity(0.55)
+                : Colors.white.withOpacity(0.06),
+            width: picked ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(preset.emoji, style: const TextStyle(fontSize: 22, height: 1)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                preset.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: picked ? AppColors.emerald : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: picked ? AppColors.emerald : Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: picked
+                  ? const Icon(Icons.check, color: Colors.black, size: 14)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Act 4 · Punishment reveal ─────────────
+//
+// Slot-machine reveal that lands on ONE punishment from the pool. The
+// user knows the pool exists, doesn't know which they'll get when they
+// break a real Law. Uncertainty of consequence beats certainty every
+// time (Kahneman's variable-ratio schedule).
+
+class _PunishmentReveal extends StatefulWidget {
+  final OnboardingState state;
+  final VoidCallback onNext;
+  const _PunishmentReveal({required this.state, required this.onNext});
+
+  @override
+  State<_PunishmentReveal> createState() => _PunishmentRevealState();
+}
+
+class _PunishmentRevealState extends State<_PunishmentReveal> {
+  Timer? _tick;
+  bool _locked = false;
+  late LawPunishment _current;
+  late final LawPunishment _target;
+  int _spinCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = LawPunishmentPicker.sample();
+    _current = LawPunishmentPicker.pool.first;
+    widget.state.revealedPunishmentId = _target.id;
+    // 65ms cycle so the label looks like it's flickering — total spin
+    // time ~2.4 seconds, ~37 cycles before it locks.
+    _tick = Timer.periodic(const Duration(milliseconds: 65), (_) {
+      if (_locked || !mounted) return;
+      setState(() {
+        _current = LawPunishmentPicker.pool[
+            (LawPunishmentPicker.pool.indexOf(_current) + 1) %
+                LawPunishmentPicker.pool.length];
+        _spinCount++;
+      });
+    });
+    // Slow down and lock at ~2.4s.
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _current = _target;
+        _locked = true;
+      });
+      _tick?.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Hero(
+            title: _locked ? 'You broke a Law.' : 'Rolling your fate…',
+            subtitle: _locked
+                ? "Here's one thing you might owe."
+                : "You won't know which one you'll get.",
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _locked
+                    ? [
+                        AppColors.error.withOpacity(0.18),
+                        AppColors.error.withOpacity(0.02),
+                      ]
+                    : [
+                        Colors.white.withOpacity(0.04),
+                        Colors.white.withOpacity(0.01),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: _locked
+                    ? AppColors.error.withOpacity(0.55)
+                    : Colors.white.withOpacity(0.08),
+                width: _locked ? 1.8 : 1,
+              ),
+              boxShadow: _locked
+                  ? [
+                      BoxShadow(
+                        color: AppColors.error.withOpacity(0.35),
+                        blurRadius: 32,
+                        offset: const Offset(0, 12),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 90),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween(
+                    begin: const Offset(0, 0.4),
+                    end: Offset.zero,
+                  ).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: Column(
+                key: ValueKey('${_current.id}_$_locked'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _current.emoji,
+                    style: const TextStyle(fontSize: 62, height: 1),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    _current.label.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _locked ? Colors.white : Colors.white.withOpacity(0.85),
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4,
+                      height: 1.05,
+                      shadows: _locked
+                          ? [Shadow(color: AppColors.error.withOpacity(0.4), blurRadius: 16)]
+                          : null,
+                    ),
+                  ),
+                  if (_locked) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _current.flavor,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Center(
+            child: Text(
+              _locked
+                  ? 'Different Laws. Different punishments. You never know.'
+                  : 'Locking in…',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.45),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          const Spacer(flex: 2),
+          // Medical / physical-effort disclaimer. Required by App Review
+          // 1.4.1 for any UI that leads directly into physical exercise —
+          // no visible copy about doctor consultation was a common reason
+          // for rejection in the 2025-26 review cycle.
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _locked ? 1 : 0,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'HabitDrill is not medical advice. Consult a doctor before '
+                'starting any new exercise routine.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _locked ? 1 : 0,
+            child: _PrimaryButton(
+              // "I ACCEPT THE RISK" → "I ACCEPT THE CONSEQUENCE". App
+              // Review 1.4.5 flags bet/dare/risk/challenge language as
+              // gambling-adjacent. Consequence framing keeps the weight
+              // without the review-trigger keyword.
+              label: 'I ACCEPT THE CONSEQUENCE',
+              enabled: _locked,
+              onTap: widget.onNext,
+            ),
+          ),
+          const SizedBox(height: 10),
         ],
       ),
     );

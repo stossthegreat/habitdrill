@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.2+554
+version: 1.0.2+558
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

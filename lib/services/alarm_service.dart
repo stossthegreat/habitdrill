@@ -35,11 +35,15 @@ class AlarmService {
     try {
       debugPrint('🔧 Initializing AlarmService...');
 
-      // Request permissions
-      final notifStatus = await Permission.notification.request();
-      debugPrint('Notification permission: $notifStatus');
+      // Permissions are NOT requested here anymore — the onboarding flow
+      // asks the user in-context (see _PermissionAsk screens). Auto-
+      // requesting at app launch before any screen explains why is what
+      // tanks grant-rate. We just check the current status.
+      final notifStatus = await Permission.notification.status;
+      debugPrint('Notification permission (status only): $notifStatus');
 
-      // Exact alarm permission is Android-only
+      // Android exact-alarm permission is different — it's a system
+      // pass-through with no in-context ask, so we still request it here.
       if (Platform.isAndroid) {
         final alarmStatus = await Permission.scheduleExactAlarm.request();
         debugPrint('Exact alarm permission: $alarmStatus');
