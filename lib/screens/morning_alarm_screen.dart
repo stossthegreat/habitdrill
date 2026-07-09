@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -18,8 +17,9 @@ import 'sergeant/wake_exercise_screen.dart';
 /// debt owed right now. The ONLY exit is a slide-to-punishment bar that
 /// hands off to the wake exercise. No dismiss. No snooze. No mercy.
 ///
-/// Audio blasts from AVAudioSession playback category (bypasses silent
-/// switch) and the phone vibrates every second until the user slides.
+/// No background audio, no background video. The AlarmKit cascade is
+/// already ringing the phone through Silent + Focus every 3 seconds;
+/// this screen just holds the pressure until they slide.
 class MorningAlarmScreen extends ConsumerStatefulWidget {
   final Habit habit;
   const MorningAlarmScreen({super.key, required this.habit});
@@ -29,7 +29,6 @@ class MorningAlarmScreen extends ConsumerStatefulWidget {
 }
 
 class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
-  final AudioPlayer _player = AudioPlayer();
   Timer? _hapticTimer;
   Timer? _tickTimer;
   bool _handingOff = false;
@@ -38,24 +37,14 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   void initState() {
     super.initState();
     WakeDebtService.markActive(widget.habit.id);
-    _startAlarm();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Heavy vibration every second — a constant "get up" pulse.
+    _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      HapticFeedback.heavyImpact();
+    });
     // Tick every 10s so the debt counter climbs live in front of them.
     _tickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
-    });
-  }
-
-  Future<void> _startAlarm() async {
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    try {
-      await _player.setReleaseMode(ReleaseMode.loop);
-      await _player.setVolume(1.0);
-      await _player.play(AssetSource('images/sergeant_intro.mp4'));
-    } catch (e) {
-      debugPrint('alarm audio failed: $e');
-    }
-    _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
-      HapticFeedback.heavyImpact();
     });
   }
 
@@ -64,7 +53,6 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     _handingOff = true;
     _hapticTimer?.cancel();
     _tickTimer?.cancel();
-    await _player.stop();
     HapticFeedback.heavyImpact();
     if (!mounted) return;
     await Navigator.of(context).pushReplacement(
@@ -79,8 +67,6 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   void dispose() {
     _hapticTimer?.cancel();
     _tickTimer?.cancel();
-    _player.stop();
-    _player.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
