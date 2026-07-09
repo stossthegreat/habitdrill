@@ -6,6 +6,7 @@ import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../providers/habit_provider.dart';
 import '../services/analytics_service.dart';
+import '../widgets/wheel_time_picker.dart';
 import 'contracts_screen.dart' show PresetParams;
 
 class NewContractScreen extends ConsumerStatefulWidget {
@@ -116,15 +117,13 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _time,
-      builder: (context, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(primary: AppColors.emerald),
-        ),
-        child: child!,
-      ),
+    // Wheel picker — same UX as the wake-alarm flow. The Material
+    // clock face was too easy to mis-tap; the iOS wheel is universally
+    // familiar and hard to fumble at 6 a.m.
+    final picked = await showWheelTimePicker(
+      context,
+      initial: _time,
+      title: 'ALARM TIME',
     );
     if (picked != null) setState(() => _time = picked);
   }
