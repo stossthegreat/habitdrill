@@ -206,30 +206,48 @@ class AlarmService {
       int successCount = 0;
       int failCount = 0;
 
-      // On iOS 26+ we ALSO schedule via AlarmKit — real system alarms that
-      // ring through the silent switch and Focus modes by design.
+      // AlarmKit (iOS 26+): the next upcoming fire gets the FULL
+      // 30-alarm cascade — one alarm every 10 seconds for 5 minutes.
+      // Dismissing one just means another rings 10 s later. Only
+      // completing reps cancels the queue (see cancelWakeAlarmKitRetries).
       //
-      // ONE alarm per weekday. AlarmKit alarms ring until the user
-      // dismisses them by design — no cascade needed. The app then
-      // FORCES the punishment screen (see PunishmentGate) so they can't
-      // just go back to the home screen and pretend.
+      // Other weekdays each get one seed alarm; the cascade is rebuilt
+      // for THAT day when the app resumes on or before that fire
+      // (see rescheduleWakeAlarms).
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       if (alarmKitAvailable) {
+        final tz.TZDateTime akNextFire = habit.repeatDays
+            .map((d) => _getNextAlarmTime(d, habit.timeOfDay))
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+        final int akNextFireDay = _dayForTz(akNextFire);
+
         for (final day in habit.repeatDays) {
           final baseAlarmId = _getAlarmId(habit.id, day);
           final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
-          final akId = _uuidFromInt(baseAlarmId * 100);
-          try {
-            await AlarmKitService.cancel(akId);
-            final ok = await AlarmKitService.schedule(
-              id: akId,
-              title: 'ORDER: ${habit.title.toUpperCase()}',
-              fireAt: fireDate.toLocal(),
-              habitId: habit.id,
-            );
-            debugPrint('   🛎️ AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}');
-          } catch (e) {
-            debugPrint('   ❌ AlarmKit ${_getDayName(day)}: $e');
+          final isNext = day == akNextFireDay
+              && fireDate.millisecondsSinceEpoch
+                  == akNextFire.millisecondsSinceEpoch;
+          final offsets = isNext ? _akCascadeOffsets : const [Duration.zero];
+
+          for (int r = 0; r < offsets.length; r++) {
+            final akId = _uuidFromInt(baseAlarmId * 100 + r);
+            final fireAt = fireDate.add(offsets[r]).toLocal();
+            try {
+              await AlarmKitService.cancel(akId);
+              final ok = await AlarmKitService.schedule(
+                id: akId,
+                title: r == 0
+                    ? 'ORDER: ${habit.title.toUpperCase()}'
+                    : 'GET UP: ${habit.title.toUpperCase()}',
+                fireAt: fireAt,
+                habitId: habit.id,
+              );
+              if (r == 0 || r == offsets.length - 1) {
+                debugPrint('   🛎️ AlarmKit ${_getDayName(day)} #$r: ${ok ? "scheduled" : "failed"}');
+              }
+            } catch (e) {
+              debugPrint('   ❌ AlarmKit ${_getDayName(day)} #$r: $e');
+            }
           }
         }
       }
@@ -609,39 +627,47 @@ class AlarmService {
     }
   }
 
-  /// Cascade offsets from the next upcoming fire. The phone rings on X
-  /// EVERY THREE SECONDS for the first minute — no escape by dismissing.
-  /// After that the intervals widen through 25 minutes so the alarm keeps
-  /// coming back if the user manages to silence it.
+  /// One alarm every 10 seconds for 5 minutes straight — 30 alarms total.
+  /// Under the hood these are separate AlarmKit alarms, but the user
+  /// experience is "the alarm won't die": dismiss one → 10 seconds
+  /// later another rings → dismiss → another → until they finish reps
+  /// (at which point cancelWakeAlarmKitRetries kills every remaining
+  /// one).
   ///
-  /// Applied ONLY to the next upcoming fire (see scheduleAlarm) so the
-  /// pending-alarm count stays manageable — 24 cascade slots + 6 other
-  /// weekdays = 30 AlarmKit alarms per wake habit.
+  /// Only applied to the NEXT upcoming fire; other weekdays get the
+  /// single initial alarm. Total per habit: 30 + 6 = 36 AlarmKit
+  /// alarms. Well within iOS limits.
   static const List<Duration> _akCascadeOffsets = [
     Duration.zero,
-    Duration(seconds: 3),
-    Duration(seconds: 6),
-    Duration(seconds: 9),
-    Duration(seconds: 12),
-    Duration(seconds: 15),
-    Duration(seconds: 18),
-    Duration(seconds: 21),
-    Duration(seconds: 24),
-    Duration(seconds: 27),
+    Duration(seconds: 10),
+    Duration(seconds: 20),
     Duration(seconds: 30),
-    Duration(seconds: 35),
-    Duration(seconds: 42),
+    Duration(seconds: 40),
     Duration(seconds: 50),
     Duration(seconds: 60),
+    Duration(seconds: 70),
     Duration(seconds: 80),
-    Duration(seconds: 105),
-    Duration(minutes: 2, seconds: 30),
-    Duration(minutes: 4),
-    Duration(minutes: 6),
-    Duration(minutes: 9),
-    Duration(minutes: 13),
-    Duration(minutes: 18),
-    Duration(minutes: 25),
+    Duration(seconds: 90),
+    Duration(seconds: 100),
+    Duration(seconds: 110),
+    Duration(seconds: 120),
+    Duration(seconds: 130),
+    Duration(seconds: 140),
+    Duration(seconds: 150),
+    Duration(seconds: 160),
+    Duration(seconds: 170),
+    Duration(seconds: 180),
+    Duration(seconds: 190),
+    Duration(seconds: 200),
+    Duration(seconds: 210),
+    Duration(seconds: 220),
+    Duration(seconds: 230),
+    Duration(seconds: 240),
+    Duration(seconds: 250),
+    Duration(seconds: 260),
+    Duration(seconds: 270),
+    Duration(seconds: 280),
+    Duration(seconds: 290),
   ];
 
   /// Schedule a test alarm (fires in 1 minute)
