@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.2+576
+version: 1.0.2+577
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,9 +14,13 @@ dependencies:
   # State Management
   flutter_riverpod: ^2.4.9
 
-  # Firebase & Authentication
-  firebase_core: ^3.1.0
-  firebase_analytics: ^11.4.2
+  # Firebase & Authentication — PINNED (not ^) so Codemagic doesn't pull
+  # the buggy 11.15.x Firebase iOS SDK whose Package.swift declares a
+  # broken FirebaseFunctionsCombineSwift target ("invalid custom path
+  # 'FirebaseCombineSwift/Sources/Functions'") that fails SPM
+  # resolution. 3.6.0 → Firebase iOS 11.4.0, well before that bug.
+  firebase_core: 3.6.0
+  firebase_analytics: 11.3.3
 
   # Local Storage
   hive: ^2.2.3
