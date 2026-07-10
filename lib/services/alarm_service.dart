@@ -639,20 +639,20 @@ class AlarmService {
     }
   }
 
-  /// One AlarmKit alarm every 10 seconds for the next 30 minutes —
-  /// 180 alarms total. Under the hood these are separate AlarmKit
+  /// One AlarmKit alarm every 10 seconds — 30 alarms, 5 minutes of
+  /// nonstop ringing. Under the hood these are separate AlarmKit
   /// alarms, but the user experience is "the alarm won't die":
-  /// dismiss one → 10 seconds later another rings → dismiss → another
-  /// → until they finish reps (at which point
-  /// cancelWakeAlarmKitRetries kills every remaining one).
+  /// dismiss one → 10 seconds later another rings → dismiss →
+  /// another → until they finish reps (cancelWakeAlarmKitRetries
+  /// then kills every remaining one).
   ///
-  /// 30 minutes covers the exercise window (5 min wake screen + intro
-  /// video + 5-min countdown + rep-counting) with generous headroom.
-  /// Only applied to the NEXT upcoming fire; other weekdays get the
-  /// single initial alarm. Total per habit: 180 + 6 = 186 AlarmKit
-  /// alarms — well within iOS's per-app limit.
+  /// ⚠️ AlarmKit caps at ~100 scheduled alarms PER APP. Previously
+  /// we tried 180 here to cover a 30-min workout — every schedule
+  /// call silently exceeded that ceiling and NO alarms fired. Stay
+  /// under 100. Total per habit at 30 cascade + 6 seed for other
+  /// weekdays = 36 alarms, leaving generous headroom.
   static final List<Duration> _akCascadeOffsets = List<Duration>.generate(
-    180,
+    30,
     (i) => Duration(seconds: 10 * i),
   );
 
