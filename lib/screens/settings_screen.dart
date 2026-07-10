@@ -48,6 +48,22 @@ class SettingsScreen extends StatelessWidget {
                       height: 1,
                     ),
                   ),
+                  const Spacer(),
+                  // Close X — Settings is now only reached via the
+                  // header gear icon (no tab), so it always needs a
+                  // way out.
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white.withOpacity(0.55),
+                        size: 24,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),

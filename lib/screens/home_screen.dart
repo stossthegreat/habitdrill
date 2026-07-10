@@ -790,15 +790,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Streak — big fire icon with the number visible outside the
-              // badge so it reads instantly.
               _HeaderIcon(
                 icon: LucideIcons.flame,
                 color: AppColors.fire,
                 badge: _bestStreak > 0 ? '$_bestStreak' : null,
                 onTap: _showShareCard,
               ),
-              const SizedBox(width: 6),
               _HeaderIcon(
                 icon: LucideIcons.award,
                 color: const Color(0xFFF59E0B),
@@ -806,9 +803,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   MaterialPageRoute(builder: (_) => const AchievementsScreen()),
                 ),
               ),
-              const SizedBox(width: 6),
-              // Settings replaces Share here. Share moved to the Profile
-              // tab where the share card actually lives.
+              // Settings replaces Share here. Share moved to Profile.
               _HeaderIcon(
                 icon: LucideIcons.settings,
                 color: Colors.white.withOpacity(0.7),
@@ -837,37 +832,19 @@ class _HeaderIcon extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(8),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Ringed disc — icons now render as status badges (36pt
-            // circle with colored border and matching glow) so the
-            // streak flame and the achievement medal command the row.
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.14),
-                shape: BoxShape.circle,
-                border: Border.all(color: color.withOpacity(0.55), width: 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 14,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: color, size: 19),
-            ),
+            // Simple flat icons. Reverted from the ringed-disc style
+            // that was throwing the header spacing off.
+            Icon(icon, color: color, size: 22),
             if (badge != null)
               Positioned(
                 right: -6,
                 top: -4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(8),

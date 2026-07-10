@@ -2,7 +2,6 @@ import Flutter
 import UIKit
 #if canImport(AlarmKit)
 import AlarmKit
-import AppIntents
 #endif
 
 /// Bridges Flutter → AlarmKit (iOS 26+).
@@ -59,16 +58,22 @@ import AppIntents
       }
     case "schedule":
       if #available(iOS 26.0, *) {
+        // ⚠️ Cast fireAtMs via NSNumber, not `as? Int64`. Flutter sends
+        // Dart ints as NSNumber; direct `as? Int64` fails on some
+        // devices and returns nil — which silently killed every single
+        // alarm we scheduled. NSNumber.int64Value is the correct
+        // bridge and works everywhere.
         guard let args = call.arguments as? [String: Any],
               let idString = args["id"] as? String,
               let uuid = UUID(uuidString: idString),
               let title = args["title"] as? String,
-              let fireAtMs = args["fireAtMs"] as? Int64 else {
+              let msNumber = args["fireAtMs"] as? NSNumber else {
           result(FlutterError(code: "bad_args",
                               message: "schedule needs id, title, fireAtMs",
                               details: nil))
           return
         }
+        let fireAtMs = msNumber.int64Value
         let fireAt = Date(timeIntervalSince1970: TimeInterval(fireAtMs) / 1000.0)
         let habitId = args["habitId"] as? String ?? ""
         Task { [weak self] in
@@ -127,29 +132,24 @@ import AppIntents
   @available(iOS 26.0, *)
   private func schedule(uuid: UUID, title: String, fireAt: Date, habitId: String, result: @escaping FlutterResult) async {
     do {
-      // Fire once at fireAt. Weekly repeat + retries are handled by the
-      // Flutter side scheduling multiple AlarmKit alarms per weekday.
       let schedule = Alarm.Schedule.fixed(fireAt)
 
-      // Two-button alert:
-      //   • STOP (X)     — dismisses ringing.
-      //   • OPEN (arrow) — custom secondary that runs an AppIntent to
-      //     hand the user directly into the wake exercise. Erly-style.
+      // MINIMAL alarm — STOP button only, no secondary/no custom
+      // intent. Adding a LiveActivityIntent required a widget
+      // extension we haven't shipped; without it, AlarmKit could
+      // throw AT SCHEDULE TIME and every alarm would silently fail.
+      // The Flutter side's PunishmentGate detects the wake via
+      // WakeDebtService.findDueWakeHabit and force-shows the
+      // punishment screen the instant the app foregrounds — same
+      // final experience with a config that actually schedules.
       let stopButton = AlarmButton(
         text: "STOP",
         textColor: .white,
         systemImageName: "xmark.circle.fill"
       )
-      let openButton = AlarmButton(
-        text: "OPEN",
-        textColor: .white,
-        systemImageName: "arrow.right.circle.fill"
-      )
       let alert = AlarmPresentation.Alert(
         title: LocalizedStringResource(stringLiteral: title),
-        stopButton: stopButton,
-        secondaryButton: openButton,
-        secondaryButtonBehavior: .custom
+        stopButton: stopButton
       )
       let presentation = AlarmPresentation(alert: alert)
 
@@ -160,10 +160,9 @@ import AppIntents
       )
 
       let config = AlarmManager.AlarmConfiguration(
-        countdownDuration: nil,      // no snooze / pre-alert
+        countdownDuration: nil,
         schedule: schedule,
         attributes: attributes,
-        secondaryIntent: OpenWakeIntent(habitId: habitId),
         sound: .default
       )
 
@@ -183,30 +182,5 @@ import AppIntents
 struct HabitDrillMetadata: AlarmMetadata {
   let habitId: String
   init(habitId: String = "") { self.habitId = habitId }
-}
-
-/// AppIntent invoked when the user taps the OPEN button on the alarm.
-/// Opens the app (openAppWhenRun) and drops the fired habit ID into the
-/// same UserDefaults keys that AlarmService.consumeRecentAlarmTap reads
-/// (SharedPreferences on the Dart side lives under the "flutter." prefix).
-/// PunishmentGate picks it up on resume and pushes MorningAlarmScreen.
-@available(iOS 26.0, *)
-struct OpenWakeIntent: LiveActivityIntent {
-  static var title: LocalizedStringResource = "Open Wake"
-  static var openAppWhenRun: Bool = true
-
-  @Parameter(title: "Habit ID")
-  var habitId: String
-
-  init() { self.habitId = "" }
-  init(habitId: String) { self.habitId = habitId }
-
-  func perform() async throws -> some IntentResult {
-    let defaults = UserDefaults.standard
-    defaults.set(habitId, forKey: "flutter.last_alarm_tapped_habit")
-    defaults.set(Int(Date().timeIntervalSince1970 * 1000),
-                 forKey: "flutter.last_alarm_tapped_at")
-    return .result()
-  }
 }
 #endif

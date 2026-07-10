@@ -35,31 +35,14 @@ class AlarmService {
     try {
       debugPrint('🔧 Initializing AlarmService...');
 
-      // Permissions are NOT requested here anymore — the onboarding flow
-      // asks the user in-context (see _PermissionAsk screens). Auto-
-      // requesting at app launch before any screen explains why is what
-      // tanks grant-rate. We just check the current status.
+      // NO permission requests here. Every one of them auto-firing
+      // at launch is what put "alarm permission" on the first screen
+      // of onboarding no matter how we structured the flow. All three
+      // (notification, exact-alarm, AlarmKit authorization) now
+      // happen inline via the onboarding permission screens or lazily
+      // inside scheduleAlarm() when the user actually needs them.
       final notifStatus = await Permission.notification.status;
       debugPrint('Notification permission (status only): $notifStatus');
-
-      // Android exact-alarm permission is different — it's a system
-      // pass-through with no in-context ask, so we still request it here.
-      if (Platform.isAndroid) {
-        final alarmStatus = await Permission.scheduleExactAlarm.request();
-        debugPrint('Exact alarm permission: $alarmStatus');
-      }
-
-      // AlarmKit permission is iOS 26+ only. Bridge returns "unsupported"
-      // on older iOS, so this is a safe no-op there.
-      if (Platform.isIOS && await AlarmKitService.isAvailable()) {
-        final status = await AlarmKitService.authorizationStatus();
-        if (status == 'notDetermined') {
-          final result = await AlarmKitService.requestAuthorization();
-          debugPrint('AlarmKit permission: $result');
-        } else {
-          debugPrint('AlarmKit permission (existing): $status');
-        }
-      }
 
       // Initialize notification plugin.
       //
@@ -226,7 +209,16 @@ class AlarmService {
       // Other weekdays each get one seed alarm; the cascade is rebuilt
       // for THAT day when the app resumes on or before that fire
       // (see rescheduleWakeAlarms).
+      // Lazy AlarmKit permission ask. First alarm scheduling triggers
+      // the request; subsequent calls just check status. Keeps the
+      // permission out of app launch and out of onboarding page 1.
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
+      if (alarmKitAvailable) {
+        final akStatus = await AlarmKitService.authorizationStatus();
+        if (akStatus == 'notDetermined') {
+          await AlarmKitService.requestAuthorization();
+        }
+      }
       if (alarmKitAvailable) {
         final tz.TZDateTime akNextFire = habit.repeatDays
             .map((d) => _getNextAlarmTime(d, habit.timeOfDay))
