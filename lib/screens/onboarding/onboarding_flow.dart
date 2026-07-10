@@ -1557,7 +1557,7 @@ class _EscalationWarning extends StatelessWidget {
                   ).animate().fadeIn(),
                   const SizedBox(height: 4),
                   const Text(
-                    '+5 REPS.',
+                    '+2 REPS.',
                     style: TextStyle(
                       color: AppColors.emerald,
                       fontSize: 36,
@@ -1572,7 +1572,9 @@ class _EscalationWarning extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _MinuteRow(
                         minute: i + 1,
-                        reps: reps + i * 5,
+                        // +2 reps per minute (matches
+                        // WakeDebtService.repsPerMinute).
+                        reps: reps + i * 2,
                       ).animate(delay: (400 + i * 100).ms).fadeIn(duration: 300.ms).slideX(begin: 0.05, end: 0),
                     ),
                   const SizedBox(height: 16),
@@ -1674,7 +1676,7 @@ class _MinuteRow extends StatelessWidget {
           ),
           if (penalty)
             Text(
-              '+5',
+              '+2',
               style: TextStyle(
                 color: AppColors.error,
                 fontSize: 14,

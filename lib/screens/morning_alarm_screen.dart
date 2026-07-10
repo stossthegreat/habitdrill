@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../services/wake_debt_service.dart';
-import '../services/wake_siren_service.dart';
 import 'sergeant/wake_exercise_screen.dart';
 
 /// The morning wake alarm — Erly-killer.
@@ -30,6 +29,7 @@ class MorningAlarmScreen extends ConsumerStatefulWidget {
 }
 
 class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
+  Timer? _hapticTimer;
   Timer? _tickTimer;
   bool _handingOff = false;
 
@@ -38,11 +38,13 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     super.initState();
     WakeDebtService.markActive(widget.habit.id);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // The shark. Continuous looping siren + heavy haptic. Owned by
-    // WakeSirenService so it survives the navigation from this screen
-    // into WakeExerciseScreen — stops ONLY when reps complete (see
-    // WakeExerciseScreen._onWakeComplete → WakeSirenService.stop()).
-    WakeSirenService.start();
+    // NO in-app audio — the AlarmKit cascade is what makes the phone
+    // ring nonstop. A local AudioPlayer here (previous "wake siren"
+    // build) took ownership of the AVAudioSession and silenced every
+    // AlarmKit ring after the first. Just haptic + AlarmKit.
+    _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      HapticFeedback.heavyImpact();
+    });
     // Tick every 10s so the debt counter climbs live in front of them.
     _tickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
@@ -52,7 +54,7 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   Future<void> _handoffToExercise() async {
     if (_handingOff) return;
     _handingOff = true;
-    // DO NOT stop the siren here — it must ring through the workout.
+    _hapticTimer?.cancel();
     _tickTimer?.cancel();
     HapticFeedback.heavyImpact();
     if (!mounted) return;
@@ -73,9 +75,7 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
 
   @override
   void dispose() {
-    // DO NOT stop the siren here either. This screen may dispose when
-    // WakeExerciseScreen pushes over it or when the user pops back to
-    // this screen — the workout screen calls start() again defensively.
+    _hapticTimer?.cancel();
     _tickTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();

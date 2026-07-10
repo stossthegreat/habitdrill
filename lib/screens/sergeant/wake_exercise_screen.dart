@@ -14,7 +14,6 @@ import '../../services/alarm_service.dart';
 import '../../services/discipline_service.dart';
 import '../../services/wake_debt_service.dart';
 import '../../services/wake_mission_prefs.dart';
-import '../../services/wake_siren_service.dart';
 import 'exercise_circuit_screen.dart';
 import 'wake_complete_screen.dart';
 
@@ -55,10 +54,6 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // Defensive: WakeSirenService.start() is idempotent. If the user
-    // opened this screen via cold-start (skipping MorningAlarmScreen)
-    // we still want the siren wailing.
-    WakeSirenService.start();
     _buildSet();
     _initVideo();
   }
@@ -155,16 +150,12 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       }
     } catch (_) {}
 
-    // Stop the nag: cancel every escalation ping still queued for this
-    // habit, and drop the active-wake flag so cold-start doesn't route
-    // straight back into the wake screen.
-    try {
-      await AlarmService.cancelWakeEscalations(widget.habit.id);
-    } catch (_) {}
-    // KILL THE SHARK. Reps are done, siren stops.
-    try {
-      await WakeSirenService.stop();
-    } catch (_) {}
+    // Do NOT cancel escalations or the AlarmKit cascade here — the
+    // alarm must keep ringing right up until the WakeCompleteScreen
+    // mounts. That screen owns the cancel call in its initState so
+    // there is no gap between reps done and the finish screen where
+    // the alarm could go quiet. (Anti-cheat: user hits reps target,
+    // alarm still rings until they see the payoff.)
     await WakeDebtService.clearActive();
 
     // Hand off to the payoff screen — big MISSION COMPLETE + share card.
@@ -177,6 +168,7 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => WakeCompleteScreen(
+          habitId: widget.habit.id,
           habitTitle: widget.habit.title,
           reps: ex?.reps ?? 0,
           exerciseName: ex?.name ?? 'Reps',
