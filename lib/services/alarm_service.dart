@@ -625,48 +625,22 @@ class AlarmService {
     }
   }
 
-  /// One alarm every 10 seconds for 5 minutes straight — 30 alarms total.
-  /// Under the hood these are separate AlarmKit alarms, but the user
-  /// experience is "the alarm won't die": dismiss one → 10 seconds
-  /// later another rings → dismiss → another → until they finish reps
-  /// (at which point cancelWakeAlarmKitRetries kills every remaining
-  /// one).
+  /// One AlarmKit alarm every 10 seconds for the next 30 minutes —
+  /// 180 alarms total. Under the hood these are separate AlarmKit
+  /// alarms, but the user experience is "the alarm won't die":
+  /// dismiss one → 10 seconds later another rings → dismiss → another
+  /// → until they finish reps (at which point
+  /// cancelWakeAlarmKitRetries kills every remaining one).
   ///
+  /// 30 minutes covers the exercise window (5 min wake screen + intro
+  /// video + 5-min countdown + rep-counting) with generous headroom.
   /// Only applied to the NEXT upcoming fire; other weekdays get the
-  /// single initial alarm. Total per habit: 30 + 6 = 36 AlarmKit
-  /// alarms. Well within iOS limits.
-  static const List<Duration> _akCascadeOffsets = [
-    Duration.zero,
-    Duration(seconds: 10),
-    Duration(seconds: 20),
-    Duration(seconds: 30),
-    Duration(seconds: 40),
-    Duration(seconds: 50),
-    Duration(seconds: 60),
-    Duration(seconds: 70),
-    Duration(seconds: 80),
-    Duration(seconds: 90),
-    Duration(seconds: 100),
-    Duration(seconds: 110),
-    Duration(seconds: 120),
-    Duration(seconds: 130),
-    Duration(seconds: 140),
-    Duration(seconds: 150),
-    Duration(seconds: 160),
-    Duration(seconds: 170),
-    Duration(seconds: 180),
-    Duration(seconds: 190),
-    Duration(seconds: 200),
-    Duration(seconds: 210),
-    Duration(seconds: 220),
-    Duration(seconds: 230),
-    Duration(seconds: 240),
-    Duration(seconds: 250),
-    Duration(seconds: 260),
-    Duration(seconds: 270),
-    Duration(seconds: 280),
-    Duration(seconds: 290),
-  ];
+  /// single initial alarm. Total per habit: 180 + 6 = 186 AlarmKit
+  /// alarms — well within iOS's per-app limit.
+  static final List<Duration> _akCascadeOffsets = List<Duration>.generate(
+    180,
+    (i) => Duration(seconds: 10 * i),
+  );
 
   /// Schedule a test alarm (fires in 1 minute)
   static Future<void> scheduleTestAlarm() async {

@@ -14,7 +14,6 @@ import '../../services/alarm_service.dart';
 import '../../services/discipline_service.dart';
 import '../../services/wake_debt_service.dart';
 import '../../services/wake_mission_prefs.dart';
-import '../../services/wake_siren_service.dart';
 import 'exercise_circuit_screen.dart';
 import 'wake_complete_screen.dart';
 
@@ -55,10 +54,6 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // Defensive: WakeSirenService.start() is idempotent. If the user
-    // opened this screen via cold-start (skipping MorningAlarmScreen)
-    // we still want the siren wailing.
-    WakeSirenService.start();
     _buildSet();
     _initVideo();
   }
@@ -156,14 +151,9 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
     } catch (_) {}
 
     // Stop the nag: cancel every escalation ping still queued for this
-    // habit, and drop the active-wake flag so cold-start doesn't route
-    // straight back into the wake screen.
+    // habit, plus the whole AlarmKit cascade for the next fires.
     try {
       await AlarmService.cancelWakeEscalations(widget.habit.id);
-    } catch (_) {}
-    // KILL THE SHARK. Reps are done, siren stops.
-    try {
-      await WakeSirenService.stop();
     } catch (_) {}
     await WakeDebtService.clearActive();
 
