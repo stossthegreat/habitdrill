@@ -30,6 +30,12 @@ flutter_ios_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # Firebase version pinning is done in pubspec.yaml
+  # (firebase_core: 3.6.0 / firebase_analytics: 11.3.3). Those dart
+  # packages carry podspecs that lock Firebase iOS SDK to 11.4.0,
+  # which is pre-11.15 (11.15 broke SPM with an invalid
+  # FirebaseFunctionsCombineSwift custom path). No explicit `pod`
+  # lines here — that just fights CocoaPods' resolver.
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'RunnerTests' do

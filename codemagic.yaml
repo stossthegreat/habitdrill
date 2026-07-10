@@ -1,12 +1,26 @@
 # Codemagic workflow.
 #
-# Why this file exists: Flutter 3.24+ auto-adds Swift Package Manager
-# integration on `flutter build ipa`, and Firebase iOS SDK's SPM
-# Package.swift declares a broken `FirebaseFunctionsCombineSwift`
-# target ("invalid custom path 'FirebaseCombineSwift/Sources/Functions'")
-# that fails resolution even when the app doesn't import Firebase
-# Functions. We already use CocoaPods (see ios/Podfile) so SPM adds
-# nothing. Disable it before every build.
+# ⚠️ For this file to run, the Codemagic app MUST be set to "use
+# codemagic.yaml" in its Settings → Build → "Workflow settings" page.
+# If the app is on UI-configured workflow mode, this file is IGNORED
+# and the default Codemagic Flutter iOS steps run instead (which is
+# what happened in the previous builds — you saw the same "Adding
+# Swift Package Manager integration..." step, meaning our
+# `flutter config --no-enable-swift-package-manager` never ran).
+#
+# Why disabling SPM matters here:
+#   Flutter 3.24+ auto-adds Swift Package Manager integration on every
+#   `flutter build ipa`. When SPM resolves the firebase-ios-sdk package
+#   it walks every target in that Package.swift — including a broken
+#   `FirebaseFunctionsCombineSwift` target ("invalid custom path
+#   'FirebaseCombineSwift/Sources/Functions'"). We use CocoaPods only
+#   (see ios/Podfile) so SPM adds nothing here — just kill it.
+#
+# In addition to disabling SPM, we ALSO nuke the SPM artifacts cache
+# on the build machine. Codemagic's build image sometimes carries
+# partial downloads across runs ("file already exists in file system"
+# failures we saw), so wiping the cache and any local SPM state up
+# front is a belt-and-braces move.
 
 workflows:
   ios-workflow:
@@ -20,21 +34,39 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.habitdrill.habitdrill
     scripts:
+      - name: Clear Swift Package Manager cache (belt-and-braces)
+        script: |
+          set -e
+          rm -rf ~/Library/Caches/org.swift.swiftpm || true
+          rm -rf ~/Library/org.swift.swiftpm || true
+          rm -rf ~/Library/Developer/Xcode/DerivedData || true
+          rm -rf ios/.symlinks || true
+          rm -rf ios/Pods || true
+          rm -f  ios/Podfile.lock || true
+          rm -rf build || true
       - name: Disable Flutter's Swift Package Manager integration
         script: |
+          set -e
           flutter config --no-enable-swift-package-manager
-      - name: Get Flutter packages
+          flutter config
+      - name: Flutter clean + pub get
         script: |
+          set -e
+          flutter clean
           flutter pub get
       - name: Install CocoaPods
         script: |
-          cd ios && pod install
+          set -e
+          cd ios
+          pod install --repo-update
       - name: Set up code signing
         script: |
           xcode-project use-profiles
       - name: Flutter build ipa
         script: |
+          set -e
           flutter build ipa --release \
+            --no-tree-shake-icons \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
