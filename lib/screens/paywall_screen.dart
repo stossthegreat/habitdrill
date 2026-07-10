@@ -87,24 +87,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 40),
 
               // The manifesto — headline + four short beats + closer.
-              // Fits on one screen with the CTA; disclosure scrolls
-              // below.
+              // Sized so the CTA lands at the bottom of the viewport
+              // with everything fully readable above. No scrolling to
+              // reach the purchase button; the legal footer scrolls in.
               const Text(
                 'STOP LOSING\nTO YOURSELF.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 32,
+                  fontSize: 46,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
+                  letterSpacing: -1,
                   height: 1.02,
                 ),
               ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.06, end: 0),
 
-              const SizedBox(height: 22),
+              const SizedBox(height: 32),
 
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -116,21 +117,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
 
               Text(
                 "The Sergeant doesn't care how you feel.\nHe cares whether you did it.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
-                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   fontStyle: FontStyle.italic,
                   height: 1.45,
                 ),
               ).animate(delay: 700.ms).fadeIn(),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 36),
 
               // Plan toggle
               Container(
@@ -290,9 +291,9 @@ class _ManifestoBeat extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Colors.white.withOpacity(0.9),
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.2,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.3,
           height: 1.2,
         ),
       ),

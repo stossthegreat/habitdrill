@@ -409,127 +409,117 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final streak = habit.streak;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDone
-              ? [
-                  AppColors.emerald.withOpacity(0.28),
-                  AppColors.emerald.withOpacity(0.06),
-                ]
-              : [
-                  const Color(0xFF12130A),
-                  const Color(0xFF080904),
-                ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF0B0B0B),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDone
-              ? AppColors.emerald.withOpacity(0.55)
-              : AppColors.emerald.withOpacity(0.25),
-          width: 1.2,
+              ? AppColors.emerald.withOpacity(0.5)
+              : Colors.white.withOpacity(0.06),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.emerald.withOpacity(isDone ? 0.35 : 0.12),
-            blurRadius: 26,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Big time.
-              Text(
-                time,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 54,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -2,
-                  height: 1,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              const Spacer(),
-              // Status pill.
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (isDone ? AppColors.emerald : AppColors.fire).withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: (isDone ? AppColors.emerald : AppColors.fire).withOpacity(0.55),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  isDone ? 'DONE' : 'ARMED',
-                  style: TextStyle(
-                    color: isDone ? AppColors.emerald : AppColors.fire,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+          // Big time — the only thing that dominates.
           Text(
-            habit.title.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
+            time,
+            style: TextStyle(
+              color: isDone
+                  ? AppColors.emerald
+                  : Colors.white.withOpacity(0.98),
+              fontSize: 44,
               fontWeight: FontWeight.w900,
-              letterSpacing: 2,
+              letterSpacing: -1.5,
               height: 1,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(
-                Icons.alarm_rounded,
-                color: Colors.white.withOpacity(0.4),
-                size: 12,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                _daysLabel(habit.repeatDays),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              if (streak > 0) ...[
-                const SizedBox(width: 10),
-                const Text('🔥', style: TextStyle(fontSize: 11)),
-                const SizedBox(width: 2),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  '$streak',
-                  style: TextStyle(
-                    color: AppColors.fire,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                  habit.title.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                    height: 1.1,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      _daysLabel(habit.repeatDays),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.35),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    if (streak > 0) ...[
+                      Text(
+                        '  ·  ',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.15),
+                          fontSize: 10,
+                        ),
+                      ),
+                      const Text('🔥', style: TextStyle(fontSize: 10)),
+                      Text(
+                        ' $streak',
+                        style: TextStyle(
+                          color: AppColors.fire.withOpacity(0.9),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
-            ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Status indicator — small circle. Emerald ring + check when
+          // done, quiet alarm icon when armed.
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDone
+                  ? AppColors.emerald.withOpacity(0.15)
+                  : Colors.white.withOpacity(0.04),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDone
+                    ? AppColors.emerald
+                    : Colors.white.withOpacity(0.15),
+                width: 1.4,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              isDone ? Icons.check_rounded : Icons.alarm_rounded,
+              color: isDone
+                  ? AppColors.emerald
+                  : Colors.white.withOpacity(0.55),
+              size: 20,
+            ),
           ),
         ],
       ),
-    ).animate(delay: (index * 60).ms).fadeIn(duration: 300.ms).slideY(begin: 0.05, end: 0);
+    ).animate(delay: (index * 60).ms).fadeIn(duration: 300.ms).slideY(begin: 0.04, end: 0);
   }
 
   String _daysLabel(List<int> days) {

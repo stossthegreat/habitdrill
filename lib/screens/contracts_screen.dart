@@ -88,13 +88,15 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
       await _openNewWakeAlarm();
     } else if (choice == 'contract') {
       HapticFeedback.selectionClick();
+      // Empty title so the field stays as placeholder — user types
+      // their own goal. Type + default emoji + duration primed.
       await Navigator.of(context).push(
         MaterialPageRoute(
           fullscreenDialog: true,
           builder: (_) => const NewContractScreen(
             preset: PresetParams(
-              title: 'Exercise',
-              emoji: '💪',
+              title: '',
+              emoji: '🎯',
               targetDays: 30,
               type: 'habit',
             ),
@@ -108,7 +110,7 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
           fullscreenDialog: true,
           builder: (_) => const NewContractScreen(
             preset: PresetParams(
-              title: 'Quit Porn',
+              title: '',
               emoji: '🚫',
               targetDays: 90,
               type: 'bad_habit',
@@ -202,7 +204,7 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
               ],
               SliverToBoxAdapter(
                 child: _SectionLabel(
-                  label: 'CONTRACTS',
+                  label: 'LAWS & CONTRACTS',
                   count: contracts.length,
                 ),
               ),
