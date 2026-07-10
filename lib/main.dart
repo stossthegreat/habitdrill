@@ -92,19 +92,20 @@ Future<void> main() async {
       debugPrint('AlarmService init failed: $e');
     }
 
-    // Configure iOS audio session so alarm + sergeant audio play at full
-    // volume even when the phone is on silent. This is what Alarmy /
-    // Sleep Cycle do — AVAudioSessionCategory.playback overrides the
-    // physical silent switch for our session.
+    // Configure iOS audio session so alarm + sergeant audio play at
+    // full volume even when the phone is on silent. This is what
+    // Alarmy / Sleep Cycle do — AVAudioSessionCategory.playback
+    // overrides the physical silent switch for our session.
+    //
+    // NOTE: no `duckOthers` — we run our own in-app "shark" siren
+    // (WakeSirenService) that must play ALONGSIDE the AlarmKit
+    // cascade, not duck it. `mixWithOthers` lets both play.
     try {
       await AudioPlayer.global.setAudioContext(
         const AudioContext(
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: [
-              AVAudioSessionOptions.mixWithOthers,
-              AVAudioSessionOptions.duckOthers,
-            ],
+            options: [AVAudioSessionOptions.mixWithOthers],
           ),
           android: AudioContextAndroid(
             isSpeakerphoneOn: false,
@@ -344,18 +345,15 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   }
 
   void _checkForPunishment() async {
-    final isPro = await PremiumService.isPremium();
-    if (!isPro) return;
-
-    await SergeantService.scanForOverdueToday();
-
-    final violation = SergeantService.getWorstPendingViolation();
-    if (violation != null && mounted) {
-      setState(() {
-        _activeViolation = violation;
-        _showPunishment = true;
-      });
-    }
+    // The legacy violation-based PunishmentScreen (spawned when a rule
+    // or contract went overdue) has been retired. The ONLY punishment
+    // in HabitDrill now is the morning-wake workout gate above. Users
+    // reported the old screen firing on top of the wake flow as
+    // "second punishment popping up after morning workout" — this
+    // no-op fixes that. Kept as a stub so all the wiring
+    // (initState/postFrameCallback/didChangeAppLifecycleState) can
+    // stay untouched.
+    return;
   }
 
   void _onPunishmentComplete() {
