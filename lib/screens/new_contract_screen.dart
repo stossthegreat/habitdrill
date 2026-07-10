@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../providers/habit_provider.dart';
+import '../services/alarm_service.dart';
 import '../services/analytics_service.dart';
+import '../services/normal_reminder_registry.dart';
 import '../widgets/wheel_time_picker.dart';
 import 'contracts_screen.dart' show PresetParams;
 import 'main_screen.dart' show MainNav;
@@ -195,6 +197,7 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
     final startDate = _isEdit ? widget.edit!.startDate : DateTime.now();
     final endDate = startDate.add(Duration(days: _durationDays));
 
+    Habit? saved;
     try {
       final engine = ref.read(habitEngineProvider);
       if (_isEdit) {
@@ -210,8 +213,9 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
           emoji: emoji,
         );
         await engine.updateHabit(updated);
+        saved = updated;
       } else {
-        await engine.createHabit(
+        saved = await engine.createHabit(
           title: title,
           type: _type,
           time: timeStr,
@@ -227,6 +231,27 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       debugPrint('Contract save failed: $e');
       if (mounted) setState(() => _saving = false);
       return;
+    }
+    // Contracts and laws want a NORMAL single-ping reminder, NOT the
+    // drill-sergeant wake cascade. Register the habit id so
+    // AlarmService uses the single-notification path and
+    // PunishmentGate skips it. If the user turned the alarm off, we
+    // still register (harmless — the scheduler bails on !reminderOn).
+    if (saved != null && reminderOn && timeStr.isNotEmpty) {
+      try {
+        await NormalReminderRegistry.mark(saved.id);
+        // Kick a reschedule so the notification is registered with iOS
+        // right now — otherwise the user gets nothing until the next
+        // app resume.
+        await AlarmService.scheduleAlarm(saved);
+      } catch (e) {
+        debugPrint('Contract reminder scheduling failed: $e');
+      }
+    } else if (saved != null) {
+      // Alarm removed on edit — clear the registry entry.
+      try {
+        await NormalReminderRegistry.unmark(saved.id);
+      } catch (_) {}
     }
     // 1) Explicitly switch MainScreen to the Contracts tab BEFORE
     //    popping. Without this the user would land on whatever tab

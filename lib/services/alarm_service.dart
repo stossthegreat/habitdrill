@@ -10,6 +10,7 @@ import '../models/habit.dart';
 import '../models/violation.dart';
 import '../models/escalation_config.dart';
 import 'alarmkit_service.dart';
+import 'normal_reminder_registry.dart';
 
 class AlarmService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -198,6 +199,14 @@ class AlarmService {
       // Cancel existing alarms so we don't duplicate notifications
       await cancelAlarm(habit.id);
 
+      // Contract/law reminders: single weekly ping per repeat day.
+      // No AlarmKit cascade, no escalation ladder — just a normal
+      // notification that tells them "hey, your rule/order is up."
+      if (NormalReminderRegistry.isNormalReminder(habit.id)) {
+        await _scheduleContractReminder(habit);
+        return;
+      }
+
       int successCount = 0;
       int failCount = 0;
 
@@ -364,6 +373,66 @@ class AlarmService {
       debugPrint('❌ scheduleAlarm error: $e');
       debugPrint('Stack: $stack');
     }
+  }
+
+  /// Schedule a plain, non-cascading reminder for contracts and laws.
+  /// One notification per repeat day, matches iOS's dayOfWeekAndTime
+  /// so it repeats weekly on its own. NO AlarmKit cascade, NO
+  /// escalation ping ladder, NO punishment gate — this ping just
+  /// tells them "your contract time is up."
+  static Future<void> _scheduleContractReminder(Habit habit) async {
+    int successCount = 0;
+    for (final day in habit.repeatDays) {
+      final baseAlarmId = _getAlarmId(habit.id, day);
+      final pingId = baseAlarmId * 100; // slot 0
+      final fireTime = _getNextAlarmTime(day, habit.timeOfDay);
+      try {
+        await _notifications.zonedSchedule(
+          pingId,
+          '⏰ ${habit.title}',
+          habit.type == 'bad_habit'
+              ? "Stay honest with your rule."
+              : "It's time. Show up.",
+          fireTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              _channelName,
+              channelDescription: _channelDescription,
+              importance: Importance.high,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+              enableLights: true,
+              autoCancel: true,
+            ),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentSound: true,
+              presentBadge: true,
+              interruptionLevel: InterruptionLevel.active,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: habit.id,
+        );
+        _scheduledAlarms[pingId] = {
+          'habitTitle': habit.title,
+          'habitId': habit.id,
+          'day': day,
+          'time': habit.time,
+          'kind': 'contract_reminder',
+          'scheduledAt': fireTime.toIso8601String(),
+        };
+        successCount++;
+      } catch (e) {
+        debugPrint('   ❌ contract reminder ${_getDayName(day)}: $e');
+      }
+    }
+    debugPrint('📣 Contract reminder scheduled ($successCount days) for "${habit.title}"');
   }
 
   /// Cancel all alarms for a habit
@@ -639,20 +708,20 @@ class AlarmService {
     }
   }
 
-  /// One AlarmKit alarm every 10 seconds for the next 30 minutes —
-  /// 180 alarms total. Under the hood these are separate AlarmKit
+  /// One AlarmKit alarm every 10 seconds — 30 alarms, 5 minutes of
+  /// nonstop ringing. Under the hood these are separate AlarmKit
   /// alarms, but the user experience is "the alarm won't die":
-  /// dismiss one → 10 seconds later another rings → dismiss → another
-  /// → until they finish reps (at which point
-  /// cancelWakeAlarmKitRetries kills every remaining one).
+  /// dismiss one → 10 seconds later another rings → dismiss →
+  /// another → until they finish reps (cancelWakeAlarmKitRetries
+  /// then kills every remaining one).
   ///
-  /// 30 minutes covers the exercise window (5 min wake screen + intro
-  /// video + 5-min countdown + rep-counting) with generous headroom.
-  /// Only applied to the NEXT upcoming fire; other weekdays get the
-  /// single initial alarm. Total per habit: 180 + 6 = 186 AlarmKit
-  /// alarms — well within iOS's per-app limit.
+  /// ⚠️ AlarmKit caps at ~100 scheduled alarms PER APP. Previously
+  /// we tried 180 here to cover a 30-min workout — every schedule
+  /// call silently exceeded that ceiling and NO alarms fired. Stay
+  /// under 100. Total per habit at 30 cascade + 6 seed for other
+  /// weekdays = 36 alarms, leaving generous headroom.
   static final List<Duration> _akCascadeOffsets = List<Duration>.generate(
-    180,
+    30,
     (i) => Duration(seconds: 10 * i),
   );
 
