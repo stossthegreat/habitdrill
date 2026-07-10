@@ -1023,6 +1023,17 @@ class _RescueOfferState extends State<_RescueOffer> {
 
   @override
   Widget build(BuildContext context) {
+    // Post-reveal: a full white-theme paywall page that matches the
+    // reference screenshot 1:1. Pre-reveal: keep the dark wheel-of-
+    // fortune vibe. Nothing about the wheel changes.
+    if (_revealed) {
+      return _RescueRevealPage(
+        loading: widget.loading,
+        onPurchase: widget.onPurchase,
+        onDecline: widget.onDecline,
+        onRestore: widget.onRestore,
+      );
+    }
     return Column(
       children: [
         _TopRow(onClose: widget.onDecline, onRestore: widget.onRestore),
@@ -1034,7 +1045,7 @@ class _RescueOfferState extends State<_RescueOffer> {
               children: [
                 const SizedBox(height: 8),
                 Text(
-                  _revealed ? 'Locked in.' : 'Spinning your rescue.',
+                  'Spinning your rescue.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.55),
@@ -1043,10 +1054,10 @@ class _RescueOfferState extends State<_RescueOffer> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  _revealed ? 'You got the deal.' : 'Hold on…',
+                const Text(
+                  'Hold on…',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 30,
                     fontWeight: FontWeight.w900,
@@ -1055,43 +1066,12 @@ class _RescueOfferState extends State<_RescueOffer> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 380),
-                  curve: Curves.easeOutCubic,
-                  child: _revealed
-                      ? _RevealCard(
-                          loading: widget.loading,
-                          onPurchase: widget.onPurchase,
-                        )
-                      : Center(
-                          child: _SlotStrip(onDone: () {
-                            if (mounted) setState(() => _revealed = true);
-                          }),
-                        ),
+                Center(
+                  child: _SlotStrip(onDone: () {
+                    if (mounted) setState(() => _revealed = true);
+                  }),
                 ),
                 const SizedBox(height: 22),
-                if (_revealed) ...[
-                  Center(
-                    child: GestureDetector(
-                      onTap: widget.onDecline,
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Text(
-                          'No thanks',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.35),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _LegalFooter(onRestore: widget.onRestore),
-                ],
-                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -1280,20 +1260,18 @@ class _WheelPainter extends CustomPainter {
     for (int i = 0; i < slices; i++) {
       final rect = Rect.fromCircle(center: center, radius: radius);
       final sliceStart = startAngle + (i * sliceAngle);
-      final isPrize = i == prizeIndex;
+      // Every slice is identical — no visible prize marker. Just a
+      // gentle even/odd alternation so the divisions read at a glance.
+      // The pointer still mechanically lands on prizeIndex; the reveal
+      // card afterwards is what tells the user they won.
       final fill = Paint()
         ..style = PaintingStyle.fill
         ..shader = SweepGradient(
           startAngle: sliceStart,
           endAngle: sliceStart + sliceAngle,
-          colors: isPrize
-              ? [
-                  const Color(0xFF10B981),
-                  const Color(0xFF059669),
-                ]
-              : (i.isEven
-                  ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
-                  : [const Color(0xFF141414), const Color(0xFF080808)]),
+          colors: i.isEven
+              ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
+              : [const Color(0xFF141414), const Color(0xFF080808)],
         ).createShader(rect);
 
       canvas.drawArc(rect, sliceStart, sliceAngle, true, fill);
@@ -1310,25 +1288,19 @@ class _WheelPainter extends CustomPainter {
         divider,
       );
 
-      // Label — question mark for the mystery slices, prize glyph for
-      // the winner. Rendered along the mid-angle at 60% of the radius.
+      // Same "?" glyph on every slice — no prize giveaway before the
+      // reveal card.
       final midAngle = sliceStart + sliceAngle / 2;
       final labelRadius = radius * 0.65;
       final labelPos = center +
           Offset(cos(midAngle) * labelRadius, sin(midAngle) * labelRadius);
-      final label = isPrize ? '£' : '?';
       final tp = TextPainter(
         text: TextSpan(
-          text: label,
+          text: '?',
           style: TextStyle(
-            color: isPrize ? Colors.white : Colors.white.withOpacity(0.4),
-            fontSize: isPrize ? 22 : 18,
+            color: Colors.white.withOpacity(0.4),
+            fontSize: 18,
             fontWeight: FontWeight.w900,
-            shadows: isPrize
-                ? [
-                    const Shadow(color: Colors.black26, blurRadius: 4),
-                  ]
-                : null,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -1336,9 +1308,6 @@ class _WheelPainter extends CustomPainter {
 
       canvas.save();
       canvas.translate(labelPos.dx, labelPos.dy);
-      // Rotate the glyph so it stands upright relative to the slice
-      // radius (readable when the wheel is spinning too, thanks to
-      // the pointer landing straight up).
       canvas.rotate(midAngle + pi / 2);
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
       canvas.restore();
@@ -1391,133 +1360,488 @@ class _PointerPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ────────────────────────── Reveal card ────────────────────────────
+// ────────────────────────── Reveal page (white theme) ─────────────
+//
+// Full-page rescue reveal. Runs after the wheel finishes. White
+// background, gold "SPECIAL OFFER" card, "Pay 83% less", plan card
+// with a 3-DAY FREE TRIAL header, black Start Free Trial CTA, plus the
+// legal-disclosure footer required by Apple 3.1.2.
 
-class _RevealCard extends StatelessWidget {
+class _RescueRevealPage extends StatelessWidget {
   final bool loading;
   final VoidCallback onPurchase;
-  const _RevealCard({required this.loading, required this.onPurchase});
+  final VoidCallback onDecline;
+  final VoidCallback onRestore;
+
+  const _RescueRevealPage({
+    required this.loading,
+    required this.onPurchase,
+    required this.onDecline,
+    required this.onRestore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: const ValueKey('reveal_page'),
+      color: Colors.white,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 76, 24, 32),
+              child: Column(
+                children: [
+                  const _SpecialOfferCard(),
+                  const SizedBox(height: 30),
+                  const Text(
+                    'Pay 83% less',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF0A0A0A),
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'than monthly subscribers',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF757575),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 34),
+                  const _RescuePlanCard(),
+                  const SizedBox(height: 18),
+                  _StartTrialButton(loading: loading, onTap: onPurchase),
+                  const SizedBox(height: 14),
+                  const _NoCommitmentRow(),
+                  const SizedBox(height: 14),
+                  const Text(
+                    '3 days free, then £19.99 per year.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF9A9A9A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Billed annually and renews automatically unless\n'
+                    'canceled in the App Store.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF9A9A9A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _LightLegalRow(onRestore: onRestore),
+                  const SizedBox(height: 10),
+                  // Full Apple 3.1.2 auto-renew disclosure — required
+                  // even though the summary is above; keep tiny and
+                  // low-contrast so it doesn't fight the CTA.
+                  Text(
+                    'Payment will be charged to your Apple ID at confirmation '
+                    'of purchase. Subscription automatically renews unless '
+                    'auto-renew is turned off at least 24 hours before the '
+                    'end of the current period. Manage or cancel in your App '
+                    'Store account settings.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.black.withOpacity(0.35),
+                      fontSize: 9.5,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: onDecline,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(
+                        'No thanks',
+                        style: TextStyle(
+                          color: Colors.black.withOpacity(0.4),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Top-left close X in a circle — matches the reference.
+            Positioned(
+              top: 12,
+              left: 20,
+              child: GestureDetector(
+                onTap: onDecline,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.close, color: Color(0xFF0A0A0A), size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 380.ms);
+  }
+}
+
+class _SpecialOfferCard extends StatelessWidget {
+  const _SpecialOfferCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        // Sparkles around the card.
+        const Positioned(left: -8, top: 30, child: _Sparkle(size: 14)),
+        const Positioned(left: 8, top: 130, child: _Sparkle(size: 22, color: _kGold)),
+        const Positioned(left: -6, bottom: 20, child: _Sparkle(size: 26, color: _kGold)),
+        const Positioned(right: -6, top: 20, child: _Sparkle(size: 18)),
+        const Positioned(right: 6, top: 100, child: _Sparkle(size: 12, color: _kGold)),
+        const Positioned(right: -4, bottom: 40, child: _Sparkle(size: 20)),
+        // Card.
+        Container(
+          width: 280,
+          height: 180,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0A),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Column(
+              children: [
+                // Gold header stripe.
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [Color(0xFFE8B84E), Color(0xFFF4D07A)],
+                    ),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'SPECIAL OFFER',
+                      style: TextStyle(
+                        color: Color(0xFF0A0A0A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.5,
+                      ),
+                    ),
+                  ),
+                ),
+                // Body.
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF1A1509), Color(0xFF0A0A0A)],
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '£29.99',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: Colors.white54,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '£19.99/year',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+const Color _kGold = Color(0xFFE8B84E);
+
+class _Sparkle extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _Sparkle({required this.size, this.color = const Color(0xFF0A0A0A)});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _SparklePainter(color: color)),
+    );
+  }
+}
+
+class _SparklePainter extends CustomPainter {
+  final Color color;
+  _SparklePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w / 2, 0)
+      ..quadraticBezierTo(w / 2, h / 2, w, h / 2)
+      ..quadraticBezierTo(w / 2, h / 2, w / 2, h)
+      ..quadraticBezierTo(w / 2, h / 2, 0, h / 2)
+      ..quadraticBezierTo(w / 2, h / 2, w / 2, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklePainter old) => old.color != color;
+}
+
+class _RescuePlanCard extends StatelessWidget {
+  const _RescuePlanCard();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      key: const ValueKey('reveal_card'),
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.emerald.withOpacity(0.18),
-            AppColors.emerald.withOpacity(0.02),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.emerald.withOpacity(0.5), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.emerald.withOpacity(0.28),
-            blurRadius: 40,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF0A0A0A), width: 2),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          // Black chip on top.
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.emerald,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Text(
-              'RESCUE UNLOCKED',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2.5,
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            '£34.99',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.35),
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              decoration: TextDecoration.lineThrough,
-              decorationColor: Colors.white38,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '£19',
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            color: const Color(0xFF0A0A0A),
+            child: const Center(
+              child: Text(
+                '3-DAY FREE TRIAL',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 92,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -4,
-                  height: 1,
-                  shadows: [Shadow(color: AppColors.emerald.withOpacity(0.55), blurRadius: 22)],
+                  letterSpacing: 2.5,
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  '.99',
+            ),
+          ),
+          // Body.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Yearly Plan',
+                      style: TextStyle(
+                        color: Color(0xFF0A0A0A),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '£19.99 billed yearly',
+                      style: TextStyle(
+                        color: Color(0xFF808080),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Text(
+                  'only £1.66/mo',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1,
-                    shadows: [Shadow(color: AppColors.emerald.withOpacity(0.55), blurRadius: 22)],
+                    color: Color(0xFF808080),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'PER YEAR · LOCKED FOREVER',
-            style: TextStyle(
-              color: AppColors.emerald.withOpacity(0.9),
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3,
+              ],
             ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            height: 1,
-            color: Colors.white.withOpacity(0.06),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Cancel anytime. Never renews at full price.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 18),
-          _CTA(
-            label: 'CLAIM RESCUE',
-            sublabel: '£19.99 charged today',
-            loading: loading,
-            onTap: onPurchase,
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 380.ms).slideY(begin: 0.05, end: 0);
+    );
+  }
+}
+
+class _StartTrialButton extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onTap;
+  const _StartTrialButton({required this.loading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0A),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        alignment: Alignment.center,
+        child: loading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Text(
+                'Start Free Trial',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _NoCommitmentRow extends StatelessWidget {
+  const _NoCommitmentRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.check_rounded, color: Color(0xFF0A0A0A), size: 18),
+        SizedBox(width: 8),
+        Text(
+          'No commitment  •  Cancel anytime',
+          style: TextStyle(
+            color: Color(0xFF0A0A0A),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LightLegalRow extends StatelessWidget {
+  final VoidCallback onRestore;
+  const _LightLegalRow({required this.onRestore});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget link(String label, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF808080),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+    Widget dot() => const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
+          child: Text('·', style: TextStyle(color: Color(0xFFBDBDBD), fontSize: 14)),
+        );
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        link('Terms', () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TermsScreen()),
+            )),
+        dot(),
+        link('Privacy', () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PrivacyScreen()),
+            )),
+        dot(),
+        link('Restore', onRestore),
+      ],
+    );
   }
 }
 

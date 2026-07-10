@@ -150,11 +150,12 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       }
     } catch (_) {}
 
-    // Stop the nag: cancel every escalation ping still queued for this
-    // habit, plus the whole AlarmKit cascade for the next fires.
-    try {
-      await AlarmService.cancelWakeEscalations(widget.habit.id);
-    } catch (_) {}
+    // Do NOT cancel escalations or the AlarmKit cascade here — the
+    // alarm must keep ringing right up until the WakeCompleteScreen
+    // mounts. That screen owns the cancel call in its initState so
+    // there is no gap between reps done and the finish screen where
+    // the alarm could go quiet. (Anti-cheat: user hits reps target,
+    // alarm still rings until they see the payoff.)
     await WakeDebtService.clearActive();
 
     // Hand off to the payoff screen — big MISSION COMPLETE + share card.
@@ -167,6 +168,7 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => WakeCompleteScreen(
+          habitId: widget.habit.id,
           habitTitle: widget.habit.title,
           reps: ex?.reps ?? 0,
           exerciseName: ex?.name ?? 'Reps',

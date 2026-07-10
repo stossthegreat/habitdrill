@@ -20,10 +20,16 @@ class WakeDebtService {
   static const int baseReps = 10;
 
   /// Extra reps added for every full minute the alarm is unanswered.
-  static const int repsPerMinute = 5;
+  static const int repsPerMinute = 2;
+
+  /// Debt stops growing after this many minutes — so the maximum
+  /// escalation is repsPerMinute × maxLateMinutes = 40 reps on top of
+  /// the base.
+  static const int maxLateMinutes = 20;
 
   /// Hard cap so total debt never exceeds this many reps.
-  static const int maxDebtReps = 100;
+  /// (repsPerMinute × maxLateMinutes = 2 × 20 = 40.)
+  static const int maxDebtReps = maxLateMinutes * repsPerMinute;
 
   /// Change-notifier that PunishmentGate listens to. Every markActive /
   /// clearActive call toggles this value so the gate re-checks and

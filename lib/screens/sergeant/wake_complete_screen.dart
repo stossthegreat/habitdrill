@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../design/tokens.dart';
+import '../../services/alarm_service.dart';
 
 /// Shown the moment the user finishes their morning wake reps. It's the
 /// payoff — the whole point of enduring the alarm cascade. Confetti-free
@@ -21,6 +23,7 @@ import '../../design/tokens.dart';
 /// ratio and dropped as a temporary PNG that share_plus dispatches to
 /// the system share sheet.
 class WakeCompleteScreen extends StatefulWidget {
+  final String habitId;
   final String habitTitle;
   final int reps;
   final String exerciseName;
@@ -28,6 +31,7 @@ class WakeCompleteScreen extends StatefulWidget {
 
   const WakeCompleteScreen({
     super.key,
+    required this.habitId,
     required this.habitTitle,
     required this.reps,
     required this.exerciseName,
@@ -38,15 +42,43 @@ class WakeCompleteScreen extends StatefulWidget {
   State<WakeCompleteScreen> createState() => _WakeCompleteScreenState();
 }
 
+/// Rotating flex statements for the viral share card. One is picked at
+/// random per session so the shared image feels fresh each time.
+const List<String> _flexStatements = [
+  'I won the first battle of the day.',
+  'While you were asleep,\nI was building.',
+  'Beat the alarm.\nBeat myself.',
+  'First move of the day: MOVE.',
+  "I didn't negotiate\nwith the snooze button.",
+  'The morning owes me nothing.\nI paid up front.',
+  "Discipline is a receipt.\nHere's mine.",
+  'Alarm went off. So did I.',
+  'Reps before rest.\nEvery single day.',
+];
+
 class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
   final GlobalKey _cardKey = GlobalKey();
   bool _sharing = false;
+  late final String _flex;
 
   @override
   void initState() {
     super.initState();
+    // Pick one random flex statement for the share card this session.
+    _flex = _flexStatements[Random().nextInt(_flexStatements.length)];
     HapticFeedback.heavyImpact();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // NOW kill the shark. The alarm cascade was still ringing through
+    // the entire workout — it stops the moment this celebration
+    // screen mounts, and not a second earlier. cancelWakeEscalations
+    // also cancels the AlarmKit retries under the hood.
+    Future.microtask(() async {
+      try {
+        await AlarmService.cancelWakeEscalations(widget.habitId);
+      } catch (e) {
+        debugPrint('WakeComplete: cancel escalations failed: $e');
+      }
+    });
   }
 
   Future<void> _share() async {
@@ -68,8 +100,7 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
       await file.writeAsBytes(bytes);
       await Share.shareXFiles(
         [XFile(file.path)],
-        text:
-            'I start my day by punching procrastination in the tacos 💪😡💀\nHabitDrill.',
+        text: '$_flex\nHabitDrill.',
       );
     } catch (e) {
       debugPrint('share failed: $e');
@@ -89,30 +120,30 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 _MissionBadge(),
-                const SizedBox(height: 22),
+                const SizedBox(height: 20),
                 const Text(
-                  'MISSION\nCOMPLETE.',
+                  'FIRST BATTLE\nWON.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 46,
+                    fontSize: 40,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -1.4,
+                    letterSpacing: -1.2,
                     height: 0.98,
                   ),
                 ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.05, end: 0),
                 const SizedBox(height: 8),
                 Text(
-                  'You showed up. Log the win.',
+                  'Discipline is compounding.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withOpacity(0.45),
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ).animate(delay: 250.ms).fadeIn(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
                 Expanded(
                   child: Center(
                     child: RepaintBoundary(
@@ -121,6 +152,7 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
                         habitTitle: widget.habitTitle,
                         reps: widget.reps,
                         exerciseName: widget.exerciseName,
+                        flex: _flex,
                       ),
                     ),
                   ),
@@ -164,7 +196,7 @@ class _MissionBadge extends StatelessWidget {
           const Icon(Icons.check_circle, color: AppColors.emerald, size: 14),
           const SizedBox(width: 6),
           Text(
-            'DEBT PAID',
+            'BATTLE WON',
             style: TextStyle(
               color: AppColors.emerald,
               fontSize: 11,
@@ -184,11 +216,13 @@ class _ShareCard extends StatelessWidget {
   final String habitTitle;
   final int reps;
   final String exerciseName;
+  final String flex;
 
   const _ShareCard({
     required this.habitTitle,
     required this.reps,
     required this.exerciseName,
+    required this.flex,
   });
 
   @override
@@ -328,20 +362,16 @@ class _ShareCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'I start my day by punching\nprocrastination in the tacos.',
+            flex,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.35,
+              color: Colors.white.withOpacity(0.92),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              height: 1.3,
+              letterSpacing: -0.1,
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            '💪  😡  💀',
-            style: TextStyle(fontSize: 22, letterSpacing: 6),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Text(

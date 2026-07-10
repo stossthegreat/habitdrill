@@ -513,16 +513,17 @@ class AlarmService {
   }
 
   /// The wake schedule: 3 burst pings hit the lock screen at t+0/8/16s,
-  /// then 15 escalation pings hammer once per minute from t+60s through
-  /// t+900s. Total 18 pings per fire. The debt in each escalation title
-  /// matches WakeDebtService (base 10 + 5×min_late) so what the user
-  /// sees on their lock screen == what they actually owe.
+  /// then 20 escalation pings hammer once per minute from t+60s through
+  /// t+1200s. Total 23 pings per fire. The debt in each escalation title
+  /// matches WakeDebtService (base 10 + 2×min_late, capped at 20 min /
+  /// +40 reps) so what the user sees on their lock screen == what they
+  /// actually owe.
   ///
-  /// Only the burst pings repeat weekly. The 15 escalation pings are
+  /// Only the burst pings repeat weekly. The escalation pings are
   /// one-shots scheduled for the NEXT upcoming fire and re-generated on
   /// every app resume — see `rescheduleWakeAlarms()`. This dance keeps
   /// us under iOS's 64-slot pending-notification cap even with 3 burst
-  /// × 7 weekdays + 15 escalations = 36 pending per habit.
+  /// × 7 weekdays + 20 escalations = 41 pending per habit.
   static List<_WakePing> _wakePingSchedule() => const [
         // Burst — 3 pings. First one is intentionally green ("WAKE UP OR
         // PAY") to offer a choice; the follow-ups turn into full drill-
@@ -533,42 +534,55 @@ class AlarmService {
             'GET UP GET UP GET UP GET UP. NOW.'),
         _WakePing(Duration(seconds: 16),   '🚨 GET OUT OF BED!',
             'MOVE. RIGHT. NOW. STOP LYING TO YOURSELF.'),
-        // Escalation — every minute, growing debt, sergeant losing it.
-        _WakePing(Duration(minutes: 1),    '😡 +5 REPS',
+        // Escalation — every minute for 20 minutes, growing debt at
+        // +2 reps per minute (matches WakeDebtService.repsPerMinute).
+        // After minute 20 the debt cap is hit and no more escalations
+        // fire — the alarm/live cascade takes over from there.
+        _WakePing(Duration(minutes: 1),    '😡 +2 REPS',
             'STILL IN BED?! GET UP MAGGOT.'),
-        _WakePing(Duration(minutes: 2),    '😡 +10 REPS',
+        _WakePing(Duration(minutes: 2),    '😡 +4 REPS',
             'WHAT ARE YOU DOING?! MOVE!'),
-        _WakePing(Duration(minutes: 3),    '🔥 +15 REPS',
+        _WakePing(Duration(minutes: 3),    '🔥 +6 REPS',
             'DISGRACEFUL. GET UP. NOW.'),
-        _WakePing(Duration(minutes: 4),    '🔥 +20 REPS',
+        _WakePing(Duration(minutes: 4),    '🔥 +8 REPS',
             'STOP. STOP LYING. GET UP.'),
-        _WakePing(Duration(minutes: 5),    '😤 +25 REPS',
+        _WakePing(Duration(minutes: 5),    '😤 +10 REPS',
             'YOU BROKE THE PROMISE. YOU OWE ME.'),
-        _WakePing(Duration(minutes: 6),    '😤 +30 REPS',
+        _WakePing(Duration(minutes: 6),    '😤 +12 REPS',
             "DEBT'S GROWING. EVERY MINUTE. MOVE."),
-        _WakePing(Duration(minutes: 7),    '🔥 +35 REPS',
+        _WakePing(Duration(minutes: 7),    '🔥 +14 REPS',
             'YOU DISGUST ME. GET UP.'),
-        _WakePing(Duration(minutes: 8),    '🔥 +40 REPS',
+        _WakePing(Duration(minutes: 8),    '🔥 +16 REPS',
             'STAND UP. RIGHT. NOW.'),
-        _WakePing(Duration(minutes: 9),    '💀 +45 REPS',
+        _WakePing(Duration(minutes: 9),    '💀 +18 REPS',
             "YOU'RE FAILING. AGAIN."),
-        _WakePing(Duration(minutes: 10),   '💀 +50 REPS',
+        _WakePing(Duration(minutes: 10),   '💀 +20 REPS',
             'WEAK. WEAK. WEAK.'),
-        _WakePing(Duration(minutes: 11),   '💀 +55 REPS',
+        _WakePing(Duration(minutes: 11),   '💀 +22 REPS',
             'MOVE OR LIVE WITH IT.'),
-        _WakePing(Duration(minutes: 12),   '💀 +60 REPS',
+        _WakePing(Duration(minutes: 12),   '💀 +24 REPS',
             'DISCIPLINE IS COMING FOR YOU.'),
-        _WakePing(Duration(minutes: 13),   '💀 +65 REPS',
+        _WakePing(Duration(minutes: 13),   '💀 +26 REPS',
             'FINAL WARNING, SOLDIER.'),
-        _WakePing(Duration(minutes: 14),   '💀 +70 REPS',
+        _WakePing(Duration(minutes: 14),   '💀 +28 REPS',
             'YOU CHOSE THIS. LIVE WITH IT.'),
-        _WakePing(Duration(minutes: 15),   '💀 +75 REPS',
-            'CONTRACT DEAD. YOU LOSE. GET UP AND PAY.'),
+        _WakePing(Duration(minutes: 15),   '💀 +30 REPS',
+            'CONTRACT DEAD. GET UP AND PAY.'),
+        _WakePing(Duration(minutes: 16),   '💀 +32 REPS',
+            'YOU ARE OUT OF MINUTES. MOVE.'),
+        _WakePing(Duration(minutes: 17),   '💀 +34 REPS',
+            'GET UP. GET UP. GET UP.'),
+        _WakePing(Duration(minutes: 18),   '💀 +36 REPS',
+            'THIS IS WHO YOU CHOSE TO BE.'),
+        _WakePing(Duration(minutes: 19),   '💀 +38 REPS',
+            'GET UP OR LIVE THE LIE FOREVER.'),
+        _WakePing(Duration(minutes: 20),   '💀 +40 REPS — MAX',
+            'DEBT CAPPED. NOW GET UP AND PAY IT.'),
       ];
 
   /// Which indices in [_wakePingSchedule] are the escalation pings.
   static const int _escalationStart = 3;
-  static const int _escalationEnd = 18; // exclusive
+  static const int _escalationEnd = 23; // exclusive
 
   /// Cancel every escalation ping across all days for a habit's wake.
   /// Called the instant wake reps complete — any queued escalation
