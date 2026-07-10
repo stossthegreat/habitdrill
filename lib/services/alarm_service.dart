@@ -209,16 +209,10 @@ class AlarmService {
       // Other weekdays each get one seed alarm; the cascade is rebuilt
       // for THAT day when the app resumes on or before that fire
       // (see rescheduleWakeAlarms).
-      // Lazy AlarmKit permission ask. First alarm scheduling triggers
-      // the request; subsequent calls just check status. Keeps the
-      // permission out of app launch and out of onboarding page 1.
+      // AlarmKit permission was asked inline during onboarding — see
+      // the `perm_alarmkit` screen. No fallback request here; if the
+      // user denied, scheduling will just fail gracefully.
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
-      if (alarmKitAvailable) {
-        final akStatus = await AlarmKitService.authorizationStatus();
-        if (akStatus == 'notDetermined') {
-          await AlarmKitService.requestAuthorization();
-        }
-      }
       if (alarmKitAvailable) {
         final tz.TZDateTime akNextFire = habit.repeatDays
             .map((d) => _getNextAlarmTime(d, habit.timeOfDay))

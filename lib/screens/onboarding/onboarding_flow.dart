@@ -14,6 +14,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../design/tokens.dart';
 import '../../providers/habit_provider.dart';
+import '../../services/alarmkit_service.dart';
 import '../../services/law_punishment_picker.dart';
 import 'onboarding_state.dart';
 import 'onboarding_paywall.dart';
@@ -34,7 +35,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   // ACT 7 (2) = 27 screens. Act 5 (signature) is just the pad — the
   // "give yourself your word" statement is embedded inside it. Progress
   // bar fills against this; the counter itself is hidden.
-  static const int _total = 27;
+  static const int _total = 28;
 
   @override
   void dispose() {
@@ -175,6 +176,37 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                         'is just a ping.',
                     ctaLabel: 'ALLOW NOTIFICATIONS',
                     request: () => Permission.notification.request(),
+                    onNext: _next,
+                  ),
+                  // Alarm permission back-to-back with notification —
+                  // both are "wake you up" affordances and the pairing
+                  // reads as one commitment, not two ambushes.
+                  _PermissionAsk(
+                    key: const ValueKey('perm_alarmkit'),
+                    icon: Icons.alarm_rounded,
+                    headline: 'Real alarms.\nNot just notifications.',
+                    body:
+                        'HabitDrill schedules system alarms that ring '
+                        'through Silent and Focus by design. Without this '
+                        'permission the sergeant is muted at 6 a.m.',
+                    ctaLabel: 'ALLOW ALARMS',
+                    request: () async {
+                      // On iOS <26 AlarmKit isn't available — pretend
+                      // granted so we don't route to Settings for a
+                      // permission that doesn't exist yet.
+                      if (!await AlarmKitService.isAvailable()) {
+                        return PermissionStatus.granted;
+                      }
+                      final s = await AlarmKitService.requestAuthorization();
+                      switch (s) {
+                        case 'authorized':
+                          return PermissionStatus.granted;
+                        case 'denied':
+                          return PermissionStatus.permanentlyDenied;
+                        default:
+                          return PermissionStatus.denied;
+                      }
+                    },
                     onNext: _next,
                   ),
                   _ExercisePicker(state: _s, onNext: _next),

@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 #if canImport(AlarmKit)
 import AlarmKit
+import AppIntents
 #endif
 
 /// Bridges Flutter → AlarmKit (iOS 26+).
@@ -134,22 +135,29 @@ import AlarmKit
     do {
       let schedule = Alarm.Schedule.fixed(fireAt)
 
-      // MINIMAL alarm — STOP button only, no secondary/no custom
-      // intent. Adding a LiveActivityIntent required a widget
-      // extension we haven't shipped; without it, AlarmKit could
-      // throw AT SCHEDULE TIME and every alarm would silently fail.
-      // The Flutter side's PunishmentGate detects the wake via
-      // WakeDebtService.findDueWakeHabit and force-shows the
-      // punishment screen the instant the app foregrounds — same
-      // final experience with a config that actually schedules.
+      // Two buttons on the alert:
+      //   STOP  (X)     — dismisses the ring
+      //   OPEN  (arrow) — opens HabitDrill straight into punishment
+      //
+      // The OPEN button uses a minimal parameter-less
+      // LiveActivityIntent. openAppWhenRun does the heavy lift; when
+      // the app foregrounds, PunishmentGate's every-build wake check
+      // catches the due habit and swaps to the punishment screen.
       let stopButton = AlarmButton(
         text: "STOP",
         textColor: .white,
         systemImageName: "xmark.circle.fill"
       )
+      let openButton = AlarmButton(
+        text: "OPEN",
+        textColor: .white,
+        systemImageName: "arrow.right.circle.fill"
+      )
       let alert = AlarmPresentation.Alert(
         title: LocalizedStringResource(stringLiteral: title),
-        stopButton: stopButton
+        stopButton: stopButton,
+        secondaryButton: openButton,
+        secondaryButtonBehavior: .custom
       )
       let presentation = AlarmPresentation(alert: alert)
 
@@ -163,6 +171,7 @@ import AlarmKit
         countdownDuration: nil,
         schedule: schedule,
         attributes: attributes,
+        secondaryIntent: OpenAppIntent(),
         sound: .default
       )
 
@@ -182,5 +191,22 @@ import AlarmKit
 struct HabitDrillMetadata: AlarmMetadata {
   let habitId: String
   init(habitId: String = "") { self.habitId = habitId }
+}
+
+/// Minimal intent for the OPEN button on the alarm alert. No
+/// parameters, no widget-extension surface, no @Parameter storage —
+/// keeps the config schedulable everywhere. openAppWhenRun launches
+/// HabitDrill; PunishmentGate's build-time wake check then routes
+/// straight into the MorningAlarmScreen.
+@available(iOS 26.0, *)
+struct OpenAppIntent: LiveActivityIntent {
+  static var title: LocalizedStringResource = "Open"
+  static var openAppWhenRun: Bool = true
+
+  init() {}
+
+  func perform() async throws -> some IntentResult {
+    return .result()
+  }
 }
 #endif
