@@ -252,14 +252,18 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     // this notifier so we swap the root screen instantly instead of
     // waiting for the next poll tick.
     WakeDebtService.wakeChanged.addListener(_refreshWakeState);
-    // Poll every 1 second. The 2s tick was leaving a window during
-    // which the user could open the app and briefly see the home
-    // screen before the punishment took over — this is what made
-    // "close and reopen" seem to fix it. 1 s + build-time fallback
-    // = instant.
+    // Brute-force rebuild every 500 ms while the widget is mounted.
+    // Every rebuild re-runs `build()` which synchronously calls
+    // findDueWakeHabit() — meaning the moment a wake habit's fire
+    // window opens, the very next tick (≤500 ms) flips the app into
+    // MorningAlarmScreen. No lifecycle event needed, no state
+    // machinery, no "close and reopen." Cheap: findDueWakeHabit is
+    // an in-memory Hive scan.
     _wakePoll = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _refreshWakeState(),
+      const Duration(milliseconds: 500),
+      (_) {
+        if (mounted) setState(() {});
+      },
     );
     // First check as soon as the first frame commits — before any tab
     // renders behind it.

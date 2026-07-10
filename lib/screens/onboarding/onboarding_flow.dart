@@ -191,21 +191,37 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                         'permission the sergeant is muted at 6 a.m.',
                     ctaLabel: 'ALLOW ALARMS',
                     request: () async {
-                      // On iOS <26 AlarmKit isn't available — pretend
-                      // granted so we don't route to Settings for a
-                      // permission that doesn't exist yet.
-                      if (!await AlarmKitService.isAvailable()) {
-                        return PermissionStatus.granted;
+                      final available = await AlarmKitService.isAvailable();
+                      debugPrint('🔔 AlarmKit isAvailable=$available');
+                      if (available) {
+                        // iOS 26+ with AlarmKit entitlement present.
+                        // requestAuthorization() triggers the real OS
+                        // popup for AlarmKit.
+                        final s = await AlarmKitService.requestAuthorization();
+                        debugPrint('🔔 AlarmKit auth result: $s');
+                        switch (s) {
+                          case 'authorized':
+                            return PermissionStatus.granted;
+                          case 'denied':
+                            return PermissionStatus.permanentlyDenied;
+                          default:
+                            // Ambiguous — treat as denied so we route
+                            // the user to Settings where they can flip
+                            // any related toggle themselves.
+                            return PermissionStatus.permanentlyDenied;
+                        }
                       }
-                      final s = await AlarmKitService.requestAuthorization();
-                      switch (s) {
-                        case 'authorized':
-                          return PermissionStatus.granted;
-                        case 'denied':
-                          return PermissionStatus.permanentlyDenied;
-                        default:
-                          return PermissionStatus.denied;
-                      }
+                      // Fallback: this iPhone doesn't have AlarmKit
+                      // (iOS <26 or entitlement absent). The user
+                      // demanded SOMETHING visible happen on tap — so
+                      // send them straight into iOS Settings for the
+                      // app. openAppSettings() is what the shared
+                      // _PermissionAsk._tap wrapper calls on a
+                      // permanentlyDenied return, so we route through
+                      // that so behavior stays consistent with the
+                      // notification permission flow.
+                      debugPrint('🔔 AlarmKit unavailable — routing to app settings');
+                      return PermissionStatus.permanentlyDenied;
                     },
                     onNext: _next,
                   ),
