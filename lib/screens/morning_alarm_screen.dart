@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../services/wake_debt_service.dart';
+import '../services/wake_siren_service.dart';
 import 'sergeant/wake_exercise_screen.dart';
 
 /// The morning wake alarm — Erly-killer.
@@ -29,7 +30,6 @@ class MorningAlarmScreen extends ConsumerStatefulWidget {
 }
 
 class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
-  Timer? _hapticTimer;
   Timer? _tickTimer;
   bool _handingOff = false;
 
@@ -38,10 +38,11 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     super.initState();
     WakeDebtService.markActive(widget.habit.id);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // Heavy vibration every second — a constant "get up" pulse.
-    _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
-      HapticFeedback.heavyImpact();
-    });
+    // The shark. Continuous looping siren + heavy haptic. Owned by
+    // WakeSirenService so it survives the navigation from this screen
+    // into WakeExerciseScreen — stops ONLY when reps complete (see
+    // WakeExerciseScreen._onWakeComplete → WakeSirenService.stop()).
+    WakeSirenService.start();
     // Tick every 10s so the debt counter climbs live in front of them.
     _tickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
@@ -51,7 +52,7 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   Future<void> _handoffToExercise() async {
     if (_handingOff) return;
     _handingOff = true;
-    _hapticTimer?.cancel();
+    // DO NOT stop the siren here — it must ring through the workout.
     _tickTimer?.cancel();
     HapticFeedback.heavyImpact();
     if (!mounted) return;
@@ -72,7 +73,9 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
 
   @override
   void dispose() {
-    _hapticTimer?.cancel();
+    // DO NOT stop the siren here either. This screen may dispose when
+    // WakeExerciseScreen pushes over it or when the user pops back to
+    // this screen — the workout screen calls start() again defensively.
     _tickTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
