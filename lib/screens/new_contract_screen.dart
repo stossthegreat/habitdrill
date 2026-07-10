@@ -182,7 +182,11 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       if (mounted) setState(() => _saving = false);
       return;
     }
-    if (mounted) Navigator.of(context).pop();
+    // popUntil(isFirst) walks past any intermediate route (templates
+    // sheet, nested pushes) and lands the user back on the Contracts
+    // tab. A single pop was leaving them stranded on the templates
+    // screen when they'd entered through that path.
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   @override

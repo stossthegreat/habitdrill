@@ -150,7 +150,10 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
       reps: _reps,
     );
 
-    if (mounted) Navigator.of(context).pop();
+    // popUntil(isFirst) → all the way back to the Contracts tab so
+    // the user sees the alarm they just made, not the previous
+    // sheet or a stale card.
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   @override
