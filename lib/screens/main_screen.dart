@@ -82,13 +82,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   }
 }
 
-// ────────────────────────── Opal-style pill nav bar ──────────────────
+// ────────────────────────── Opal-style floating tab bar ──────────────
 //
-// Floating pill on a dark background. Selected tab renders as an
-// emerald pill with black icon+label; unselected tabs are outlined
-// icons only, no label — the label expands with a spring only for the
-// active tab. Sits inside the safe area with a bottom margin so it
-// reads as its own object, not a system component.
+// Floating dark pill capsule. Three FIXED-WIDTH tabs, each showing icon
+// on top and label underneath — ALL labels visible at ALL times, no
+// expanding pill, no size-change animation. Selection state is just an
+// emerald tint on the active tab's icon (and slightly brighter label);
+// inactive tabs are grey. This is Opal's tab bar, one-for-one.
 
 class _NavBar extends StatelessWidget {
   final int current;
@@ -105,17 +105,17 @@ class _NavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        16,
+        24,
         0,
-        16,
+        24,
         MediaQuery.of(context).padding.bottom + 12,
       ),
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0B0B0B),
+          color: const Color(0xFF111111),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
+          border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.45),
@@ -125,14 +125,15 @@ class _NavBar extends StatelessWidget {
           ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             for (int i = 0; i < _items.length; i++)
-              _NavPill(
-                icon: _items[i].icon,
-                label: _items[i].label,
-                selected: current == i,
-                onTap: () => onSelect(i),
+              Expanded(
+                child: _NavTab(
+                  icon: _items[i].icon,
+                  label: _items[i].label,
+                  selected: current == i,
+                  onTap: () => onSelect(i),
+                ),
               ),
           ],
         ),
@@ -147,13 +148,13 @@ class _NavItemData {
   const _NavItemData({required this.icon, required this.label});
 }
 
-class _NavPill extends StatelessWidget {
+class _NavTab extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavPill({
+  const _NavTab({
     required this.icon,
     required this.label,
     required this.selected,
@@ -162,57 +163,29 @@ class _NavPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Colors are the only thing that changes between states. No padding
+    // shift, no size shift, no re-flow — the layout is IDENTICAL for
+    // every tab, active or not.
+    final Color iconColor = selected ? AppColors.emerald : const Color(0xFF8A8A8A);
+    final Color labelColor = selected ? AppColors.emerald : const Color(0xFF8A8A8A);
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: selected ? 18 : 14,
-          vertical: 11,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.emerald : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.emerald.withOpacity(0.45),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected
-                  ? Colors.black
-                  : Colors.white.withOpacity(0.55),
-            ),
-            // Label only on the active pill — same as Opal's bar.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: selected
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: labelColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
           ],
         ),
