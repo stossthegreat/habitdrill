@@ -252,13 +252,13 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     // this notifier so we swap the root screen instantly instead of
     // waiting for the next poll tick.
     WakeDebtService.wakeChanged.addListener(_refreshWakeState);
-    // Poll every 2 seconds. Catches every case the lifecycle events
-    // miss — alarm firing while foregrounded, warm-start on iOS where
-    // UIScene sometimes swallows the resumed callback, notification
-    // payload never reaching Dart because of a plugin timing issue,
-    // etc. Two seconds is unnoticeable for battery.
+    // Poll every 1 second. The 2s tick was leaving a window during
+    // which the user could open the app and briefly see the home
+    // screen before the punishment took over — this is what made
+    // "close and reopen" seem to fix it. 1 s + build-time fallback
+    // = instant.
     _wakePoll = Timer.periodic(
-      const Duration(seconds: 2),
+      const Duration(seconds: 1),
       (_) => _refreshWakeState(),
     );
     // First check as soon as the first frame commits — before any tab
@@ -360,12 +360,22 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     // WAKE FIRST. When a wake alarm is due, THE APP IS THE PUNISHMENT
-    // SCREEN. No tabs, no home, no way to browse around it. Only the
-    // reps finish this.
-    if (_forcedWakeHabit != null) {
+    // SCREEN. No tabs, no home, no way to browse around it.
+    //
+    // We check `findDueWakeHabit()` synchronously on EVERY build in
+    // addition to trusting the async-driven `_forcedWakeHabit` state.
+    // This is the "close-and-reopen fixes it" bug: the async state
+    // machine had a race window where the user could see MainScreen
+    // for a beat before punishment took over. The build-time check
+    // eliminates that window — the moment build runs (and it runs on
+    // every rebuild, every setState, every timer tick), a due wake
+    // wins.
+    final syncDueWake = WakeDebtService.findDueWakeHabit();
+    final wake = _forcedWakeHabit ?? syncDueWake;
+    if (wake != null) {
       return MorningAlarmScreen(
-        key: ValueKey('wake_${_forcedWakeHabit!.id}'),
-        habit: _forcedWakeHabit!,
+        key: ValueKey('wake_${wake.id}'),
+        habit: wake,
       );
     }
     if (_showPunishment && _activeViolation != null) {
