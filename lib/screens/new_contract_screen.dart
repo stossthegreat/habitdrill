@@ -1,3 +1,4 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -24,7 +25,8 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
   final _titleController = TextEditingController();
 
   String _type = 'habit';
-  // Default emoji resolved by type / preset. Not user-editable.
+  // Default emoji resolved by type / preset — user-editable via
+  // _pickEmoji() below (tap the emoji chip beside the title field).
   String _emoji = '🎯';
   int _durationDays = 30;
   _Frequency _frequency = _Frequency.daily;
@@ -115,6 +117,49 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
   void dispose() {
     _titleController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickEmoji() async {
+    HapticFeedback.selectionClick();
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        height: 340,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() => _emoji = emoji.emoji);
+            Navigator.of(context).pop();
+          },
+          config: Config(
+            height: 300,
+            checkPlatformCompatibility: true,
+            emojiViewConfig: const EmojiViewConfig(
+              emojiSizeMax: 28,
+              backgroundColor: Color(0xFF0B0B0B),
+              columns: 7,
+              buttonMode: ButtonMode.MATERIAL,
+            ),
+            skinToneConfig: const SkinToneConfig(),
+            categoryViewConfig: const CategoryViewConfig(
+              backgroundColor: Color(0xFF0B0B0B),
+              iconColorSelected: AppColors.emerald,
+              indicatorColor: AppColors.emerald,
+            ),
+            bottomActionBarConfig: const BottomActionBarConfig(
+              backgroundColor: Color(0xFF0B0B0B),
+              buttonColor: Color(0xFF161616),
+              buttonIconColor: AppColors.emerald,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickTime() async {
@@ -220,14 +265,22 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
                     const SizedBox(height: 28),
                     _Section(
                       label: 'TITLE',
-                      child: _TitleField(
-                        // Placeholder shifts with type — hollowed-out
-                        // example, never pre-typed. User fills their own.
-                        titleController: _titleController,
-                        hint: _type == 'bad_habit'
-                            ? 'e.g. Quit Vape'
-                            : 'e.g. Exercise',
-                        onChanged: () => setState(() {}),
+                      child: Row(
+                        children: [
+                          _EmojiChip(emoji: _emoji, onTap: _pickEmoji),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _TitleField(
+                              // Placeholder shifts with type — hollowed-out
+                              // example, never pre-typed. User fills their own.
+                              titleController: _titleController,
+                              hint: _type == 'bad_habit'
+                                  ? 'e.g. Quit Vape'
+                                  : 'e.g. Exercise',
+                              onChanged: () => setState(() {}),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 22),
@@ -453,6 +506,35 @@ class _FieldLabel extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.06))),
       ],
+    );
+  }
+}
+
+// ────────────────────────── Emoji chip ──────────────────────────
+
+class _EmojiChip extends StatelessWidget {
+  final String emoji;
+  final VoidCallback onTap;
+  const _EmojiChip({required this.emoji, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.06), width: 1),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          emoji,
+          style: const TextStyle(fontSize: 26, height: 1),
+        ),
+      ),
     );
   }
 }
