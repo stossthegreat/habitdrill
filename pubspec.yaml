@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.2+577
+version: 1.0.2+578
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,13 +14,20 @@ dependencies:
   # State Management
   flutter_riverpod: ^2.4.9
 
-  # Firebase & Authentication — PINNED (not ^) so Codemagic doesn't pull
-  # the buggy 11.15.x Firebase iOS SDK whose Package.swift declares a
-  # broken FirebaseFunctionsCombineSwift target ("invalid custom path
-  # 'FirebaseCombineSwift/Sources/Functions'") that fails SPM
-  # resolution. 3.6.0 → Firebase iOS 11.4.0, well before that bug.
-  firebase_core: 3.6.0
-  firebase_analytics: 11.3.3
+  # Firebase & Authentication — PINNED to the last release before the
+  # 11.15 SPM regression.
+  #
+  #   * 3.15.x → Firebase iOS 11.15.0, whose Package.swift declares a
+  #     broken FirebaseFunctionsCombineSwift target ("invalid custom
+  #     path 'FirebaseCombineSwift/Sources/Functions'") that crashes
+  #     SPM resolution.
+  #   * 3.6.0  → Firebase iOS 11.4.0, but that version predates the
+  #     firebase_sdk_version.rb file Flutter's SPM integration now
+  #     expects to find — SPM fails with "no such file or directory".
+  #   * 3.14.0 → Firebase iOS 11.14.0, has the .rb file, no 11.15 bug.
+  #     Sweet spot.
+  firebase_core: 3.14.0
+  firebase_analytics: 11.5.0
 
   # Local Storage
   hive: ^2.2.3
