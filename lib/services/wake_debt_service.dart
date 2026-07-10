@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/habit.dart';
 import 'local_storage.dart';
+import 'normal_reminder_registry.dart';
 
 /// Computes the escalating rep debt for a wake alarm.
 ///
@@ -71,6 +72,9 @@ class WakeDebtService {
     final today = now.weekday == 7 ? 0 : now.weekday;
     for (final h in LocalStorageService.getAllHabits()) {
       if (!h.reminderOn || h.time.isEmpty) continue;
+      // Contracts/laws use a plain reminder ping — they must NOT
+      // trigger the punishment gate.
+      if (NormalReminderRegistry.isNormalReminder(h.id)) continue;
       if (!h.repeatDays.contains(today)) continue;
       if (h.isDoneOn(now)) continue;
       try {

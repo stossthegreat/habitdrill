@@ -681,6 +681,7 @@ class _ContractCardState extends State<_ContractCard> {
   Widget build(BuildContext context) {
     final view = _ContractView.fromHabit(widget.habit);
     final accent = view.accent;
+    final hasAlarm = widget.habit.time.isNotEmpty && widget.habit.reminderOn;
     return GestureDetector(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
@@ -690,7 +691,7 @@ class _ContractCardState extends State<_ContractCard> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+        padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -717,20 +718,57 @@ class _ContractCardState extends State<_ContractCard> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        view.typeLabel,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            view.typeLabel,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.35),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                          if (hasAlarm) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              LucideIcons.bell,
+                              size: 10,
+                              color: accent.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.habit.time,
+                              style: TextStyle(
+                                color: accent.withOpacity(0.85),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 _DayBadge(view: view, accent: accent),
+                const SizedBox(width: 4),
+                // Explicit EDIT affordance — pencil in a hit-target padding.
+                GestureDetector(
+                  onTap: widget.onTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      LucideIcons.pencil,
+                      size: 16,
+                      color: Colors.white.withOpacity(0.55),
+                    ),
+                  ),
+                ),
               ],
             ),
             if (view.hasTarget) ...[

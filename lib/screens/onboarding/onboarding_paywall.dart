@@ -1101,8 +1101,8 @@ class _SlotStrip extends StatefulWidget {
 
 class _SlotStripState extends State<_SlotStrip>
     with SingleTickerProviderStateMixin {
-  static const int _slices = 12;
-  static const int _prizeIndex = 3; // arbitrary — pointer will land here
+  static const int _slices = 8;
+  static const int _prizeIndex = 2; // arbitrary — pointer will land here
 
   late final AnimationController _controller;
   late final Animation<double> _rotation;
@@ -1156,9 +1156,13 @@ class _SlotStripState extends State<_SlotStrip>
 
   @override
   Widget build(BuildContext context) {
+    // Wheel is 300px (up from 240) — with only 8 slices each slice is
+    // fatter so a bigger radius reads correctly. The container is a
+    // little taller than the wheel to leave room for the pointer above.
+    const double wheelSize = 300;
     return SizedBox(
-      width: 280,
-      height: 300,
+      width: 320,
+      height: 360,
       child: Stack(
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
@@ -1167,8 +1171,8 @@ class _SlotStripState extends State<_SlotStrip>
           Positioned(
             top: 30,
             child: Container(
-              width: 240,
-              height: 240,
+              width: wheelSize,
+              height: wheelSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -1188,7 +1192,7 @@ class _SlotStripState extends State<_SlotStrip>
               builder: (context, _) => Transform.rotate(
                 angle: _rotation.value,
                 child: CustomPaint(
-                  size: const Size(240, 240),
+                  size: const Size(wheelSize, wheelSize),
                   painter: _WheelPainter(
                     slices: _slices,
                     prizeIndex: _prizeIndex,
@@ -1199,7 +1203,7 @@ class _SlotStripState extends State<_SlotStrip>
           ),
           // Fixed center hub.
           Positioned(
-            top: 30 + 240 / 2 - 22,
+            top: 30 + wheelSize / 2 - 22,
             child: Container(
               width: 44,
               height: 44,
@@ -1260,18 +1264,20 @@ class _WheelPainter extends CustomPainter {
     for (int i = 0; i < slices; i++) {
       final rect = Rect.fromCircle(center: center, radius: radius);
       final sliceStart = startAngle + (i * sliceAngle);
-      // Every slice is identical — no visible prize marker. Just a
-      // gentle even/odd alternation so the divisions read at a glance.
-      // The pointer still mechanically lands on prizeIndex; the reveal
-      // card afterwards is what tells the user they won.
+      final isPrize = i == prizeIndex;
       final fill = Paint()
         ..style = PaintingStyle.fill
         ..shader = SweepGradient(
           startAngle: sliceStart,
           endAngle: sliceStart + sliceAngle,
-          colors: i.isEven
-              ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
-              : [const Color(0xFF141414), const Color(0xFF080808)],
+          colors: isPrize
+              ? [
+                  const Color(0xFF10B981),
+                  const Color(0xFF059669),
+                ]
+              : (i.isEven
+                  ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
+                  : [const Color(0xFF141414), const Color(0xFF080808)]),
         ).createShader(rect);
 
       canvas.drawArc(rect, sliceStart, sliceAngle, true, fill);
@@ -1288,19 +1294,22 @@ class _WheelPainter extends CustomPainter {
         divider,
       );
 
-      // Same "?" glyph on every slice — no prize giveaway before the
-      // reveal card.
+      // Label — question mark for mystery slices, £ for the prize.
       final midAngle = sliceStart + sliceAngle / 2;
       final labelRadius = radius * 0.65;
       final labelPos = center +
           Offset(cos(midAngle) * labelRadius, sin(midAngle) * labelRadius);
+      final label = isPrize ? '£' : '?';
       final tp = TextPainter(
         text: TextSpan(
-          text: '?',
+          text: label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
-            fontSize: 18,
+            color: isPrize ? Colors.white : Colors.white.withOpacity(0.4),
+            fontSize: isPrize ? 26 : 22,
             fontWeight: FontWeight.w900,
+            shadows: isPrize
+                ? [const Shadow(color: Colors.black26, blurRadius: 4)]
+                : null,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -1394,8 +1403,10 @@ class _RescueRevealPage extends StatelessWidget {
                 children: [
                   const _SpecialOfferCard(),
                   const SizedBox(height: 30),
+                  // Rescue price £19.99 vs monthly £7.99 × 12 = £95.88
+                  // → 79.14% less. Rounded down = 79%.
                   const Text(
-                    'Pay 83% less',
+                    'Pay 79% less',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Color(0xFF0A0A0A),
@@ -1520,106 +1531,120 @@ class _SpecialOfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        // Sparkles around the card.
-        const Positioned(left: -8, top: 30, child: _Sparkle(size: 14)),
-        const Positioned(left: 8, top: 130, child: _Sparkle(size: 22, color: _kGold)),
-        const Positioned(left: -6, bottom: 20, child: _Sparkle(size: 26, color: _kGold)),
-        const Positioned(right: -6, top: 20, child: _Sparkle(size: 18)),
-        const Positioned(right: 6, top: 100, child: _Sparkle(size: 12, color: _kGold)),
-        const Positioned(right: -4, bottom: 40, child: _Sparkle(size: 20)),
-        // Card.
-        Container(
-          width: 280,
-          height: 180,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0A),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
+    return SizedBox(
+      width: double.infinity,
+      height: 240,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          // Six sparkles arranged around the card — mixture of gold and
+          // black, matched to the cal.ai reference. Sizes vary for
+          // visual rhythm. Positioned by absolute coordinates from the
+          // sides of the row so they hang off the sides of the card.
+          const Positioned(left: 8, top: 12, child: _Sparkle(size: 18)),
+          const Positioned(left: 46, top: 84, child: _Sparkle(size: 14, color: _kGold)),
+          const Positioned(left: 4, top: 148, child: _Sparkle(size: 26, color: _kGold)),
+          const Positioned(right: 12, top: 20, child: _Sparkle(size: 22)),
+          const Positioned(right: 44, top: 88, child: _Sparkle(size: 14, color: _kGold)),
+          const Positioned(right: 6, top: 168, child: _Sparkle(size: 20)),
+          // Slight tilt on the card + soft shadow underneath = the
+          // floating "sticker" look the reference has.
+          Transform.rotate(
+            angle: -0.03,
+            child: Container(
+              width: 300,
+              height: 200,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 30,
+                    offset: const Offset(4, 14),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Column(
-              children: [
-                // Gold header stripe.
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [Color(0xFFE8B84E), Color(0xFFF4D07A)],
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'SPECIAL OFFER',
-                      style: TextStyle(
-                        color: Color(0xFF0A0A0A),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2.5,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Column(
+                  children: [
+                    // Gold header stripe.
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [Color(0xFFE8B84E), Color(0xFFF4D07A)],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                // Body.
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF1A1509), Color(0xFF0A0A0A)],
-                      ),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '£29.99',
+                      child: const Center(
+                        child: Text(
+                          'SPECIAL OFFER',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Colors.white54,
+                            color: Color(0xFF0A0A0A),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            '£19.99/year',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1.2,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    // Body — gradient from warm dark-gold to black,
+                    // strikethrough regular yearly then bold rescue.
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF241A0A), Color(0xFF0A0A0A)],
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Standard yearly £34.99 struck through.
+                            Text(
+                              '£34.99',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.42),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: Colors.white54,
+                                decorationThickness: 2,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '£19.99/year',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1647,17 +1672,30 @@ class _SparklePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // A 4-point star with sharp tips and concave sides — same silhouette
+    // as the cal.ai reference. Built from 8 anchored points; the inner
+    // waist (at 22% of the max radius) creates the pinch between arms.
     final paint = Paint()
       ..color = color
-      ..style = PaintingStyle.fill;
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
     final w = size.width;
     final h = size.height;
+    final cx = w / 2;
+    final cy = h / 2;
+    final ax = w / 2; // outer arm length x
+    final ay = h / 2; // outer arm length y
+    final ix = ax * 0.22; // inner waist x
+    final iy = ay * 0.22; // inner waist y
     final path = Path()
-      ..moveTo(w / 2, 0)
-      ..quadraticBezierTo(w / 2, h / 2, w, h / 2)
-      ..quadraticBezierTo(w / 2, h / 2, w / 2, h)
-      ..quadraticBezierTo(w / 2, h / 2, 0, h / 2)
-      ..quadraticBezierTo(w / 2, h / 2, w / 2, 0)
+      ..moveTo(cx, cy - ay) // top point
+      ..lineTo(cx + ix, cy - iy)
+      ..lineTo(cx + ax, cy) // right point
+      ..lineTo(cx + ix, cy + iy)
+      ..lineTo(cx, cy + ay) // bottom point
+      ..lineTo(cx - ix, cy + iy)
+      ..lineTo(cx - ax, cy) // left point
+      ..lineTo(cx - ix, cy - iy)
       ..close();
     canvas.drawPath(path, paint);
   }

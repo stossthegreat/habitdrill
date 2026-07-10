@@ -127,7 +127,7 @@ class HabitEngine extends ChangeNotifier {
     debugPrint('✅ Completed habit: ${h.title}');
   }
 
-  Future<void> createHabit({
+  Future<Habit> createHabit({
     required String title,
     required String type,
     required String time,
@@ -186,6 +186,7 @@ class HabitEngine extends ChangeNotifier {
     } else {
       debugPrint('⏰ Alarm NOT scheduled (reminderOn=${habit.reminderOn})');
     }
+    return habit;
   }
 
   Future<void> updateHabit(Habit updated) async {
