@@ -243,6 +243,12 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
   Violation? _activeViolation;
   Habit? _forcedWakeHabit;
   Timer? _wakePoll;
+  // Which wake habit id we already popped routes for. When this
+  // matches the current wake id we skip popUntil so that
+  // MorningAlarmScreen's push of WakeExerciseScreen isn't immediately
+  // popped back off on the next 500 ms timer tick. Cleared whenever
+  // there's no active wake.
+  String? _poppedForWakeId;
 
   @override
   void initState() {
@@ -377,11 +383,33 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     final syncDueWake = WakeDebtService.findDueWakeHabit();
     final wake = _forcedWakeHabit ?? syncDueWake;
     if (wake != null) {
+      // Belt-and-braces: if the user had ANY route pushed on top of
+      // PunishmentGate (Settings, contract editor, terms, etc.) when
+      // the alarm fires, that pushed route stays visible and hides
+      // the punishment screen even though we've swapped the root. Pop
+      // it all off ONCE after this frame so MorningAlarmScreen becomes
+      // the only visible surface. We DON'T re-pop on later rebuilds,
+      // because MorningAlarmScreen legitimately pushes WakeExerciseScreen
+      // during the workout — and we'd otherwise kick the user back to
+      // the alarm every 500 ms.
+      if (_poppedForWakeId != wake.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final nav = Navigator.maybeOf(context);
+          if (nav != null && nav.canPop()) {
+            nav.popUntil((r) => r.isFirst);
+          }
+          _poppedForWakeId = wake.id;
+        });
+      }
       return MorningAlarmScreen(
         key: ValueKey('wake_${wake.id}'),
         habit: wake,
       );
     }
+    // No wake right now — clear the pop marker so a future wake can
+    // reset routes again.
+    _poppedForWakeId = null;
     if (_showPunishment && _activeViolation != null) {
       return PunishmentScreen(
         violation: _activeViolation!,

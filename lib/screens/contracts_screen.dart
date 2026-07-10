@@ -77,6 +77,18 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
   //   if (mounted) setState(() {});
   // }
 
+  /// Open the New Contract screen pre-filled from one of the empty-state
+  /// example chips. Users can still edit anything before saving.
+  Future<void> _openPreset(PresetParams preset) async {
+    HapticFeedback.selectionClick();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => NewContractScreen(preset: preset),
+      ),
+    );
+  }
+
   Future<void> _showAddSheet() async {
     HapticFeedback.mediumImpact();
     final choice = await showModalBottomSheet<String>(
@@ -193,7 +205,11 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
                 ),
               ),
               if (contracts.isEmpty)
-                const SliverToBoxAdapter(child: _EmptyState())
+                SliverToBoxAdapter(
+                  child: _EmptyState(
+                    onPickPreset: _openPreset,
+                  ),
+                )
               else
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1144,7 +1160,23 @@ class _NewContractButton extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final ValueChanged<PresetParams> onPickPreset;
+  const _EmptyState({required this.onPickPreset});
+
+  static const _examples = <PresetParams>[
+    PresetParams(
+      title: '30 mins Exercise',
+      emoji: '💪',
+      targetDays: 30,
+      type: 'habit',
+    ),
+    PresetParams(
+      title: 'Quit Vaping',
+      emoji: '🚭',
+      targetDays: 30,
+      type: 'bad_habit',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1152,32 +1184,111 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 28),
+        padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
         decoration: BoxDecoration(
           color: const Color(0xFF080808),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withOpacity(0.04), width: 1),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'NO ACTIVE CONTRACTS',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
+            Center(
+              child: Text(
+                'NO ACTIVE CONTRACTS',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Pick one below to make your first promise.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.25),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+            const SizedBox(height: 6),
+            Center(
+              child: Text(
+                'Start with one of these — or tap + for a custom one.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.28),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
+            const SizedBox(height: 18),
+            for (int i = 0; i < _examples.length; i++) ...[
+              _ExamplePresetChip(
+                preset: _examples[i],
+                onTap: () => onPickPreset(_examples[i]),
+              ),
+              if (i < _examples.length - 1) const SizedBox(height: 10),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExamplePresetChip extends StatelessWidget {
+  final PresetParams preset;
+  final VoidCallback onTap;
+  const _ExamplePresetChip({required this.preset, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isBad = preset.type == 'bad_habit';
+    final accent = isBad ? AppColors.error : AppColors.emerald;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B0B0B),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withOpacity(0.35), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accent.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Text(preset.emoji, style: const TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    preset.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isBad ? 'RULE · ${preset.targetDays} DAYS' : 'ORDER · ${preset.targetDays} DAYS',
+                    style: TextStyle(
+                      color: accent.withOpacity(0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: accent.withOpacity(0.7), size: 14),
           ],
         ),
       ),

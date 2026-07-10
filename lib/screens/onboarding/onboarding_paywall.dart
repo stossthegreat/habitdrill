@@ -7,9 +7,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../main.dart';
 import '../../design/tokens.dart';
 import '../../services/premium_service.dart';
-import '../main_screen.dart';
 import '../privacy_screen.dart';
 import '../terms_screen.dart';
 import 'onboarding_state.dart';
@@ -129,8 +129,14 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
       await prefs.setBool('seen_onboarding', true);
     } catch (_) {}
     if (!mounted) return;
+    // Route to PunishmentGate (not MainScreen). If we drop straight
+    // into MainScreen, the wake-alarm gate never runs — meaning a user
+    // who finishes onboarding minutes before their alarm fires never
+    // sees the punishment screen unless they hard-close and cold-launch
+    // the app (which THEN routes through AppRouter → PunishmentGate).
+    // That was the "have to close and reopen" bug.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainScreen()),
+      MaterialPageRoute(builder: (_) => const PunishmentGate()),
       (_) => false,
     );
   }
