@@ -1,0 +1,41 @@
+# Codemagic workflow.
+#
+# Why this file exists: Flutter 3.24+ auto-adds Swift Package Manager
+# integration on `flutter build ipa`, and Firebase iOS SDK's SPM
+# Package.swift declares a broken `FirebaseFunctionsCombineSwift`
+# target ("invalid custom path 'FirebaseCombineSwift/Sources/Functions'")
+# that fails resolution even when the app doesn't import Firebase
+# Functions. We already use CocoaPods (see ios/Podfile) so SPM adds
+# nothing. Disable it before every build.
+
+workflows:
+  ios-workflow:
+    name: HabitDrill iOS
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.habitdrill.habitdrill
+    scripts:
+      - name: Disable Flutter's Swift Package Manager integration
+        script: |
+          flutter config --no-enable-swift-package-manager
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Flutter build ipa
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
