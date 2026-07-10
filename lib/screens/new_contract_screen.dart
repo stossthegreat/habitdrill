@@ -8,6 +8,7 @@ import '../providers/habit_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/wheel_time_picker.dart';
 import 'contracts_screen.dart' show PresetParams;
+import 'main_screen.dart' show MainNav;
 
 class NewContractScreen extends ConsumerStatefulWidget {
   final Habit? edit;
@@ -182,11 +183,18 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       if (mounted) setState(() => _saving = false);
       return;
     }
-    // popUntil(isFirst) walks past any intermediate route (templates
-    // sheet, nested pushes) and lands the user back on the Contracts
-    // tab. A single pop was leaving them stranded on the templates
-    // screen when they'd entered through that path.
-    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+    // 1) Explicitly switch MainScreen to the Contracts tab BEFORE
+    //    popping. Without this the user would land on whatever tab
+    //    was last active (usually Today), matching the "stuck" bug
+    //    they reported. MainNav is a global ValueNotifier that
+    //    MainScreen listens to.
+    // 2) popUntil(isFirst) then walks back past every pushed route
+    //    (create screen, templates, wherever they came from) and
+    //    drops them at the root — which is now the Contracts tab.
+    if (mounted) {
+      MainNav.goToContracts();
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
   }
 
   @override

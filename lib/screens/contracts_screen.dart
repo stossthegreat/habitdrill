@@ -88,8 +88,9 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
       await _openNewWakeAlarm();
     } else if (choice == 'contract') {
       HapticFeedback.selectionClick();
-      // Empty title so the field stays as placeholder — user types
-      // their own goal. Type + default emoji + duration primed.
+      // One entry point for both Contracts and Laws. NewContractScreen
+      // has an in-screen TYPE toggle (ORDER / RULE) so the user
+      // picks the flavour there. No template screen anymore.
       await Navigator.of(context).push(
         MaterialPageRoute(
           fullscreenDialog: true,
@@ -103,23 +104,6 @@ class _ContractsScreenState extends ConsumerState<ContractsScreen> {
           ),
         ),
       );
-    } else if (choice == 'law') {
-      HapticFeedback.selectionClick();
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => const NewContractScreen(
-            preset: PresetParams(
-              title: '',
-              emoji: '🚫',
-              targetDays: 90,
-              type: 'bad_habit',
-            ),
-          ),
-        ),
-      );
-    } else if (choice == 'templates') {
-      await _openTemplates();
     }
   }
 
@@ -329,21 +313,9 @@ class _AddSheet extends StatelessWidget {
           ),
           _SheetOption(
             icon: LucideIcons.scroll,
-            title: 'NEW CONTRACT',
-            subtitle: 'A goal to build. Exercise, study, whatever compounds.',
+            title: 'NEW CONTRACT & LAW',
+            subtitle: 'A goal to build or a rule to break. Same screen.',
             onTap: () => Navigator.of(context).pop('contract'),
-          ),
-          _SheetOption(
-            icon: LucideIcons.ban,
-            title: 'NEW LAW',
-            subtitle: 'A rule to break. Vape, porn, junk. We pick the price.',
-            onTap: () => Navigator.of(context).pop('law'),
-          ),
-          _SheetOption(
-            icon: LucideIcons.layoutGrid,
-            title: 'BROWSE TEMPLATES',
-            subtitle: 'Pick from the popular ones.',
-            onTap: () => Navigator.of(context).pop('templates'),
           ),
           const SizedBox(height: 4),
         ],

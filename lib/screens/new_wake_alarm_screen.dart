@@ -10,6 +10,7 @@ import '../providers/habit_provider.dart';
 import '../services/analytics_service.dart';
 import '../services/wake_mission_prefs.dart';
 import '../widgets/wheel_time_picker.dart';
+import 'main_screen.dart' show MainNav;
 
 /// New (or edit) Wake Alarm — the standalone morning-punishment builder.
 /// Structure mirrors the reference screenshot: name → time → days →
@@ -150,10 +151,14 @@ class _NewWakeAlarmScreenState extends ConsumerState<NewWakeAlarmScreen> {
       reps: _reps,
     );
 
-    // popUntil(isFirst) → all the way back to the Contracts tab so
-    // the user sees the alarm they just made, not the previous
-    // sheet or a stale card.
-    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+    // Explicitly land on the Contracts tab so the alarm the user
+    // just saved is visible immediately. MainNav notifies MainScreen
+    // to switch tabs; popUntil unwinds every pushed route above the
+    // root.
+    if (mounted) {
+      MainNav.goToContracts();
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
   }
 
   @override
