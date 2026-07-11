@@ -13,6 +13,8 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../design/tokens.dart';
 import '../../services/alarm_service.dart';
+import '../../services/review_prompt_service.dart';
+import '../../services/wake_siren_service.dart';
 
 /// Shown the moment the user finishes their morning wake reps. It's the
 /// payoff — the whole point of enduring the alarm cascade. Confetti-free
@@ -68,17 +70,40 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
     _flex = _flexStatements[Random().nextInt(_flexStatements.length)];
     HapticFeedback.heavyImpact();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    // NOW kill the shark. The alarm cascade was still ringing through
-    // the entire workout — it stops the moment this celebration
-    // screen mounts, and not a second earlier. cancelWakeEscalations
-    // also cancels the AlarmKit retries under the hood.
+    // NOW kill the shark — every noisemaker at once, in one place:
+    //   1. WakeSirenService: the in-app looping "MOVE IT" siren
+    //      that's been screaming through the workout.
+    //   2. AlarmKit cascade retries (kills every queued 10s alarm).
+    //   3. flutter_local_notifications escalation pings.
+    // The workout screens intentionally leave all three running so
+    // the alarm is relentless up to the celebration moment.
     Future.microtask(() async {
+      try {
+        await WakeSirenService.stop();
+      } catch (e) {
+        debugPrint('WakeComplete: siren stop failed: $e');
+      }
       try {
         await AlarmService.cancelWakeEscalations(widget.habitId);
       } catch (e) {
         debugPrint('WakeComplete: cancel escalations failed: $e');
       }
     });
+  }
+
+  void _returnToBase() {
+    // Use OUR own live context — NOT widget.onClose. The onClose
+    // closure passed from WakeExerciseScreen captured a build context
+    // that's now dead (WakeExerciseScreen was pushReplaced by this
+    // route). Calling Navigator.of on a dead context is a no-op, which
+    // is why RETURN TO BASE looked broken. Popping to root from THIS
+    // context works because our route is live.
+    HapticFeedback.mediumImpact();
+    // Prime aha moment #1 — the user just won the morning battle.
+    // iOS's SKStoreReviewController is throttled to ~3 prompts/year,
+    // so this is safe to fire from every return-to-base tap.
+    ReviewPromptService.maybeAsk(alsoRegisterAha: true);
+    Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
   Future<void> _share() async {
@@ -166,7 +191,7 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
                 const SizedBox(height: 10),
                 _SecondaryButton(
                   label: 'RETURN TO BASE',
-                  onTap: widget.onClose,
+                  onTap: _returnToBase,
                 ).animate(delay: 600.ms).fadeIn(),
                 const SizedBox(height: 20),
               ],
