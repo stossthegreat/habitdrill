@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../services/wake_debt_service.dart';
+import '../services/wake_mission_prefs.dart';
 import '../services/wake_siren_service.dart';
 import 'sergeant/wake_exercise_screen.dart';
 
@@ -33,6 +34,12 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   Timer? _hapticTimer;
   Timer? _tickTimer;
   bool _handingOff = false;
+  // User-picked mission for THIS wake alarm — read once when the
+  // screen mounts. Falls back to squats if we can't find one (edge
+  // case: brand-new habit whose mission never got persisted). This
+  // is what drives the "N HIGH KNEES TO ESCAPE" pill so it stops
+  // lying by hard-coding "SQUATS".
+  Mission _mission = WakeMissionPrefs.missions.first;
 
   @override
   void initState() {
@@ -55,6 +62,12 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     _tickTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
     });
+    // Load the user's mission asynchronously — pull from
+    // WakeMissionPrefs and rebuild once the label can be truthful.
+    () async {
+      final m = await WakeMissionPrefs.getMission(widget.habit.id);
+      if (mounted) setState(() => _mission = m);
+    }();
   }
 
   Future<void> _handoffToExercise() async {
@@ -144,7 +157,7 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _RepsPill(reps: reps),
+                    _RepsPill(reps: reps, missionName: _mission.name),
                     const Spacer(flex: 2),
                     _SlideToPunish(onCompleted: _handoffToExercise),
                     const SizedBox(height: 32),
@@ -232,7 +245,8 @@ class _AlarmBadge extends StatelessWidget {
 
 class _RepsPill extends StatelessWidget {
   final int reps;
-  const _RepsPill({required this.reps});
+  final String missionName;
+  const _RepsPill({required this.reps, required this.missionName});
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +266,7 @@ class _RepsPill extends StatelessWidget {
         ],
       ),
       child: Text(
-        '$reps SQUATS TO ESCAPE',
+        '$reps ${missionName.toUpperCase()} TO ESCAPE',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 15,
