@@ -7,6 +7,7 @@ import '../services/local_storage.dart';
 import '../services/alarm_service.dart';
 import '../services/sergeant_service.dart';
 import '../services/discipline_service.dart';
+import '../services/rule_break_ledger.dart';
 
 class HabitEngine extends ChangeNotifier {
   final LocalStorageService localStorageService;
@@ -216,21 +217,41 @@ class HabitEngine extends ChangeNotifier {
   Future<Violation?> toggleHabitCompletion(String habitId) async {
     final habit = _habits.firstWhere((h) => h.id == habitId);
 
-    // Bad habits: "completing" means user indulged → trigger sergeant.
-    // Streak is a CLEAN-DAYS counter for Laws; pressing "I broke it"
-    // resets it to 0. The daily check job increments it by 1 for every
-    // day a rule wasn't broken (see DisciplineService.runDailyCheck).
+    // Bad habits: "completing" means user indulged.
+    // Rules:
+    //   * FIRST break of the day → full drill-sergeant punishment
+    //     (returned via Violation), streak zeroed, RuleBreakLedger
+    //     records the streak that was lost so the shame card can
+    //     display it. Home rule card locks into BROKEN-for-today
+    //     state.
+    //   * Subsequent breaks the SAME day → the ledger counter goes
+    //     up (so the shame card can read "OFFENSE #3 TODAY") but no
+    //     new physical workout fires — punishment fatigue kills app
+    //     engagement, one workout per day is the ceiling.
     if (habit.type == 'bad_habit') {
-      final violation = await SergeantService.triggerBadHabitViolation(habit);
-      final updated = habit.copyWith(
-        done: true,
-        completedAt: DateTime.now(),
-        streak: 0,
+      final streakAtTime = habit.streak;
+      final isFirstBreak = await RuleBreakLedger.recordBreak(
+        habit.id,
+        streakAtTime: streakAtTime,
       );
-      await LocalStorageService.saveHabit(updated);
-      final idx = _habits.indexWhere((h) => h.id == habitId);
-      if (idx != -1) {
-        _habits[idx] = updated;
+      Violation? violation;
+      if (isFirstBreak) {
+        violation = await SergeantService.triggerBadHabitViolation(habit);
+        final updated = habit.copyWith(
+          done: true,
+          completedAt: DateTime.now(),
+          streak: 0,
+        );
+        await LocalStorageService.saveHabit(updated);
+        final idx = _habits.indexWhere((h) => h.id == habitId);
+        if (idx != -1) {
+          _habits[idx] = updated;
+          notifyListeners();
+        }
+      } else {
+        // Repeat break — the habit is already in the broken state
+        // from the first tap today. Just notify so any cards that
+        // read RuleBreakLedger.offensesToday can redraw.
         notifyListeners();
       }
       return violation;

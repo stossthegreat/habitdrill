@@ -24,6 +24,7 @@ import '../../widgets/pt_setup_advice_screen.dart';
 import '../../services/sergeant_audio_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/ledger_service.dart';
+import '../../services/rule_break_ledger.dart';
 
 class ExerciseCircuitScreen extends StatefulWidget {
   /// Punishment flow: violation drives the exercise set.
@@ -784,6 +785,13 @@ class _ShameShareCard extends StatelessWidget {
         ? 'Broke my rule.\nOwn it. Move on.'
         : "Skipped the order.\nOwn it. Move on.";
 
+    // Per-day counters — sourced from RuleBreakLedger which is
+    // written the moment `confess()` runs on Home. streakLost is the
+    // value we zeroed on the FIRST break of the day, so if this is
+    // that first break we've got the number to shame with.
+    final streakLost = RuleBreakLedger.streakLostToday(v.habitId);
+    final todayOffenses = RuleBreakLedger.offensesToday(v.habitId);
+
     return Container(
       width: 320,
       padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
@@ -877,6 +885,19 @@ class _ShameShareCard extends StatelessWidget {
               height: 1,
             ),
           ),
+          if (streakLost > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              'LOST A $streakLost-DAY STREAK',
+              style: TextStyle(
+                color: AppColors.error.withOpacity(0.85),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -897,15 +918,34 @@ class _ShameShareCard extends StatelessWidget {
               const SizedBox(width: 10),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'OFFENSE',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    height: 1,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'OFFENSE',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        height: 1,
+                      ),
+                    ),
+                    if (todayOffenses > 1) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'X$todayOffenses TODAY',
+                        style: TextStyle(
+                          color: AppColors.error.withOpacity(0.9),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
