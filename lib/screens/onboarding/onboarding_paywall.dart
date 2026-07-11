@@ -1264,20 +1264,19 @@ class _WheelPainter extends CustomPainter {
     for (int i = 0; i < slices; i++) {
       final rect = Rect.fromCircle(center: center, radius: radius);
       final sliceStart = startAngle + (i * sliceAngle);
-      final isPrize = i == prizeIndex;
+      // Every slice is identical — no visible prize marker. Gentle
+      // even/odd alternation so the divisions read, but no colour
+      // hint about where the wheel will land. The pointer still
+      // mechanically stops at prizeIndex; the reveal card afterwards
+      // is what tells the user they won.
       final fill = Paint()
         ..style = PaintingStyle.fill
         ..shader = SweepGradient(
           startAngle: sliceStart,
           endAngle: sliceStart + sliceAngle,
-          colors: isPrize
-              ? [
-                  const Color(0xFF10B981),
-                  const Color(0xFF059669),
-                ]
-              : (i.isEven
-                  ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
-                  : [const Color(0xFF141414), const Color(0xFF080808)]),
+          colors: i.isEven
+              ? [const Color(0xFF1A1A1A), const Color(0xFF0D0D0D)]
+              : [const Color(0xFF141414), const Color(0xFF080808)],
         ).createShader(rect);
 
       canvas.drawArc(rect, sliceStart, sliceAngle, true, fill);
@@ -1294,22 +1293,18 @@ class _WheelPainter extends CustomPainter {
         divider,
       );
 
-      // Label — question mark for mystery slices, £ for the prize.
+      // Same "?" glyph on every slice — no giveaway.
       final midAngle = sliceStart + sliceAngle / 2;
       final labelRadius = radius * 0.65;
       final labelPos = center +
           Offset(cos(midAngle) * labelRadius, sin(midAngle) * labelRadius);
-      final label = isPrize ? '£' : '?';
       final tp = TextPainter(
         text: TextSpan(
-          text: label,
+          text: '?',
           style: TextStyle(
-            color: isPrize ? Colors.white : Colors.white.withOpacity(0.4),
-            fontSize: isPrize ? 26 : 22,
+            color: Colors.white.withOpacity(0.4),
+            fontSize: 22,
             fontWeight: FontWeight.w900,
-            shadows: isPrize
-                ? [const Shadow(color: Colors.black26, blurRadius: 4)]
-                : null,
           ),
         ),
         textDirection: TextDirection.ltr,

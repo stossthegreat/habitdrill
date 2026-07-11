@@ -3253,7 +3253,11 @@ class _TrialBridge extends StatelessWidget {
             ),
           ).animate(delay: 600.ms).fadeIn(),
           const Spacer(),
-          _PrimaryButton(label: 'START MY FREE TRIAL', onTap: onNext)
+          // "CONTINUE" — the two paywall stages after this bridge each
+          // have their own real trial/subscribe CTA. This screen is
+          // just an emotional handoff to the paywall, so it shouldn't
+          // read as the moment they commit.
+          _PrimaryButton(label: 'CONTINUE', onTap: onNext)
               .animate(delay: 800.ms).fadeIn().slideY(begin: 0.05, end: 0),
         ],
       ),

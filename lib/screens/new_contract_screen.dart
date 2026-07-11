@@ -232,26 +232,26 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       if (mounted) setState(() => _saving = false);
       return;
     }
-    // Contracts and laws want a NORMAL single-ping reminder, NOT the
-    // drill-sergeant wake cascade. Register the habit id so
-    // AlarmService uses the single-notification path and
-    // PunishmentGate skips it. If the user turned the alarm off, we
-    // still register (harmless — the scheduler bails on !reminderOn).
-    if (saved != null && reminderOn && timeStr.isNotEmpty) {
-      try {
-        await NormalReminderRegistry.mark(saved.id);
-        // Kick a reschedule so the notification is registered with iOS
-        // right now — otherwise the user gets nothing until the next
-        // app resume.
-        await AlarmService.scheduleAlarm(saved);
-      } catch (e) {
-        debugPrint('Contract reminder scheduling failed: $e');
-      }
-    } else if (saved != null) {
-      // Alarm removed on edit — clear the registry entry.
-      try {
-        await NormalReminderRegistry.unmark(saved.id);
-      } catch (_) {}
+    // Fire-and-forget the reminder registry + notification
+    // scheduling. scheduleAlarm cancels 7×20 pending pings and
+    // re-registers them, which was blocking the UI for 1-2 seconds
+    // between the SAVE tap and the pop back to Contracts. Move it
+    // off the critical path — nothing after here needs the result.
+    if (saved != null) {
+      final Habit target = saved;
+      // ignore: unawaited_futures
+      Future(() async {
+        try {
+          if (reminderOn && timeStr.isNotEmpty) {
+            await NormalReminderRegistry.mark(target.id);
+            await AlarmService.scheduleAlarm(target);
+          } else {
+            await NormalReminderRegistry.unmark(target.id);
+          }
+        } catch (e) {
+          debugPrint('Contract reminder scheduling (async) failed: $e');
+        }
+      });
     }
     // 1) Explicitly switch MainScreen to the Contracts tab BEFORE
     //    popping. Without this the user would land on whatever tab
