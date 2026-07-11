@@ -29,21 +29,21 @@ class HabitEngine extends ChangeNotifier {
     _habits.add(h);
     notifyListeners();
 
-    // Schedule the alarm in the background — awaiting it was blocking
-    // the save-flow UI for 1-2s while AlarmService tore down 7×20
-    // pending notifications and re-scheduled them. The caller
-    // (NewContractScreen / NewWakeAlarmScreen) can now pop
-    // immediately.
+    // Schedule alarm if reminder is enabled.
+    // NOTE: this call is AWAITED. A previous "fire-and-forget"
+    // variant was tempting for save-routing speed but left the
+    // alarm unscheduled when the surrounding flow tore down the
+    // context before the background Future() ran — that's the
+    // "alarm we had is broken again" regression the user hit.
+    // If the schedule call slows the save flow, the fix belongs at
+    // the AlarmService layer, not by dropping the await here.
     if (h.reminderOn && h.time.isNotEmpty) {
-      // ignore: unawaited_futures
-      Future(() async {
-        try {
-          await AlarmService.scheduleAlarm(h);
-          debugPrint('✅ Alarm scheduled (async) for habit: ${h.title}');
-        } catch (e) {
-          debugPrint('⚠️ Failed to schedule alarm for habit "${h.title}": $e');
-        }
-      });
+      try {
+        await AlarmService.scheduleAlarm(h);
+        debugPrint('✅ Alarm scheduled successfully for habit: ${h.title}');
+      } catch (e) {
+        debugPrint('⚠️ Failed to schedule alarm for habit "${h.title}": $e');
+      }
     } else {
       debugPrint('⏰ No alarm scheduled for "${h.title}" (reminderOn=${h.reminderOn}, time="${h.time}")');
     }
@@ -203,24 +203,12 @@ class HabitEngine extends ChangeNotifier {
       _habits[idx] = updated;
       notifyListeners();
 
-      // Fire-and-forget the alarm cancel+reschedule. Same reason as
-      // addHabit — this cascade of iOS notification calls was the
-      // multi-second pause between SAVE tap and the Contracts tab
-      // showing up. The persistence and in-memory update above are
-      // synchronous, so the UI is already correct by the time this
-      // runs in the background.
-      // ignore: unawaited_futures
-      Future(() async {
-        try {
-          await AlarmService.cancelAlarm(updated.id);
-          if (updated.reminderOn && updated.time.isNotEmpty) {
-            await AlarmService.scheduleAlarm(updated);
-            debugPrint('🔔 Rescheduled (async) alarm for "${updated.title}"');
-          }
-        } catch (e) {
-          debugPrint('⚠️ Failed to reschedule alarm for "${updated.title}": $e');
-        }
-      });
+      // Update alarms — awaited for the same reason as addHabit above.
+      await AlarmService.cancelAlarm(updated.id);
+      if (updated.reminderOn && updated.time.isNotEmpty) {
+        await AlarmService.scheduleAlarm(updated);
+        debugPrint('🔔 Rescheduled alarm for "${updated.title}"');
+      }
     }
   }
 

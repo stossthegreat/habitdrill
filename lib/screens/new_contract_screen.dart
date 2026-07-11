@@ -232,26 +232,22 @@ class _NewContractScreenState extends ConsumerState<NewContractScreen> {
       if (mounted) setState(() => _saving = false);
       return;
     }
-    // Fire-and-forget the reminder registry + notification
-    // scheduling. scheduleAlarm cancels 7×20 pending pings and
-    // re-registers them, which was blocking the UI for 1-2 seconds
-    // between the SAVE tap and the pop back to Contracts. Move it
-    // off the critical path — nothing after here needs the result.
-    if (saved != null) {
-      final Habit target = saved;
-      // ignore: unawaited_futures
-      Future(() async {
-        try {
-          if (reminderOn && timeStr.isNotEmpty) {
-            await NormalReminderRegistry.mark(target.id);
-            await AlarmService.scheduleAlarm(target);
-          } else {
-            await NormalReminderRegistry.unmark(target.id);
-          }
-        } catch (e) {
-          debugPrint('Contract reminder scheduling (async) failed: $e');
-        }
-      });
+    // Register the id as a NORMAL reminder (single ping, no wake
+    // cascade) and schedule the alarm. AWAITED — a previous
+    // fire-and-forget variant left alarms unscheduled when the pop
+    // tore down the state before the background Future ran. That
+    // was the "alarm we had is broken again" regression.
+    if (saved != null && reminderOn && timeStr.isNotEmpty) {
+      try {
+        await NormalReminderRegistry.mark(saved.id);
+        await AlarmService.scheduleAlarm(saved);
+      } catch (e) {
+        debugPrint('Contract reminder scheduling failed: $e');
+      }
+    } else if (saved != null) {
+      try {
+        await NormalReminderRegistry.unmark(saved.id);
+      } catch (_) {}
     }
     // 1) Explicitly switch MainScreen to the Contracts tab BEFORE
     //    popping. Without this the user would land on whatever tab
