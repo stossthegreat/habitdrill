@@ -17,6 +17,7 @@ import '../services/sergeant_service.dart';
 import '../services/discipline_service.dart';
 import '../services/premium_service.dart';
 import '../services/analytics_service.dart';
+import '../services/normal_reminder_registry.dart';
 import '../models/habit.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -146,11 +147,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final dayOrders = allHabits.where((h) => h.isScheduledForDate(_selectedDate)).toList();
     final hasFailed = SergeantService.hasPendingPunishment();
 
-    // Split the day. The wake alarm gets its own hero — different weight
-    // from a regular contract because it is the keystone habit and the
-    // one thing the whole app is built around.
+    // Split the day. The wake alarm gets its own hero — different
+    // weight from a regular contract because it is the keystone habit
+    // and the one thing the whole app is built around. Contracts with
+    // a plain reminder (NormalReminderRegistry) are NOT wake alarms —
+    // they belong under ORDERS just like the timeless contracts.
     final wakeAlarms = dayOrders
-        .where((h) => h.type == 'habit' && h.time.isNotEmpty && h.reminderOn)
+        .where((h) =>
+            h.type == 'habit' &&
+            h.time.isNotEmpty &&
+            h.reminderOn &&
+            !NormalReminderRegistry.isNormalReminder(h.id))
         .toList();
     final orders = dayOrders
         .where((h) => h.type != 'bad_habit' && !wakeAlarms.contains(h))

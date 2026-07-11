@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../design/tokens.dart';
 import '../../services/alarm_service.dart';
+import '../../services/review_prompt_service.dart';
 import '../../services/wake_siren_service.dart';
 
 /// Shown the moment the user finishes their morning wake reps. It's the
@@ -98,6 +99,10 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
     // is why RETURN TO BASE looked broken. Popping to root from THIS
     // context works because our route is live.
     HapticFeedback.mediumImpact();
+    // Prime aha moment #1 — the user just won the morning battle.
+    // iOS's SKStoreReviewController is throttled to ~3 prompts/year,
+    // so this is safe to fire from every return-to-base tap.
+    ReviewPromptService.maybeAsk(alsoRegisterAha: true);
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
