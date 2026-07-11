@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../design/tokens.dart';
 import '../models/habit.dart';
 import '../services/wake_debt_service.dart';
+import '../services/wake_siren_service.dart';
 import 'sergeant/wake_exercise_screen.dart';
 
 /// The morning wake alarm — Erly-killer.
@@ -38,10 +39,15 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
     super.initState();
     WakeDebtService.markActive(widget.habit.id);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    // NO in-app audio — the AlarmKit cascade is what makes the phone
-    // ring nonstop. A local AudioPlayer here (previous "wake siren"
-    // build) took ownership of the AVAudioSession and silenced every
-    // AlarmKit ring after the first. Just haptic + AlarmKit.
+    // In-app siren — takes over as the noisemaker the moment the app
+    // is foregrounded, since iOS mutes further AlarmKit alerts once
+    // the app is active. AVAudioSession is set to playback +
+    // mixWithOthers in main.dart so this coexists with any AlarmKit
+    // ring instead of ducking it. WakeSirenService.stop() is called
+    // from WakeCompleteScreen.initState AFTER reps land.
+    WakeSirenService.start();
+    // Own haptic timer is redundant with the siren's, but keep it
+    // running for extra pressure while this specific screen is up.
     _hapticTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
       HapticFeedback.heavyImpact();
     });
@@ -54,6 +60,7 @@ class _MorningAlarmScreenState extends ConsumerState<MorningAlarmScreen> {
   Future<void> _handoffToExercise() async {
     if (_handingOff) return;
     _handingOff = true;
+    // Do NOT stop the siren here — it must ring through the workout.
     _hapticTimer?.cancel();
     _tickTimer?.cancel();
     HapticFeedback.heavyImpact();
