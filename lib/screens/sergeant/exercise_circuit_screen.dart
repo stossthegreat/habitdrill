@@ -1,9 +1,16 @@
-import 'dart:io' show Platform;
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../design/tokens.dart';
 import '../../models/violation.dart';
@@ -605,12 +612,52 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     );
   }
 
+  final GlobalKey _shameCardKey = GlobalKey();
+  bool _shareBusy = false;
+
+  Future<void> _shareShame() async {
+    if (_shareBusy) return;
+    _shareBusy = true;
+    HapticFeedback.mediumImpact();
+    try {
+      final ctx = _shameCardKey.currentContext;
+      if (ctx == null) return;
+      final boundary = ctx.findRenderObject() as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      final bytes = byteData.buffer.asUint8List();
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        '${dir.path}/habitdrill_shame_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Broke my promise. Paid the price.\nHabitDrill.',
+      );
+    } catch (e) {
+      debugPrint('shame share failed: $e');
+    } finally {
+      _shareBusy = false;
+    }
+  }
+
   Widget _buildDismissed() {
+    final v = widget.violation;
+    // The wake flow doesn't come through here (its share screen is
+    // WakeCompleteScreen), so if there's no violation this is a
+    // generic "punishment done" state and we just show the simple
+    // check-mark + button. When there IS a violation, render the
+    // shaming share card.
+    if (v == null) return _buildSimpleDismissed();
+    return _buildShameCard(v);
+  }
+
+  Widget _buildSimpleDismissed() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _finishNow,
+      body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -628,23 +675,346 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
               ).animate(delay: 200.ms).fadeIn(),
               const SizedBox(height: 12),
               Text(
-                'Don\'t fail again.',
+                "Don't fail again.",
                 style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w600),
               ).animate(delay: 500.ms).fadeIn(),
               const SizedBox(height: 48),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.emerald,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: AppColors.emerald.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 4))],
-                ),
-                child: const Text(
-                  'RETURN TO BASE',
-                  style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
-                ),
-              ).animate(delay: 800.ms).fadeIn(),
+              _ReturnToBaseButton(onTap: _finishNow)
+                  .animate(delay: 800.ms).fadeIn(),
+              const SizedBox(height: 24),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShameCard(Violation v) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              _ShameBadge(offense: v.offenseNumber),
+              const SizedBox(height: 18),
+              const Text(
+                'DEBT PAID.\nDON\'T DO IT AGAIN.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1,
+                  height: 1.02,
+                ),
+              ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.05, end: 0),
+              const SizedBox(height: 22),
+              Expanded(
+                child: Center(
+                  child: RepaintBoundary(
+                    key: _shameCardKey,
+                    child: _ShameShareCard(v: v),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _SharePrimaryButton(onTap: _shareShame)
+                  .animate(delay: 500.ms).fadeIn().slideY(begin: 0.05, end: 0),
+              const SizedBox(height: 10),
+              _ReturnToBaseButton(onTap: _finishNow)
+                  .animate(delay: 600.ms).fadeIn(),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────── Shame UI pieces ─────────────────────────
+
+class _ShameBadge extends StatelessWidget {
+  final int offense;
+  const _ShameBadge({required this.offense});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.error.withOpacity(0.55), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            'OFFENSE #$offense',
+            style: TextStyle(
+              color: AppColors.error,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 3,
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+}
+
+class _ShameShareCard extends StatelessWidget {
+  final Violation v;
+  const _ShameShareCard({required this.v});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final date = DateFormat('EEE · d MMM').format(now).toUpperCase();
+    final time = DateFormat('HH:mm').format(now);
+
+    final line = v.violationType == 'indulged'
+        ? 'Broke my rule.\nOwn it. Move on.'
+        : "Skipped the order.\nOwn it. Move on.";
+
+    return Container(
+      width: 320,
+      padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A0606), Color(0xFF0A0303)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.error.withOpacity(0.5), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.error.withOpacity(0.30),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 6,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: 'Habit',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Drill',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                date,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text(
+            v.habitTitle.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'BROKEN AT $time',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '#${v.offenseNumber}',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontSize: 66,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -3,
+                  height: 1,
+                  shadows: [
+                    Shadow(color: AppColors.error.withOpacity(0.55), blurRadius: 26),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'OFFENSE',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(height: 1, color: Colors.white.withOpacity(0.06)),
+          const SizedBox(height: 12),
+          Text(
+            line,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              height: 1.3,
+              letterSpacing: -0.1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                'HABITDRILL.APP',
+                style: TextStyle(
+                  color: AppColors.error.withOpacity(0.9),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'THE DRILL SGT. APP',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.3),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SharePrimaryButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _SharePrimaryButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          gradient: AppColors.emeraldGradient,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.emerald.withOpacity(0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.share2, color: Colors.black, size: 18),
+            SizedBox(width: 10),
+            Text(
+              'SHARE THE SHAME',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReturnToBaseButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ReturnToBaseButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Text(
+          'RETURN TO BASE',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.55),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2.5,
           ),
         ),
       ),
