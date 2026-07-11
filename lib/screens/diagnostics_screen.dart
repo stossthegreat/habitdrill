@@ -199,6 +199,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   ),
                   const SizedBox(height: 20),
                   _section('TEST FIRE'),
+                  _hint(
+                    'Each tap uses a unique id (timestamped) so back-to-back probes do NOT replace each other — you get one alarm per press.',
+                  ),
                   _button(
                     icon: Icons.flash_on,
                     label: 'FIRE TEST NOTIFICATION NOW',
@@ -233,7 +236,11 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   _section('HABITS (${_habits.length})'),
                   ..._habits.map(_habitRow),
                   const SizedBox(height: 20),
-                  _section('PENDING NOTIFICATIONS (${_pending.length})'),
+                  _section('PENDING NOTIFICATIONS (${_pending.length} / 64 iOS cap)'),
+                  if (_pending.length >= 60)
+                    _warnBanner(
+                      'iOS caps pending notifications at ~64 per app. You are close to the ceiling — anything scheduled beyond it is silently dropped.',
+                    ),
                   if (_pending.isEmpty)
                     _hint('No notifications queued with iOS.'),
                   ..._pending.map(_pendingRow),
@@ -418,11 +425,17 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         : isNormal
             ? 'CONTRACT REMINDER'
             : (h.time.isNotEmpty ? 'WAKE ALARM' : 'ORDER');
-    final future = WakeMissionPrefs.getMission(h.id);
-    return FutureBuilder<Mission>(
-      future: future,
+    // Load mission + reps together so the display doesn't say
+    // 'reps={loading}'. FutureBuilder rebuilds when both resolve.
+    Future<({Mission mission, int reps})> loadMissionReps() async {
+      final m = await WakeMissionPrefs.getMission(h.id);
+      final r = await WakeMissionPrefs.getReps(h.id);
+      return (mission: m, reps: r);
+    }
+    return FutureBuilder<({Mission mission, int reps})>(
+      future: loadMissionReps(),
       builder: (context, snap) {
-        final mission = snap.data;
+        final data = snap.data;
         return Container(
           margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -469,9 +482,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
               if (h.time.isNotEmpty && h.reminderOn && !isNormal) ...[
                 const SizedBox(height: 4),
                 Text(
-                  mission == null
+                  data == null
                       ? 'mission=loading…'
-                      : 'mission=${mission.name}  reps={loading}',
+                      : 'mission=${data.mission.name}  reps=${data.reps}',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.55),
                     fontSize: 11,
@@ -479,6 +492,15 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: 4),
+              Text(
+                'id=${h.id}  streak=${h.streak}  done=${h.isDoneOn(DateTime.now())}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.35),
+                  fontSize: 10,
+                  fontFamily: 'Menlo',
+                ),
+              ),
             ],
           ),
         );
@@ -550,6 +572,34 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             fontSize: 12,
             fontStyle: FontStyle.italic,
           ),
+        ),
+      );
+
+  Widget _warnBanner(String s) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.error.withOpacity(0.4)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                s,
+                style: TextStyle(
+                  color: AppColors.error.withOpacity(0.9),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 }

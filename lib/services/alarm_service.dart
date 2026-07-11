@@ -808,12 +808,14 @@ class AlarmService {
     }
   }
 
-  /// Dispatch an immediate test notification. If iOS is going to
-  /// silently drop us this call will make it obvious.
+  /// Dispatch an immediate test notification. Unique id per call
+  /// (timestamp-derived) so back-to-back probes don't replace each
+  /// other — iOS replaces silently when you reuse an id.
   static Future<bool> fireTestNotificationNow() async {
     try {
+      final id = 999000 + (DateTime.now().millisecondsSinceEpoch % 900);
       await _notifications.show(
-        999998,
+        id,
         '🧪 HABITDRILL TEST',
         'If you see this, foreground notifications are wired.',
         const NotificationDetails(
@@ -841,8 +843,10 @@ class AlarmService {
 
   /// Schedule a plain notification 30 seconds from now — end-to-end
   /// probe of the "future alarm" pipeline. Returns the fire time.
+  /// Uses a unique id per call (timestamp-derived) so running the
+  /// probe twice within 60 seconds gives you TWO alarms not one.
   static Future<DateTime> scheduleTestAlarmIn30Seconds() async {
-    final testId = 999997;
+    final testId = 998000 + (DateTime.now().millisecondsSinceEpoch % 900);
     final fireAt = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
     try {
       await _notifications.zonedSchedule(
