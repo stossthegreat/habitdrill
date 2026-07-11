@@ -92,20 +92,19 @@ Future<void> main() async {
       debugPrint('AlarmService init failed: $e');
     }
 
-    // Configure iOS audio session so alarm + sergeant audio play at
-    // full volume even when the phone is on silent. This is what
-    // Alarmy / Sleep Cycle do — AVAudioSessionCategory.playback
-    // overrides the physical silent switch for our session.
-    //
-    // NOTE: no `duckOthers` — we run our own in-app "shark" siren
-    // (WakeSirenService) that must play ALONGSIDE the AlarmKit
-    // cascade, not duck it. `mixWithOthers` lets both play.
+    // Configure iOS audio session so alarm + sergeant audio play at full
+    // volume even when the phone is on silent. This is what Alarmy /
+    // Sleep Cycle do — AVAudioSessionCategory.playback overrides the
+    // physical silent switch for our session.
     try {
       await AudioPlayer.global.setAudioContext(
         const AudioContext(
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: [AVAudioSessionOptions.mixWithOthers],
+            options: [
+              AVAudioSessionOptions.mixWithOthers,
+              AVAudioSessionOptions.duckOthers,
+            ],
           ),
           android: AudioContextAndroid(
             isSpeakerphoneOn: false,

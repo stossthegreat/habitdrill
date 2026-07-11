@@ -13,7 +13,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../design/tokens.dart';
 import '../../services/alarm_service.dart';
-import '../../services/wake_siren_service.dart';
 
 /// Shown the moment the user finishes their morning wake reps. It's the
 /// payoff — the whole point of enduring the alarm cascade. Confetti-free
@@ -69,19 +68,10 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
     _flex = _flexStatements[Random().nextInt(_flexStatements.length)];
     HapticFeedback.heavyImpact();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    // NOW kill the shark — every noisemaker at once, in one place:
-    //   1. WakeSirenService: the in-app looping "MOVE IT" siren
-    //      that's been screaming through the workout.
-    //   2. AlarmKit cascade retries (kills every queued 10s alarm).
-    //   3. flutter_local_notifications escalation pings.
-    // The workout screens intentionally leave all three running so
-    // the alarm is relentless up to the celebration moment.
+    // NOW kill the shark. The AlarmKit cascade + escalation ping ladder
+    // stop the moment this celebration screen mounts, and not a second
+    // earlier. cancelWakeEscalations also cancels the AlarmKit retries.
     Future.microtask(() async {
-      try {
-        await WakeSirenService.stop();
-      } catch (e) {
-        debugPrint('WakeComplete: siren stop failed: $e');
-      }
       try {
         await AlarmService.cancelWakeEscalations(widget.habitId);
       } catch (e) {
