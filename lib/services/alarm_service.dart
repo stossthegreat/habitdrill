@@ -792,6 +792,101 @@ class AlarmService {
     return _initialized;
   }
 
+  // ────────────────── Diagnostics helpers (public) ──────────────────
+
+  /// All notifications currently scheduled with iOS/Android. Sorted
+  /// by id. Consumed by DiagnosticsScreen to show whether the
+  /// scheduleAlarm calls actually made it into the OS queue.
+  static Future<List<PendingNotificationRequest>> pendingNotifications() async {
+    try {
+      final all = await _notifications.pendingNotificationRequests();
+      all.sort((a, b) => a.id.compareTo(b.id));
+      return all;
+    } catch (e) {
+      debugPrint('pendingNotifications failed: $e');
+      return const [];
+    }
+  }
+
+  /// Dispatch an immediate test notification. If iOS is going to
+  /// silently drop us this call will make it obvious.
+  static Future<bool> fireTestNotificationNow() async {
+    try {
+      await _notifications.show(
+        999998,
+        '🧪 HABITDRILL TEST',
+        'If you see this, foreground notifications are wired.',
+        const NotificationDetails(
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentSound: true,
+            presentBadge: true,
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('fireTestNotificationNow error: $e');
+      return false;
+    }
+  }
+
+  /// Schedule a plain notification 30 seconds from now — end-to-end
+  /// probe of the "future alarm" pipeline. Returns the fire time.
+  static Future<DateTime> scheduleTestAlarmIn30Seconds() async {
+    final testId = 999997;
+    final fireAt = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
+    try {
+      await _notifications.zonedSchedule(
+        testId,
+        '🧪 HABITDRILL TEST ALARM',
+        'Scheduled probe — if this fires the alarm pipeline works.',
+        fireAt,
+        const NotificationDetails(
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentSound: true,
+            presentBadge: true,
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('scheduleTestAlarmIn30Seconds error: $e');
+    }
+    return DateTime.fromMillisecondsSinceEpoch(fireAt.millisecondsSinceEpoch);
+  }
+
+  /// Cancel every notification (habit + test + sergeant). Used from
+  /// diagnostics to reset the queue when it looks fried.
+  static Future<void> cancelEverything() async {
+    try {
+      await _notifications.cancelAll();
+      _scheduledAlarms.clear();
+    } catch (e) {
+      debugPrint('cancelEverything failed: $e');
+    }
+  }
+
   /// Verify that a specific habit's alarms are fully cancelled
   static Future<bool> verifyAlarmCancelled(String habitId) async {
     final habitAlarmIds = <int>[];

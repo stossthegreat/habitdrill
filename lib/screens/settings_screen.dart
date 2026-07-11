@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../design/tokens.dart';
 import '../services/analytics_service.dart';
+import 'diagnostics_screen.dart';
 import 'terms_screen.dart';
 import 'privacy_screen.dart';
 import 'support_screen.dart';
@@ -91,6 +92,13 @@ class SettingsScreen extends StatelessWidget {
                 icon: LucideIcons.alarmClock,
                 label: 'Alarm Settings',
                 onTap: () => _openAppSettings(),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.activity,
+                label: 'Diagnostics',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DiagnosticsScreen()),
+                ),
               ),
               _SettingsRow(
                 icon: LucideIcons.helpCircle,
