@@ -7,7 +7,6 @@ import '../services/local_storage.dart';
 import '../services/alarm_service.dart';
 import '../services/sergeant_service.dart';
 import '../services/discipline_service.dart';
-import '../services/review_prompt_service.dart';
 
 class HabitEngine extends ChangeNotifier {
   final LocalStorageService localStorageService;
@@ -254,13 +253,6 @@ class HabitEngine extends ChangeNotifier {
     if (idx != -1) {
       _habits[idx] = updated;
       notifyListeners();
-    }
-    // Aha moment — user just ticked an order done. Fire the native
-    // 5-star review popup at completion, throttled by
-    // ReviewPromptService + iOS's own SKStoreReviewController limit.
-    // Only on the undone→done transition; un-ticking doesn't count.
-    if (nowDone) {
-      ReviewPromptService.maybeAsk(alsoRegisterAha: true);
     }
     return null;
   }

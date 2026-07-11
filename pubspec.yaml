@@ -1,7 +1,7 @@
 name: habitdrill
 description: Discipline enforcement app - set orders, break them, train.
 publish_to: 'none'
-version: 1.0.2+580
+version: 1.0.2+581
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -65,10 +65,6 @@ dependencies:
   
   # In-App Purchases
   in_app_purchase: ^3.1.13
-
-  # Native "Enjoying HabitDrill?" star rating popup
-  # (SKStoreReviewController on iOS). Fires at aha moments.
-  in_app_review: ^2.0.9
 
   # Video Player (drill sergeant videos)
   video_player: ^2.8.6
