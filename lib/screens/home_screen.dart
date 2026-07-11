@@ -18,6 +18,7 @@ import '../services/discipline_service.dart';
 import '../services/premium_service.dart';
 import '../services/analytics_service.dart';
 import '../services/normal_reminder_registry.dart';
+import '../services/rule_break_ledger.dart';
 import '../models/habit.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -658,14 +659,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Widget _buildRuleCard(Habit habit, bool isBroken, int index) {
     final emoji = habit.emoji ?? '🚫';
     final streak = habit.streak;
+    // Per-day ledger — how many times has this rule been broken today
+    // (0 if none), and how much streak was lost on the first break.
+    final offensesToday = RuleBreakLedger.offensesToday(habit.id);
+    final streakLost = RuleBreakLedger.streakLostToday(habit.id);
+    final lockedForToday = isBroken || offensesToday > 0;
 
     Future<void> confess() async {
-      if (isBroken) return;
       if (!await _requirePro()) return;
       HapticFeedback.heavyImpact();
-      final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+      final violation =
+          await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
+      // Only the FIRST break of the day produces a Violation and
+      // pushes the physical punishment screen. Subsequent taps
+      // update the ledger silently — the rule stays locked as
+      // broken until midnight.
       if (violation != null && context.mounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () {})));
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PunishmentScreen(violation: violation, onComplete: () {}),
+          ),
+        );
       }
     }
 
@@ -676,10 +690,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
           decoration: BoxDecoration(
-            color: isBroken ? AppColors.error.withOpacity(0.06) : const Color(0xFF0B0B0B),
+            color: lockedForToday
+                ? AppColors.error.withOpacity(0.06)
+                : const Color(0xFF0B0B0B),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isBroken ? AppColors.error.withOpacity(0.35) : Colors.white.withOpacity(0.05),
+              color: lockedForToday
+                  ? AppColors.error.withOpacity(0.35)
+                  : Colors.white.withOpacity(0.05),
               width: 1,
             ),
           ),
@@ -696,7 +714,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     Text(
                       habit.title.toUpperCase(),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(isBroken ? 0.6 : 0.95),
+                        color: Colors.white.withOpacity(lockedForToday ? 0.6 : 0.95),
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.4,
@@ -711,18 +729,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         Text(
                           'RULE',
                           style: TextStyle(
-                            color: (isBroken ? AppColors.error : Colors.white).withOpacity(0.5),
+                            color: (lockedForToday ? AppColors.error : Colors.white)
+                                .withOpacity(0.5),
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 2,
                           ),
                         ),
-                        if (!isBroken && streak > 0) ...[
+                        if (!lockedForToday && streak > 0) ...[
                           Text(
                             '  ·  ',
-                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.15),
+                              fontSize: 10,
+                            ),
                           ),
-                          Text('CLEAN ', style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                          Text(
+                            'CLEAN ',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.35),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                            ),
+                          ),
                           Text(
                             '$streak D',
                             style: TextStyle(
@@ -734,15 +764,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             ),
                           ),
                         ],
-                        if (isBroken) ...[
+                        if (lockedForToday) ...[
                           Text(
                             '  ·  ',
-                            style: TextStyle(color: Colors.white.withOpacity(0.15), fontSize: 10),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.15),
+                              fontSize: 10,
+                            ),
                           ),
                           Text(
-                            'BROKEN',
+                            'BROKEN FOR TODAY',
                             style: TextStyle(
-                              color: AppColors.error.withOpacity(0.75),
+                              color: AppColors.error.withOpacity(0.85),
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.5,
@@ -751,11 +784,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                         ],
                       ],
                     ),
+                    if (lockedForToday) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (streakLost > 0) ...[
+                            Text(
+                              '${streakLost}D STREAK LOST',
+                              style: TextStyle(
+                                color: AppColors.error.withOpacity(0.7),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (offensesToday > 1)
+                            Text(
+                              '· OFFENSE #$offensesToday TODAY',
+                              style: TextStyle(
+                                color: AppColors.error.withOpacity(0.6),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Resets at midnight.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.35),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 10),
-              _BrokeItButton(isBroken: isBroken, onTap: confess),
+              _BrokeItButton(isBroken: lockedForToday, onTap: confess),
             ],
           ),
         ),
@@ -923,26 +997,50 @@ class _BrokeItButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: isBroken ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    // Locked-for-today state is a static red badge; the card as a
+    // whole is still tappable via its parent GestureDetector to add
+    // to the offense tally, but this affordance stops competing for
+    // attention (no glow, no punchy label). First-break state keeps
+    // the big red "I BROKE IT" CTA.
+    if (isBroken) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isBroken ? AppColors.error.withOpacity(0.12) : AppColors.error,
+          color: AppColors.error.withOpacity(0.12),
           borderRadius: BorderRadius.circular(10),
-          border: isBroken
-              ? Border.all(color: AppColors.error.withOpacity(0.35), width: 1)
-              : null,
-          boxShadow: isBroken
-              ? null
-              : [BoxShadow(color: AppColors.error.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 4))],
+          border: Border.all(color: AppColors.error.withOpacity(0.35), width: 1),
         ),
         child: Text(
-          isBroken ? 'FAILED' : 'I BROKE IT',
+          'FAILED',
           style: TextStyle(
-            color: isBroken ? AppColors.error : Colors.white,
+            color: AppColors.error,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.error.withOpacity(0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Text(
+          'I BROKE IT',
+          style: TextStyle(
+            color: Colors.white,
             fontSize: 11,
             fontWeight: FontWeight.w900,
             letterSpacing: 1.5,
