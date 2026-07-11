@@ -16,6 +16,7 @@ import '../../design/tokens.dart';
 import '../../providers/habit_provider.dart';
 import '../../services/alarmkit_service.dart';
 import '../../services/law_punishment_picker.dart';
+import '../../services/wake_mission_prefs.dart';
 import 'onboarding_state.dart';
 import 'onboarding_paywall.dart';
 
@@ -70,7 +71,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     Future(() async {
       try {
         final engine = ref.read(habitEngineProvider);
-        await engine.createHabit(
+        final wake = await engine.createHabit(
           title: 'Morning Rise',
           type: 'habit',
           time: wakeTimeStr,
@@ -80,6 +81,16 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
           reminderOn: true,
           color: AppColors.emerald,
           emoji: '☀️',
+        );
+        // Persist the exercise + rep pick the user made during
+        // onboarding. Without this the wake screen falls back to
+        // WakeMissionPrefs.defaultReps (20) and squats — which is
+        // what the user saw as "I picked 5 push-ups, but got 20
+        // squats." Longstanding miss.
+        await WakeMissionPrefs.setMission(
+          wake.id,
+          missionId: _s.exerciseId,
+          reps: _s.reps,
         );
         // Create a Habit(type='bad_habit') for every Law the user signed.
         // These show up in Contracts under CONTRACTS immediately with the
