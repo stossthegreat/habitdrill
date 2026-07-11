@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../design/tokens.dart';
 import '../services/analytics_service.dart';
-import '../services/review_prompt_service.dart';
 import 'terms_screen.dart';
 import 'privacy_screen.dart';
 import 'support_screen.dart';
@@ -153,13 +152,9 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _leaveReview() async {
-    // Prefer the in-app write-review sheet via ReviewPromptService.
-    // Falls back to a manual URL launch if the platform SDK isn't
-    // available (e.g. legacy iOS build). Real App Store id 6761660060.
-    try {
-      await ReviewPromptService.openStoreListing();
-      return;
-    } catch (_) {}
+    // Real App Store URL — id6761660060 is HabitDrill's actual App
+    // Store id. `action=write-review` deep-links straight into the
+    // write-review sheet on iOS.
     final uri = Uri.parse(
       'https://apps.apple.com/gb/app/habitdrill/id6761660060?action=write-review',
     );
