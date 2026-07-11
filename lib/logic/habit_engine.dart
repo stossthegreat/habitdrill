@@ -30,21 +30,29 @@ class HabitEngine extends ChangeNotifier {
     _habits.add(h);
     notifyListeners();
 
-    // Schedule alarm if reminder is enabled.
-    // NOTE: this call is AWAITED. A previous "fire-and-forget"
-    // variant was tempting for save-routing speed but left the
-    // alarm unscheduled when the surrounding flow tore down the
-    // context before the background Future() ran — that's the
-    // "alarm we had is broken again" regression the user hit.
-    // If the schedule call slows the save flow, the fix belongs at
-    // the AlarmService layer, not by dropping the await here.
+    // Schedule alarm if reminder is enabled — fire-and-forget so the
+    // caller's save flow can pop back to Contracts INSTANTLY. The
+    // 30-second lag users saw was scheduleAlarm awaiting 7×20+ iOS
+    // notification writes on the main isolate.
+    //
+    // Why this is safe now (it wasn't safe in +584):
+    //   * cancelAlarm no longer throws on verify stragglers (+590),
+    //     so a corrupt cancel can't kill the schedule.
+    //   * Dart Futures don't get cancelled by widget disposal —
+    //     scheduleAlarm keeps running on the event loop even after
+    //     the save screen pops. The app is still alive.
+    //   * Any error inside the Future is caught and logged; nothing
+    //     bubbles up into an unhandled exception.
     if (h.reminderOn && h.time.isNotEmpty) {
-      try {
-        await AlarmService.scheduleAlarm(h);
-        debugPrint('✅ Alarm scheduled successfully for habit: ${h.title}');
-      } catch (e) {
-        debugPrint('⚠️ Failed to schedule alarm for habit "${h.title}": $e');
-      }
+      // ignore: unawaited_futures
+      Future(() async {
+        try {
+          await AlarmService.scheduleAlarm(h);
+          debugPrint('✅ Alarm scheduled (async) for habit: ${h.title}');
+        } catch (e) {
+          debugPrint('⚠️ Failed to schedule alarm for habit "${h.title}": $e');
+        }
+      });
     } else {
       debugPrint('⏰ No alarm scheduled for "${h.title}" (reminderOn=${h.reminderOn}, time="${h.time}")');
     }
@@ -204,12 +212,22 @@ class HabitEngine extends ChangeNotifier {
       _habits[idx] = updated;
       notifyListeners();
 
-      // Update alarms — awaited for the same reason as addHabit above.
-      await AlarmService.cancelAlarm(updated.id);
-      if (updated.reminderOn && updated.time.isNotEmpty) {
-        await AlarmService.scheduleAlarm(updated);
-        debugPrint('🔔 Rescheduled alarm for "${updated.title}"');
-      }
+      // Cancel + reschedule fire-and-forget so the edit screen pops
+      // back to Contracts instantly. Same reasoning as addHabit —
+      // cancelAlarm no longer throws (+590) and Futures aren't
+      // cancelled by widget disposal.
+      // ignore: unawaited_futures
+      Future(() async {
+        try {
+          await AlarmService.cancelAlarm(updated.id);
+          if (updated.reminderOn && updated.time.isNotEmpty) {
+            await AlarmService.scheduleAlarm(updated);
+            debugPrint('🔔 Rescheduled (async) alarm for "${updated.title}"');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to reschedule alarm for "${updated.title}": $e');
+        }
+      });
     }
   }
 
