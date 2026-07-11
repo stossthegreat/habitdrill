@@ -550,7 +550,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       HapticFeedback.mediumImpact();
       final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
       if (violation != null && context.mounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () {})));
       }
       if (!isDone) {
         await DisciplineService.onOrderCompleted();
@@ -665,7 +665,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       HapticFeedback.heavyImpact();
       final violation = await ref.read(habitEngineProvider).toggleHabitCompletion(habit.id);
       if (violation != null && context.mounted) {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () => Navigator.of(context).pop())));
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => PunishmentScreen(violation: violation, onComplete: () {})));
       }
     }
 
