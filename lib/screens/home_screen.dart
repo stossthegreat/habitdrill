@@ -417,7 +417,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final streak = habit.streak;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+      padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
       decoration: BoxDecoration(
         color: const Color(0xFF0B0B0B),
         borderRadius: BorderRadius.circular(16),
@@ -431,21 +431,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Big time — the only thing that dominates.
+          // Big time. 38pt (was 44) so the title next to it doesn't
+          // wrap into 'MORNIN\nG RISE' on a 6.1" screen.
           Text(
             time,
             style: TextStyle(
               color: isDone
                   ? AppColors.emerald
                   : Colors.white.withOpacity(0.98),
-              fontSize: 44,
+              fontSize: 38,
               fontWeight: FontWeight.w900,
-              letterSpacing: -1.5,
+              letterSpacing: -1.4,
               height: 1,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,57 +454,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               children: [
                 Text(
                   habit.title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.6,
+                    letterSpacing: 1.4,
                     height: 1.1,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      _daysLabel(habit.repeatDays),
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.35),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    if (streak > 0) ...[
+                Text(
+                  _daysLabel(habit.repeatDays),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.35),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                if (streak > 0) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Text('🔥', style: TextStyle(fontSize: 13)),
+                      const SizedBox(width: 5),
                       Text(
-                        '  ·  ',
+                        '$streak',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.15),
-                          fontSize: 10,
-                        ),
-                      ),
-                      const Text('🔥', style: TextStyle(fontSize: 10)),
-                      Text(
-                        ' $streak',
-                        style: TextStyle(
-                          color: AppColors.fire.withOpacity(0.9),
-                          fontSize: 10,
+                          color: AppColors.fire,
+                          fontSize: 15,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
+                          height: 1,
+                          letterSpacing: 0.2,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Text(
+                        streak == 1 ? 'DAY' : 'DAYS',
+                        style: TextStyle(
+                          color: AppColors.fire.withOpacity(0.75),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          // Status indicator — small circle. Emerald ring + check when
-          // done, quiet alarm icon when armed.
+          const SizedBox(width: 12),
+          // Status indicator — smaller circle so the streak has room.
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: isDone
                   ? AppColors.emerald.withOpacity(0.15)
@@ -522,7 +534,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               color: isDone
                   ? AppColors.emerald
                   : Colors.white.withOpacity(0.55),
-              size: 20,
+              size: 18,
             ),
           ),
         ],
@@ -688,7 +700,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       child: GestureDetector(
         onTap: confess,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
           decoration: BoxDecoration(
             color: lockedForToday
                 ? AppColors.error.withOpacity(0.06)

@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../design/tokens.dart';
 import '../../services/alarm_service.dart';
+import '../../services/local_storage.dart';
 import '../../services/wake_siren_service.dart';
 
 /// Shown the moment the user finishes their morning wake reps. It's the
@@ -173,6 +174,11 @@ class _WakeCompleteScreenState extends State<WakeCompleteScreen> {
                         reps: widget.reps,
                         exerciseName: widget.exerciseName,
                         flex: _flex,
+                        // Look up the habit for streak + wake-time on the
+                        // fly. If it's not in the box (edge case: user
+                        // deleted mid-workout) fall back to zero/blank.
+                        streak: LocalStorageService.getHabit(widget.habitId)?.streak ?? 0,
+                        wakeTime: LocalStorageService.getHabit(widget.habitId)?.time ?? '',
                       ),
                     ),
                   ),
@@ -237,12 +243,16 @@ class _ShareCard extends StatelessWidget {
   final int reps;
   final String exerciseName;
   final String flex;
+  final int streak;
+  final String wakeTime;
 
   const _ShareCard({
     required this.habitTitle,
     required this.reps,
     required this.exerciseName,
     required this.flex,
+    required this.streak,
+    required this.wakeTime,
   });
 
   @override
@@ -336,13 +346,26 @@ class _ShareCard extends StatelessWidget {
             'WON AT $time',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 34,
+              fontSize: 30,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
               height: 1,
             ),
           ),
-          const SizedBox(height: 18),
+          if (wakeTime.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'WOKE AT $wakeTime',
+              style: TextStyle(
+                color: AppColors.emerald.withOpacity(0.85),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -350,7 +373,7 @@ class _ShareCard extends StatelessWidget {
                 '$reps',
                 style: TextStyle(
                   color: AppColors.emerald,
-                  fontSize: 76,
+                  fontSize: 68,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -3,
                   height: 1,
@@ -361,16 +384,51 @@ class _ShareCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  exerciseName.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    height: 1,
-                  ),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      exerciseName.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        height: 1,
+                      ),
+                    ),
+                    if (streak > 0) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Text('🔥', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$streak',
+                            style: TextStyle(
+                              color: AppColors.fire,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            streak == 1 ? 'DAY' : 'DAY STREAK',
+                            style: TextStyle(
+                              color: AppColors.fire.withOpacity(0.85),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
