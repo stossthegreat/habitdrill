@@ -517,9 +517,15 @@ class AlarmService {
     debugPrint('   ${relevantAfter.isEmpty ? "✅ All alarms verified cancelled!" : "⚠️ WARNING: ${relevantAfter.length} alarms still pending!"}');
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    // Throw error if verification failed
+    // Do NOT throw when verification finds stragglers. Historically
+    // this bubbled out of cancelAlarm and killed the wrapping try in
+    // scheduleAlarm, so a single leftover pending notification meant
+    // NO alarm got scheduled — silent failure the user sees as "the
+    // shark isn't ringing anymore." A stray notification is at worst
+    // a duplicate; the fresh schedule below is what matters, and
+    // it's idempotent per-id anyway.
     if (relevantAfter.isNotEmpty) {
-      throw Exception('Failed to cancel all alarms: ${relevantAfter.length} still pending');
+      debugPrint('   ⚠️ Continuing anyway — pending stragglers are non-fatal.');
     }
   }
 
