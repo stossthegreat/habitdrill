@@ -223,18 +223,16 @@ class AlarmService {
       // user denied, scheduling will just fail gracefully.
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       if (alarmKitAvailable) {
-        final tz.TZDateTime akNextFire = habit.repeatDays
-            .map((d) => _getNextAlarmTime(d, habit.timeOfDay))
-            .reduce((a, b) => a.isBefore(b) ? a : b);
-        final int akNextFireDay = _dayForTz(akNextFire);
-
+        // Every scheduled day gets the SAME 10-alarm cascade —
+        // 100 s of nonstop ringing regardless of whether the app has
+        // been opened since the last fire. Old scheme only cascaded
+        // the "next fire" day and gave every other day one seed
+        // alarm, which is why users reported "worked Monday, Tuesday
+        // just rang once."
         for (final day in habit.repeatDays) {
           final baseAlarmId = _getAlarmId(habit.id, day);
           final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
-          final isNext = day == akNextFireDay
-              && fireDate.millisecondsSinceEpoch
-                  == akNextFire.millisecondsSinceEpoch;
-          final offsets = isNext ? _akCascadeOffsets : const [Duration.zero];
+          final offsets = _akCascadeOffsets;
 
           for (int r = 0; r < offsets.length; r++) {
             final akId = _uuidFromInt(baseAlarmId * 100 + r);
@@ -714,20 +712,25 @@ class AlarmService {
     }
   }
 
-  /// One AlarmKit alarm every 10 seconds — 30 alarms, 5 minutes of
-  /// nonstop ringing. Under the hood these are separate AlarmKit
-  /// alarms, but the user experience is "the alarm won't die":
-  /// dismiss one → 10 seconds later another rings → dismiss →
-  /// another → until they finish reps (cancelWakeAlarmKitRetries
-  /// then kills every remaining one).
+  /// One AlarmKit alarm every 10 seconds — 10 alarms, 100 seconds of
+  /// nonstop ringing per day. Under the hood these are separate
+  /// AlarmKit alarms, but the user experience is "the alarm won't
+  /// die": dismiss one → 10 seconds later another rings → dismiss →
+  /// another — until they finish reps (cancelWakeAlarmKitRetries
+  /// kills every remaining one).
   ///
-  /// ⚠️ AlarmKit caps at ~100 scheduled alarms PER APP. Previously
-  /// we tried 180 here to cover a 30-min workout — every schedule
-  /// call silently exceeded that ceiling and NO alarms fired. Stay
-  /// under 100. Total per habit at 30 cascade + 6 seed for other
-  /// weekdays = 36 alarms, leaving generous headroom.
+  /// Why 10 (was 30 for next-fire day only, single seed for other
+  /// days): AlarmKit caps at ~100 scheduled alarms PER APP. The old
+  /// scheme gave the NEXT fire a 30-alarm cascade but every OTHER
+  /// weekday got a single seed alarm — meaning "the alarm worked
+  /// perfectly on Monday, then Tuesday morning it just rang once
+  /// and I went back to sleep." Every day now gets the same 10-slot
+  /// cascade so the pressure never depends on whether the app was
+  /// opened after Monday's alarm. Total per habit = 10 × 7 = 70
+  /// AlarmKit alarms, well inside the 100-alarm ceiling with room
+  /// for a second habit if the user adds one.
   static final List<Duration> _akCascadeOffsets = List<Duration>.generate(
-    30,
+    10,
     (i) => Duration(seconds: 10 * i),
   );
 
@@ -808,12 +811,14 @@ class AlarmService {
     }
   }
 
-  /// Dispatch an immediate test notification. If iOS is going to
-  /// silently drop us this call will make it obvious.
+  /// Dispatch an immediate test notification. Unique id per call
+  /// (timestamp-derived) so back-to-back probes don't replace each
+  /// other — iOS replaces silently when you reuse an id.
   static Future<bool> fireTestNotificationNow() async {
     try {
+      final id = 999000 + (DateTime.now().millisecondsSinceEpoch % 900);
       await _notifications.show(
-        999998,
+        id,
         '🧪 HABITDRILL TEST',
         'If you see this, foreground notifications are wired.',
         const NotificationDetails(
@@ -841,8 +846,10 @@ class AlarmService {
 
   /// Schedule a plain notification 30 seconds from now — end-to-end
   /// probe of the "future alarm" pipeline. Returns the fire time.
+  /// Uses a unique id per call (timestamp-derived) so running the
+  /// probe twice within 60 seconds gives you TWO alarms not one.
   static Future<DateTime> scheduleTestAlarmIn30Seconds() async {
-    final testId = 999997;
+    final testId = 998000 + (DateTime.now().millisecondsSinceEpoch % 900);
     final fireAt = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 30));
     try {
       await _notifications.zonedSchedule(

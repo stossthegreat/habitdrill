@@ -24,6 +24,7 @@ import 'services/retention_service.dart';
 import 'services/premium_service.dart';
 import 'services/wake_debt_service.dart';
 import 'services/analytics_service.dart';
+import 'services/debug_log_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding/onboarding_flow.dart';
 import 'screens/sergeant/punishment_screen.dart';
@@ -33,6 +34,7 @@ import 'screens/terms_screen.dart';
 import 'screens/privacy_screen.dart';
 import 'screens/support_screen.dart';
 import 'design/theme.dart';
+import 'widgets/debug_log_overlay.dart';
 
 Future<void> _initTimezone() async {
   try {
@@ -53,19 +55,27 @@ Future<void> main() async {
   await runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    // Install the in-app debug log capture BEFORE anything else runs,
+    // so every subsequent debugPrint (Firebase init, timezone init,
+    // AlarmService, all of it) is captured in the ring buffer that
+    // the floating LOG button shows.
+    DebugLogService.install();
+
     // Replace Flutter's default red error screen with a safe black fallback
     // so a single widget exception never blocks app launch (Apple flags this
     // as "displayed an error message at launch").
     ErrorWidget.builder = (FlutterErrorDetails details) {
-      debugPrint('ErrorWidget caught: ${details.exception}');
+      debugPrint('❌ ErrorWidget caught: ${details.exception}');
       return const ColoredBox(color: Colors.black);
     };
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
-      debugPrint('FlutterError: ${details.exception}');
+      debugPrint('❌ FlutterError: ${details.exception}');
+      debugPrint('   stack: ${details.stack}');
     };
     PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-      debugPrint('PlatformDispatcher error: $error');
+      debugPrint('❌ PlatformDispatcher error: $error');
+      debugPrint('   stack: $stack');
       return true;
     };
 
@@ -152,7 +162,8 @@ Future<void> main() async {
 
     runApp(const ProviderScope(child: HabitDrillApp()));
   }, (Object error, StackTrace stack) {
-    debugPrint('Uncaught zone error: $error');
+    debugPrint('❌ Uncaught zone error: $error');
+    debugPrint('   stack: $stack');
   });
 }
 
@@ -167,6 +178,12 @@ class HabitDrillApp extends StatelessWidget {
       home: const AppRouter(),
       debugShowCheckedModeBanner: false,
       navigatorObservers: [AnalyticsService.observer],
+      // Wrap EVERY route in a DebugLogOverlay so the floating LOG
+      // button and the log viewer are reachable from onboarding,
+      // wake alarm, punishment, paywall — every screen.
+      builder: (context, child) => DebugLogOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
       routes: {
         '/settings': (context) => const SettingsScreen(),
         '/terms': (context) => const TermsScreen(),
