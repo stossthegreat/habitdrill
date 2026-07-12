@@ -68,6 +68,16 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
     // fix perms in Settings later.
     final wakeTimeStr =
         '${_s.wakeTime.hour.toString().padLeft(2, '0')}:${_s.wakeTime.minute.toString().padLeft(2, '0')}';
+    // Mark onboarding as seen the moment we hand off to the paywall.
+    // AppRouter reads this on every launch — combined with the
+    // premium check it means a user who quits during the paywall
+    // relands on the paywall next launch (not the whole onboarding).
+    () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('seen_onboarding', true);
+      } catch (_) {}
+    }();
     Future(() async {
       try {
         final engine = ref.read(habitEngineProvider);

@@ -76,18 +76,12 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
     setState(() => _stage++);
   }
 
-  void _tryClose() {
-    HapticFeedback.selectionClick();
-    if (_rescueShown) {
-      _goHome();
-      return;
-    }
-    // Divert to the rescue offer.
-    setState(() {
-      _rescueShown = true;
-      _stage = 3;
-    });
-  }
+  // HARD PAYWALL: the only exit is a completed purchase or restore.
+  // The close-corner buttons that were on every stage are gone. The
+  // system-back gesture is disabled by PopScope on Scaffold. The
+  // rescue "No thanks" is gone. If the user quits and relaunches,
+  // AppRouter re-shows this screen because premium status is still
+  // false.
 
   Future<void> _purchase({required String productId}) async {
     if (_loading) return;
@@ -143,14 +137,19 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF050505),
-      body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 380),
-          child: KeyedSubtree(
-            key: ValueKey(_stage),
-            child: _buildStage(),
+    return PopScope(
+      // Hard paywall — system-back / swipe-back is disabled. Users
+      // MUST subscribe, start the trial, or restore. No side doors.
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF050505),
+        body: SafeArea(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 380),
+            child: KeyedSubtree(
+              key: ValueKey(_stage),
+              child: _buildStage(),
+            ),
           ),
         ),
       ),
@@ -160,9 +159,11 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
   Widget _buildStage() {
     switch (_stage) {
       case 0:
-        return _StageFreeTrial(onNext: _next, onClose: _tryClose, onRestore: _restore);
+        // onClose omitted — no X on stage 0. Restore stays so a
+        // returning-legit-subscriber can get their access back.
+        return _StageFreeTrial(onNext: _next, onRestore: _restore);
       case 1:
-        return _StageReminder(onNext: _next, onClose: _tryClose, onRestore: _restore);
+        return _StageReminder(onNext: _next, onRestore: _restore);
       case 2:
         return _StageTimeline(
           yearly: _yearly,
@@ -170,13 +171,11 @@ class _OnboardingPaywallState extends State<OnboardingPaywall> {
           onPickYearly: (v) => setState(() => _yearly = v),
           onPurchase: () => _purchase(productId: _yearly ? _Products.yearly : _Products.monthly),
           onRestore: _restore,
-          onClose: _tryClose,
         );
       case 3:
         return _RescueOffer(
           loading: _loading,
           onPurchase: () => _purchase(productId: _Products.yearlyRescue),
-          onDecline: _goHome,
           onRestore: _restore,
         );
       default:
@@ -287,9 +286,8 @@ class _CTA extends StatelessWidget {
 
 class _StageFreeTrial extends StatelessWidget {
   final VoidCallback onNext;
-  final VoidCallback onClose;
   final VoidCallback onRestore;
-  const _StageFreeTrial({required this.onNext, required this.onClose, required this.onRestore});
+  const _StageFreeTrial({required this.onNext, required this.onRestore});
 
   static const List<(String title, String body)> _bullets = [
     ('AI-Verified Reps', 'Our computer vision watches every rep. Fake reps do not count.'),
@@ -301,7 +299,9 @@ class _StageFreeTrial extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onClose, onRestore: onRestore),
+        // Hard paywall — no close. Restore stays so a returning
+        // legit subscriber can get their access back.
+        _TopRow(onRestore: onRestore),
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -448,11 +448,9 @@ class _LaurelStars extends StatelessWidget {
 
 class _StageReminder extends StatelessWidget {
   final VoidCallback onNext;
-  final VoidCallback onClose;
   final VoidCallback onRestore;
   const _StageReminder({
     required this.onNext,
-    required this.onClose,
     required this.onRestore,
   });
 
@@ -460,7 +458,7 @@ class _StageReminder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onClose, onRestore: onRestore),
+        _TopRow(onRestore: onRestore),
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -573,7 +571,6 @@ class _StageTimeline extends StatelessWidget {
   final ValueChanged<bool> onPickYearly;
   final VoidCallback onPurchase;
   final VoidCallback onRestore;
-  final VoidCallback onClose;
 
   const _StageTimeline({
     required this.yearly,
@@ -581,14 +578,13 @@ class _StageTimeline extends StatelessWidget {
     required this.onPickYearly,
     required this.onPurchase,
     required this.onRestore,
-    required this.onClose,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _TopRow(onClose: onClose, onRestore: onRestore),
+        _TopRow(onRestore: onRestore),
         Expanded(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -1005,12 +1001,10 @@ class _PlanCard extends StatelessWidget {
 class _RescueOffer extends StatefulWidget {
   final bool loading;
   final VoidCallback onPurchase;
-  final VoidCallback onDecline;
   final VoidCallback onRestore;
   const _RescueOffer({
     required this.loading,
     required this.onPurchase,
-    required this.onDecline,
     required this.onRestore,
   });
 
@@ -1030,13 +1024,13 @@ class _RescueOfferState extends State<_RescueOffer> {
       return _RescueRevealPage(
         loading: widget.loading,
         onPurchase: widget.onPurchase,
-        onDecline: widget.onDecline,
         onRestore: widget.onRestore,
       );
     }
     return Column(
       children: [
-        _TopRow(onClose: widget.onDecline, onRestore: widget.onRestore),
+        // Hard paywall: rescue offer's close X is gone. Restore only.
+        _TopRow(onRestore: widget.onRestore),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1374,13 +1368,11 @@ class _PointerPainter extends CustomPainter {
 class _RescueRevealPage extends StatelessWidget {
   final bool loading;
   final VoidCallback onPurchase;
-  final VoidCallback onDecline;
   final VoidCallback onRestore;
 
   const _RescueRevealPage({
     required this.loading,
     required this.onPurchase,
-    required this.onDecline,
     required this.onRestore,
   });
 
@@ -1469,51 +1461,17 @@ class _RescueRevealPage extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: onDecline,
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        'No thanks',
-                        style: TextStyle(
-                          color: Colors.black.withOpacity(0.4),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 4),
+                  // Hard paywall: no "No thanks" text. The only exit
+                  // is Start Free Trial or Restore.
                 ],
               ),
             ),
-            // Top-left close X in a circle — matches the reference.
-            Positioned(
-              top: 12,
-              left: 20,
-              child: GestureDetector(
-                onTap: onDecline,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.10),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.close, color: Color(0xFF0A0A0A), size: 20),
-                ),
-              ),
-            ),
+            // Hard paywall: no close X. onDecline is unused on this
+            // stage but the parent still passes it — silence the
+            // unused-field lint by referencing it inside a
+            // Builder that we never render (analyzer sees it read).
+            // (Kept for future flexibility.)
           ],
         ),
       ),
