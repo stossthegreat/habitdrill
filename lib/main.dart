@@ -26,6 +26,8 @@ import 'services/wake_debt_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding/onboarding_flow.dart';
+import 'screens/onboarding/onboarding_paywall.dart';
+import 'screens/onboarding/onboarding_state.dart';
 import 'screens/sergeant/punishment_screen.dart';
 import 'screens/morning_alarm_screen.dart';
 import 'screens/settings_screen.dart';
@@ -188,7 +190,13 @@ class HabitDrillApp extends StatelessWidget {
   }
 }
 
-/// Flow: Loading → Onboarding (once) → PunishmentGate → Home
+/// Flow: Loading → Onboarding (once) → OnboardingPaywall (until premium)
+///                                    → PunishmentGate → Home
+///
+/// Hard paywall: once onboarding is complete but the user has not
+/// subscribed / trialed, EVERY app launch drops them back on the
+/// paywall. The paywall itself has no side doors, so the user's only
+/// way in is to purchase or restore.
 class AppRouter extends StatefulWidget {
   const AppRouter({super.key});
 
@@ -196,23 +204,49 @@ class AppRouter extends StatefulWidget {
   State<AppRouter> createState() => _AppRouterState();
 }
 
-class _AppRouterState extends State<AppRouter> {
+class _AppRouterState extends State<AppRouter> with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _needsOnboarding = false;
+  bool _isPremium = false;
 
   @override
   void initState() {
     super.initState();
+    // Re-run the premium check on every foreground so a successful
+    // App-Store subscribe (which may complete while the app is in the
+    // background) drops us out of the paywall the moment they come
+    // back.
+    WidgetsBinding.instance.addObserver(this);
     _checkAppState();
   }
 
-  Future<void> _checkAppState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAppState();
+    }
+  }
+
+  Future<void> _checkAppState() async {
+    bool seenOnboarding = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+    } catch (_) {}
+    bool premium = false;
+    try {
+      premium = await PremiumService.isPremium();
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _needsOnboarding = !seenOnboarding;
+      _isPremium = premium;
       _isLoading = false;
     });
   }
@@ -226,8 +260,15 @@ class _AppRouterState extends State<AppRouter> {
       );
     }
 
+    // Not started onboarding yet → begin.
     if (_needsOnboarding) {
       return const OnboardingFlow();
+    }
+
+    // Onboarded but not paying → HARD paywall. No PunishmentGate,
+    // no MainScreen, nothing else reachable until they subscribe.
+    if (!_isPremium) {
+      return OnboardingPaywall(state: OnboardingState());
     }
 
     return const PunishmentGate();
