@@ -3,64 +3,44 @@ import 'package:flutter/services.dart';
 
 import '../services/debug_log_service.dart';
 
-/// A tiny draggable floating button that opens a full-screen log view.
+/// A floating LOG chip pinned to the bottom-right of every screen.
 ///
-/// Wraps the entire app via HabitDrillApp.builder so it's visible on
-/// every screen — home, onboarding, wake alarm, punishment, all of it.
-/// Persistence-of-symptom is the whole point: the user reported crashes
-/// happening across screens and had no way to see what led up to them.
+/// Wrapped once at MaterialApp.builder so it is visible above every
+/// route in the app — home, onboarding, wake alarm, punishment,
+/// paywall, all of it.
 ///
-/// Tap → opens ScrollView of every captured line.
-/// Long-press → drag to reposition. Position survives navigation.
-class DebugLogOverlay extends StatefulWidget {
+/// Kept intentionally minimal after a previous variant tried to nest
+/// a `Positioned` inside a `LayoutBuilder` inside a `Stack` — which
+/// is illegal (Positioned must be a direct child of a Stack) and made
+/// the app throw render-tree errors on every frame, blocking taps.
+/// No draggability, no state mutation during build, one `Positioned`
+/// child at a fixed offset.
+class DebugLogOverlay extends StatelessWidget {
   final Widget child;
   const DebugLogOverlay({super.key, required this.child});
 
   @override
-  State<DebugLogOverlay> createState() => _DebugLogOverlayState();
-}
-
-class _DebugLogOverlayState extends State<DebugLogOverlay> {
-  Offset _pos = const Offset(-1, -1); // sentinel — recompute after first layout
-
-  @override
   Widget build(BuildContext context) {
-    return Directionality(
+    return Stack(
       textDirection: TextDirection.ltr,
-      child: Stack(
-        children: [
-          widget.child,
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (_pos.dx < 0 || _pos.dy < 0) {
-                _pos = Offset(
-                  constraints.maxWidth - 60,
-                  constraints.maxHeight - 240,
-                );
-              }
-              return Positioned(
-                left: _pos.dx,
-                top: _pos.dy,
-                child: _FabButton(
-                  onTap: () => _openLog(context),
-                  onDrag: (delta) {
-                    setState(() {
-                      _pos = Offset(
-                        (_pos.dx + delta.dx).clamp(0, constraints.maxWidth - 44),
-                        (_pos.dy + delta.dy).clamp(24, constraints.maxHeight - 44),
-                      );
-                    });
-                  },
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+      fit: StackFit.expand,
+      children: [
+        // The whole app — filling the Stack. StackFit.expand + no
+        // Positioned means it grows to the parent's size.
+        child,
+        // Bottom-right, above the bottom nav bar height. Wrapped in
+        // Positioned only — no LayoutBuilder — so hit testing stays
+        // strictly local to the chip's own rect.
+        Positioned(
+          right: 12,
+          bottom: 100,
+          child: _LogFab(onTap: () => _openLog(context)),
+        ),
+      ],
     );
   }
 
-  void _openLog(BuildContext context) {
+  static void _openLog(BuildContext context) {
     HapticFeedback.selectionClick();
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
@@ -71,19 +51,19 @@ class _DebugLogOverlayState extends State<DebugLogOverlay> {
   }
 }
 
-class _FabButton extends StatelessWidget {
+class _LogFab extends StatelessWidget {
   final VoidCallback onTap;
-  final ValueChanged<Offset> onDrag;
-  const _FabButton({required this.onTap, required this.onDrag});
+  const _LogFab({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: GestureDetector(
+      child: InkResponse(
         onTap: onTap,
-        onPanUpdate: (d) => onDrag(d.delta),
-        behavior: HitTestBehavior.opaque,
+        radius: 30,
+        containedInkWell: true,
+        highlightShape: BoxShape.circle,
         child: Container(
           width: 44,
           height: 44,
