@@ -290,10 +290,15 @@ class _ExerciseCircuitScreenState extends State<ExerciseCircuitScreen> {
     // can hang and have burned us before.
     widget.onComplete();
     // When the parent flow owns navigation (wake share screen), let it
-    // route. Otherwise pop everything back to the home tree.
+    // route. Otherwise pop everything back to the home tree via the
+    // ROOT navigator — using a local Navigator only pops the local
+    // stack, and if the punishment was pushed from a nested navigator
+    // (defensive) that would leave a dead intermediate screen up. The
+    // root navigator can always reach the home widget.
     if (widget.ownsNavigation) return;
     if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
     }
   }
 
@@ -1042,19 +1047,31 @@ class _ReturnToBaseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Text(
-          'RETURN TO BASE',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.55),
-            fontSize: 12,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2.5,
+    // Full-width outlined pill — previously this was a bare text
+    // link with vertical-only padding, so the tap target was tiny
+    // and users kept missing it. Now it's an unmissable button.
+    return SizedBox(
+      width: double.infinity,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            'RETURN TO BASE',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 3,
+            ),
           ),
         ),
       ),

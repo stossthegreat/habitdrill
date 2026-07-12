@@ -1423,12 +1423,18 @@ class _RepsPicker extends StatefulWidget {
 
 class _RepsPickerState extends State<_RepsPicker> {
   late int _picked;
-  static const List<int> _options = [5, 10, 15, 20];
+  late List<int> _options;
 
   @override
   void initState() {
     super.initState();
-    _picked = widget.state.reps;
+    // Per-mission floor: high knees are low intensity per rep so
+    // they start at 20, everything else at 10. Keeps mornings from
+    // being trivial. Floor is enforced again at fire time by
+    // WakeExerciseScreen so an old saved value can't slip under.
+    final min = WakeMissionPrefs.minRepsFor(widget.state.exerciseId);
+    _options = [min, min + 10, min + 20, min + 30];
+    _picked = widget.state.reps < min ? min : widget.state.reps;
   }
 
   @override
@@ -1440,7 +1446,7 @@ class _RepsPickerState extends State<_RepsPicker> {
         children: [
           _Hero(
             title: 'How many reps to dismiss?',
-            subtitle: '${widget.state.exerciseName} — pick your minimum.',
+            subtitle: '${widget.state.exerciseName} — ${_options.first} minimum.',
           ),
           const Spacer(),
           Center(

@@ -64,7 +64,13 @@ class _WakeExerciseScreenState extends ConsumerState<WakeExerciseScreen> {
   /// reps accumulated while they stalled.
   Future<void> _buildSet() async {
     final mission = await WakeMissionPrefs.getMission(widget.habit.id);
-    final pledged = await WakeMissionPrefs.getReps(widget.habit.id);
+    final rawPledge = await WakeMissionPrefs.getReps(widget.habit.id);
+    // Floor to the per-mission morning minimum. High knees are low
+    // intensity per rep so 20 is the floor; heavier moves stay at 10.
+    final pledged =
+        rawPledge < WakeMissionPrefs.minRepsFor(mission.id)
+            ? WakeMissionPrefs.minRepsFor(mission.id)
+            : rawPledge;
     final debt = WakeDebtService.minutesLate(widget.habit) *
         WakeDebtService.repsPerMinute;
     final total = pledged +
