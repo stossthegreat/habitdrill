@@ -689,19 +689,29 @@ class AlarmService {
     debugPrint('🛑 Cancelled $cancelled wake escalation pings for $habitId');
   }
 
-  /// Cancel every AlarmKit alarm in the cascade for every weekday of a
-  /// habit. Called the instant wake reps complete so the phone stops
-  /// re-ringing three seconds later.
+  /// Cancel the remaining AlarmKit cascade for TODAY only. Called the
+  /// instant wake reps complete so the phone stops re-ringing three
+  /// seconds later. DOES NOT touch other weekdays' cascades — those
+  /// still need to fire tomorrow, the day after, etc.
+  ///
+  /// This is the actual "works then doesn't work" root cause: the
+  /// previous version looped over all 7 days and cancelled ALL 70
+  /// AlarmKit alarms in one shot. Monday reps → cancelled Tuesday
+  /// through Sunday too. If the user didn't foreground the app before
+  /// Tuesday 6am, Tuesday's cascade never rang.
   static Future<void> cancelWakeAlarmKitRetries(String habitId) async {
-    for (int day = 0; day < 7; day++) {
-      final baseAlarmId = _getAlarmId(habitId, day);
-      for (int r = 0; r < _akCascadeOffsets.length; r++) {
-        final uuid = _uuidFromInt(baseAlarmId * 100 + r);
-        try {
-          await AlarmKitService.cancel(uuid);
-        } catch (_) {}
-      }
+    final now = DateTime.now();
+    final today = now.weekday == 7 ? 0 : now.weekday;
+    final baseAlarmId = _getAlarmId(habitId, today);
+    // Sweep 200 slots to also flush any historical cascade orphans
+    // (see cancelAlarm for the same reasoning).
+    for (int r = 0; r < 200; r++) {
+      final uuid = _uuidFromInt(baseAlarmId * 100 + r);
+      try {
+        await AlarmKitService.cancel(uuid);
+      } catch (_) {}
     }
+    debugPrint('🛑 Cancelled today\'s AlarmKit cascade for $habitId (day=$today)');
   }
 
   /// Re-schedule the wake-alarm pings + AlarmKit retries for every
