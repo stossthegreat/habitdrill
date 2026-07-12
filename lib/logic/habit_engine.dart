@@ -47,10 +47,14 @@ class HabitEngine extends ChangeNotifier {
       // ignore: unawaited_futures
       Future(() async {
         try {
-          await AlarmService.scheduleAlarm(h);
-          debugPrint('✅ Alarm scheduled (async) for habit: ${h.title}');
+          // Reschedule EVERY wake alarm — adding a new alarm changes
+          // the per-alarm ping budget (see AlarmService._pingsForWakeCount),
+          // so existing alarms need their ping count refreshed too or
+          // we blow past the 64-notification cap.
+          await AlarmService.rescheduleWakeAlarms(_habits);
+          debugPrint('✅ All wake alarms rescheduled after add: ${h.title}');
         } catch (e) {
-          debugPrint('⚠️ Failed to schedule alarm for habit "${h.title}": $e');
+          debugPrint('⚠️ Failed to reschedule alarms after add "${h.title}": $e');
         }
       });
     } else {
@@ -123,6 +127,18 @@ class HabitEngine extends ChangeNotifier {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('✅ DELETION COMPLETE for: "${habit.title}"');
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // Reshuffle the wake-alarm budget — the surviving alarms can each
+    // afford more pings per fire now.
+    // ignore: unawaited_futures
+    Future(() async {
+      try {
+        await AlarmService.rescheduleWakeAlarms(_habits);
+        debugPrint('🔔 Wake fleet rescheduled after delete');
+      } catch (e) {
+        debugPrint('⚠️ Failed to reschedule after delete: $e');
+      }
+    });
   }
 
   Future<void> completeHabit(String id) async {
@@ -212,20 +228,18 @@ class HabitEngine extends ChangeNotifier {
       _habits[idx] = updated;
       notifyListeners();
 
-      // Cancel + reschedule fire-and-forget so the edit screen pops
-      // back to Contracts instantly. Same reasoning as addHabit —
-      // cancelAlarm no longer throws (+590) and Futures aren't
-      // cancelled by widget disposal.
+      // Cancel this alarm's slots + reschedule the whole wake-alarm
+      // fleet so the ping budget stays in sync with the current
+      // wake-habit count. Fire-and-forget so the edit screen pops
+      // back to Contracts instantly.
       // ignore: unawaited_futures
       Future(() async {
         try {
           await AlarmService.cancelAlarm(updated.id);
-          if (updated.reminderOn && updated.time.isNotEmpty) {
-            await AlarmService.scheduleAlarm(updated);
-            debugPrint('🔔 Rescheduled (async) alarm for "${updated.title}"');
-          }
+          await AlarmService.rescheduleWakeAlarms(_habits);
+          debugPrint('🔔 Wake fleet rescheduled after update: "${updated.title}"');
         } catch (e) {
-          debugPrint('⚠️ Failed to reschedule alarm for "${updated.title}": $e');
+          debugPrint('⚠️ Failed to reschedule alarms after update "${updated.title}": $e');
         }
       });
     }
