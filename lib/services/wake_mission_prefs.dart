@@ -22,6 +22,21 @@ class WakeMissionPrefs {
   static const String defaultMissionId = 'squats';
   static const int defaultReps = 20;
 
+  /// Minimum morning reps per mission. High knees are pretty low
+  /// intensity per rep so we ask for 20 to actually get the heart
+  /// rate up; push-ups / squats / burpees are heavier so 10 is a
+  /// meaningful bar. Enforced at pledge time (RepsPicker in
+  /// onboarding + NewWakeAlarmScreen) AND at fire time
+  /// (WakeExerciseScreen bumps anything under the floor).
+  static int minRepsFor(String missionId) {
+    switch (missionId) {
+      case 'high_knees':
+        return 20;
+      default:
+        return 10;
+    }
+  }
+
   static String _typeKey(String habitId) => 'wake_mission_type.$habitId';
   static String _repsKey(String habitId) => 'wake_mission_reps.$habitId';
 
