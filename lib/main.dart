@@ -23,6 +23,7 @@ import 'services/sergeant_service.dart';
 import 'services/retention_service.dart';
 import 'services/premium_service.dart';
 import 'services/wake_debt_service.dart';
+import 'services/wake_keepalive_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/main_screen.dart';
 import 'screens/onboarding/onboarding_flow.dart';
@@ -137,6 +138,10 @@ Future<void> main() async {
       await SergeantService.initialize();
       await RetentionService.initialize();
       await RetentionService.ensureScheduled();
+      // Start the silent audio keepalive AFTER LocalStorageService is
+      // ready (the service consults it to decide whether there's an
+      // active wake alarm to keep alive for). No-op if there isn't.
+      await WakeKeepaliveService.startIfNeeded();
     } catch (e) {
       debugPrint('Init failed: $e');
     }
@@ -345,6 +350,11 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     // Consume any fresh notification-tap payload so it doesn't linger
     // (we ignore the value — the wake state check below finds it too).
     await AlarmService.consumeRecentAlarmTap();
+    // Every foreground: kick the keepalive back on. If the user was
+    // away from the app long enough for iOS to fully suspend it, this
+    // is our only chance to re-arm the background audio session
+    // before the next alarm.
+    unawaited(WakeKeepaliveService.startIfNeeded());
     await _refreshWakeState();
     if (_forcedWakeHabit == null) {
       _checkForPunishment();
