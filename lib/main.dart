@@ -349,8 +349,25 @@ class _PunishmentGateState extends State<PunishmentGate> with WidgetsBindingObse
     if (_forcedWakeHabit == null) {
       _checkForPunishment();
     }
-    // Escalation pings are one-shots — top up the ladder for the next
-    // upcoming fire so notifications keep firing tomorrow too.
+    // ⚠️ CRITICAL: don't reschedule while a wake alarm is CURRENTLY
+    // firing. rescheduleWakeAlarms → cancelAlarm sweeps every
+    // AlarmKit slot for the habit, including the 9 remaining alarms
+    // in today's cascade that haven't fired yet. If we reschedule
+    // the moment the user opens the app after the FIRST ring, the
+    // user gets a single ring, silence, and the shark dies — which
+    // is exactly the "works then doesn't" pattern.
+    //
+    // We only reschedule on foreground when there is NO active wake
+    // and NO due wake. Otherwise the currently-firing cascade is
+    // left alone; the next `_onEnter` after the workout ends (via
+    // WakeDebtService.clearActive) will handle the reschedule with
+    // no live alarms in the queue.
+    final due = WakeDebtService.findDueWakeHabit();
+    final active = await WakeDebtService.getActiveHabitId();
+    if (due != null || active != null) {
+      debugPrint('_onEnter: wake in progress — skipping reschedule');
+      return;
+    }
     try {
       await AlarmService.rescheduleWakeAlarms(
         LocalStorageService.getAllHabits(),
