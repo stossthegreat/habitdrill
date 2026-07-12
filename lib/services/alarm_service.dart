@@ -215,43 +215,31 @@ class AlarmService {
       int successCount = 0;
       int failCount = 0;
 
-      // ── The new scheduling model ─────────────────────────────────
+      // ── Adaptive scheduling ─────────────────────────────────────
       //
-      // The pre-existing burst-3 + escalation-20 + AlarmKit-10-cascade
-      // ladder was intermittently silent because most pings were
-      // ONE-SHOT for the "next fire" day. After they fired once, they
-      // were gone until `rescheduleWakeAlarms` ran on the next app
-      // foreground — a foreground the user often didn't do between
-      // Monday's completion and Tuesday morning. Result: the
-      // familiar "works then doesn't work" pattern.
+      // Everything weekly-repeating so iOS keeps it alive without
+      // any re-schedule logic from us. Number of pings per fire is
+      // ADAPTIVE based on how many wake alarms the user has, so we
+      // stay under iOS's 64 pending-notification cap regardless of
+      // how many alarms they create.
       //
-      // New model — everything weekly-repeating. iOS's own scheduler
-      // maintains them forever with zero code required from us:
+      //   1 wake alarm            → 5 pings/day (fire, +30s, +1m, +2m, +3m)
+      //   2 wake alarms           → 4 pings/day each   (56 total)
+      //   3 wake alarms           → 3 pings/day each   (63 total)
+      //   4 wake alarms           → 2 pings/day each   (56 total)
+      //   5-9 wake alarms         → 1 ping/day each    (35-63 total)
+      //   10+ wake alarms         → still 1 ping/day, some may drop
       //
-      //   * 5 notifications per repeat day (fire, +30s, +60s, +120s,
-      //     +180s). Each carries `matchDateTimeComponents: dayOfWeek
-      //     AndTime` so iOS re-fires them every week automatically.
-      //   * 5 AlarmKit alarms per repeat day at the same offsets on
-      //     iOS 26+ (AlarmKit runs system-alarm class louder than
-      //     notifications). AlarmKit reschedules itself when the
-      //     alarm's schedule is `.weekly`, so once scheduled it just
-      //     keeps working.
-      //
-      // Totals per habit:
-      //   * Notifications: 5 × 7 = 35 (comfortably under iOS's 64
-      //     pending-notification cap; two wake habits still fits).
-      //   * AlarmKit:      5 × 7 = 35 (well under 100 per-app cap).
-      //
-      // No re-scheduling logic anywhere. No "next fire" special-case.
-      // No app-resume dependency for the alarm to fire tomorrow.
+      // AlarmKit (iOS 26+) gets the same treatment against its ~100
+      // per-app cap. On iOS < 26 the user's morning is one single
+      // (LOUD, time-sensitive) notification, exactly like a Clock
+      // alarm — plus the in-app WakeSirenService taking over once
+      // they open the app.
 
-      const List<Duration> retryOffsets = [
-        Duration.zero,
-        Duration(seconds: 30),
-        Duration(minutes: 1),
-        Duration(minutes: 2),
-        Duration(minutes: 3),
-      ];
+      final wakeHabitCount = _countActiveWakeHabits();
+      final pingsPerDay = _pingsForWakeCount(wakeHabitCount);
+      final List<Duration> retryOffsets = _retryOffsetsForCount(pingsPerDay);
+      debugPrint('   wakeHabits=$wakeHabitCount  pingsPerDay=$pingsPerDay');
 
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       debugPrint('   AlarmKit available: $alarmKitAvailable');
@@ -409,6 +397,49 @@ class AlarmService {
       }
     }
     debugPrint('📣 Contract reminder scheduled ($successCount days) for "${habit.title}"');
+  }
+
+  /// How many wake alarms (type='habit' with time+reminderOn, NOT a
+  /// contract reminder) the user currently has on file. Drives
+  /// pings-per-day so we never blow through iOS's 64 notification
+  /// cap regardless of how many alarms they create.
+  static int _countActiveWakeHabits() {
+    try {
+      final all = LocalStorageService.getAllHabits();
+      return all
+          .where((h) =>
+              h.type == 'habit' &&
+              h.time.isNotEmpty &&
+              h.reminderOn &&
+              !NormalReminderRegistry.isNormalReminder(h.id))
+          .length;
+    } catch (e) {
+      debugPrint('_countActiveWakeHabits failed: $e');
+      return 1;
+    }
+  }
+
+  /// pingsPerDay budget as a function of how many wake habits the
+  /// user has, chosen so that (pings × 7 days × habits) never crosses
+  /// 60 (iOS 64-cap with a small safety margin).
+  static int _pingsForWakeCount(int count) {
+    if (count <= 1) return 5;
+    if (count == 2) return 4;
+    if (count == 3) return 3;
+    if (count == 4) return 2;
+    return 1; // 5+ habits — clock-alarm style, one ping/morning.
+  }
+
+  static List<Duration> _retryOffsetsForCount(int pings) {
+    const all = [
+      Duration.zero,
+      Duration(seconds: 30),
+      Duration(minutes: 1),
+      Duration(minutes: 2),
+      Duration(minutes: 3),
+    ];
+    if (pings >= all.length) return all;
+    return all.sublist(0, pings);
   }
 
   /// Cancel all alarms for a habit
