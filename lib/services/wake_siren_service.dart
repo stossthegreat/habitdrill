@@ -4,6 +4,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'wake_keepalive_service.dart';
+
 /// The relentless morning shark — INSIDE the app.
 ///
 /// AlarmKit rings the phone through Silent/Focus BEFORE the user opens
@@ -43,6 +45,10 @@ class WakeSirenService {
       _kickIfDead();
       return;
     }
+    // Hand the audio session over from the silent keepalive to the
+    // loud siren. Never let them play simultaneously — same
+    // AVAudioSession, different players.
+    await WakeKeepaliveService.stop();
     _running = true;
     _startAttempts = 0;
     await _playOnce();
@@ -105,6 +111,10 @@ class WakeSirenService {
     } catch (e) {
       debugPrint('WakeSirenService.stop failed: $e');
     }
+    // Reactivate the keepalive so tomorrow's alarm has an already-
+    // alive audio session to fall back on if the user leaves the app
+    // in the background.
+    await WakeKeepaliveService.startIfNeeded();
   }
 
   static bool get isRunning => _running;
