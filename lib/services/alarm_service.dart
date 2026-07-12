@@ -439,11 +439,20 @@ class AlarmService {
     debugPrint('🗑️ CANCELLING ALARMS for habit: $habitId');
 
     // AlarmKit path — quietly cancel every derived UUID for every
-    // retry slot. Safe on old iOS because AlarmKitService returns
-    // false without erroring.
+    // retry slot from any historical cascade length. Safe on old
+    // iOS because AlarmKitService returns false without erroring.
+    //
+    // Why 200 (was _akCascadeOffsets.length): earlier builds
+    // scheduled 30-slot and 180-slot cascades. Only cancelling
+    // 0..currentLength-1 left orphan AlarmKit ids sitting in
+    // iOS's per-app queue. iOS caps AlarmKit at ~100 total, so a
+    // habit re-scheduled after the cascade shrank kept the old
+    // orphans AND added the new ids until the ceiling was hit and
+    // subsequent schedules silently dropped. Sweeping every slot
+    // that ANY historical cascade could have used clears them out.
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
-      for (int r = 0; r < _akCascadeOffsets.length; r++) {
+      for (int r = 0; r < 200; r++) {
         final akId = _uuidFromInt(baseId * 100 + r);
         try {
           await AlarmKitService.cancel(akId);
