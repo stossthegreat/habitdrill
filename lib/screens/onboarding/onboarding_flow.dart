@@ -14,6 +14,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../design/tokens.dart';
 import '../../providers/habit_provider.dart';
+import '../../services/alarm_service.dart';
 import '../../services/alarmkit_service.dart';
 import '../../services/law_punishment_picker.dart';
 import '../../services/wake_mission_prefs.dart';
@@ -196,7 +197,30 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
                         'at you through Silent and Focus. Off, and the alarm '
                         'is just a ping.',
                     ctaLabel: 'ALLOW NOTIFICATIONS',
-                    request: () => Permission.notification.request(),
+                    request: () async {
+                      // Direct UNUserNotificationCenter ask via
+                      // flutter_local_notifications — this ALWAYS
+                      // shows the iOS popup when the user hasn't
+                      // answered yet. (permission_handler alone was
+                      // compiled out by the missing Podfile macros,
+                      // so it returned denied with no popup.)
+                      final granted =
+                          await AlarmService.requestNotificationPermission();
+                      if (granted) return PermissionStatus.granted;
+                      // Not granted — ask permission_handler whether
+                      // this is a hard deny (so _tap routes them to
+                      // Settings) or a soft one.
+                      try {
+                        final st = await Permission.notification.status;
+                        if (st == PermissionStatus.permanentlyDenied ||
+                            st == PermissionStatus.denied) {
+                          return PermissionStatus.permanentlyDenied;
+                        }
+                        return st;
+                      } catch (_) {
+                        return PermissionStatus.permanentlyDenied;
+                      }
+                    },
                     onNext: _next,
                   ),
                   // Alarm permission back-to-back with notification —
