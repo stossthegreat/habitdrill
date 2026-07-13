@@ -274,6 +274,11 @@ class AlarmService {
       final bool alarmKitAvailable = await AlarmKitService.isAvailable();
       debugPrint('   AlarmKit available: $alarmKitAvailable');
 
+      // Registry of every AlarmKit ID we schedule below — cancelAlarm
+      // and cancelWakeAlarmKitRetries cancel from this list instead of
+      // blind-sweeping hundreds of derived UUIDs.
+      final akEntries = <String>[];
+
       for (final day in habit.repeatDays) {
         final baseAlarmId = _getAlarmId(habit.id, day);
         final fireDate = _getNextAlarmTime(day, habit.timeOfDay);
@@ -337,7 +342,6 @@ class AlarmService {
           if (alarmKitAvailable) {
             final akId = _uuidFromInt(baseAlarmId * 100 + i);
             try {
-              await AlarmKitService.cancel(akId);
               final ok = await AlarmKitService.schedule(
                 id: akId,
                 title: i == 0
@@ -346,6 +350,7 @@ class AlarmService {
                 fireAt: fireTime.toLocal(),
                 habitId: habit.id,
               );
+              akEntries.add('$day|$i|$akId');
               if (i == 0) {
                 debugPrint(
                   '   🛎 AlarmKit ${_getDayName(day)}: ${ok ? "scheduled" : "failed"}',
@@ -356,6 +361,18 @@ class AlarmService {
             }
           }
         }
+      }
+
+      // Persist the AlarmKit registry for this habit.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (alarmKitAvailable && akEntries.isNotEmpty) {
+          await prefs.setStringList(_akRegKey(habit.id), akEntries);
+        } else {
+          await prefs.remove(_akRegKey(habit.id));
+        }
+      } catch (e) {
+        debugPrint('   AK registry persist failed: $e');
       }
 
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -472,107 +489,75 @@ class AlarmService {
     return all.sublist(0, pings);
   }
 
-  /// Cancel all alarms for a habit
-  static Future<void> cancelAlarm(String habitId) async {
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('🗑️ CANCELLING ALARMS for habit: $habitId');
+  /// SharedPreferences key holding the AlarmKit IDs we actually
+  /// scheduled for a habit, as "day|slot|uuid" strings. Cancelling
+  /// from this registry replaces the old blind 200-slot × 7-day sweep
+  /// (1,400 method-channel round trips per habit) that froze the UI
+  /// for minutes and got the app watchdog-killed on every alarm edit.
+  static String _akRegKey(String habitId) => 'ak_reg_$habitId';
 
-    // AlarmKit path — quietly cancel every derived UUID for every
-    // retry slot from any historical cascade length. Safe on old
-    // iOS because AlarmKitService returns false without erroring.
-    //
-    // Why 200 (was _akCascadeOffsets.length): earlier builds
-    // scheduled 30-slot and 180-slot cascades. Only cancelling
-    // 0..currentLength-1 left orphan AlarmKit ids sitting in
-    // iOS's per-app queue. iOS caps AlarmKit at ~100 total, so a
-    // habit re-scheduled after the cascade shrank kept the old
-    // orphans AND added the new ids until the ceiling was hit and
-    // subsequent schedules silently dropped. Sweeping every slot
-    // that ANY historical cascade could have used clears them out.
-    for (int day = 0; day < 7; day++) {
-      final baseId = _getAlarmId(habitId, day);
-      for (int r = 0; r < 200; r++) {
-        final akId = _uuidFromInt(baseId * 100 + r);
+  /// Cancel all alarms for a habit.
+  ///
+  /// Fast paths only:
+  /// - AlarmKit: cancel exactly the UUIDs recorded in the registry
+  ///   (≤ pings × 7 entries) plus the 7 legacy per-day seeds. Orphans
+  ///   from historical ID schemes are handled by the native cancelAll
+  ///   sweep in rescheduleWakeAlarms.
+  /// - Notifications: ONE pendingNotificationRequests() call, then
+  ///   cancel only the pending IDs that belong to this habit (iOS
+  ///   holds ≤ 64 pending total, so this is ≤ 64 cancels worst case).
+  static Future<void> cancelAlarm(String habitId) async {
+    debugPrint('🗑️ Cancelling alarms for habit: $habitId');
+
+    // ── AlarmKit: registry-driven ─────────────────────────────────
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final entries = prefs.getStringList(_akRegKey(habitId)) ?? const [];
+      for (final e in entries) {
+        final uuid = e.split('|').last;
         try {
-          await AlarmKitService.cancel(akId);
+          await AlarmKitService.cancel(uuid);
         } catch (_) {}
       }
-      // Also try the pre-retry legacy UUID (single alarm per day).
+      await prefs.remove(_akRegKey(habitId));
+      if (entries.isNotEmpty) {
+        debugPrint('   🛎 AlarmKit: cancelled ${entries.length} registered');
+      }
+    } catch (e) {
+      debugPrint('   AlarmKit registry cancel failed: $e');
+    }
+    // Legacy pre-registry seeds — one per day, cheap.
+    for (int day = 0; day < 7; day++) {
       try {
-        await AlarmKitService.cancel(_uuidFromInt(baseId));
+        await AlarmKitService.cancel(_uuidFromInt(_getAlarmId(habitId, day)));
       } catch (_) {}
     }
 
-    // Get pending notifications BEFORE cancellation
-    final pendingBefore = await _notifications.pendingNotificationRequests();
-    final habitAlarmIds = <int>[];
-
-    // Up to 100 wake ping slots per day (3 burst + 15 escalation actually
-    // used; loop to 100 to catch any leftovers from older versions and
-    // legacy *10 IDs).
+    // ── Notifications: filter actual pending, cancel matches ─────
+    final possibleIds = <int>{};
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
       for (int i = 0; i < 100; i++) {
-        habitAlarmIds.add(baseId * 100 + i);
-        // Legacy *10 scheme — earlier builds; ensure they're captured too.
-        if (i < 10) habitAlarmIds.add(baseId * 10 + i);
+        possibleIds.add(baseId * 100 + i);
+        if (i < 10) possibleIds.add(baseId * 10 + i); // legacy scheme
       }
     }
-    
-    final relevantBefore = pendingBefore.where((n) => habitAlarmIds.contains(n.id)).toList();
-    debugPrint('📊 Found ${relevantBefore.length} pending alarms for this habit');
-    
-    // Cancel each alarm with error handling
-    int successCount = 0;
-    int failCount = 0;
-    
-    for (int day = 0; day < 7; day++) {
-      final baseId = _getAlarmId(habitId, day);
-      // Cancel every ping slot for this day — new *100 IDs plus any
-      // legacy *10 IDs left behind by earlier builds.
-      for (int i = 0; i < 100; i++) {
-        final newId = baseId * 100 + i;
-        try {
-          await _notifications.cancel(newId);
-          _scheduledAlarms.remove(newId);
-          successCount++;
-        } catch (e) {
-          failCount++;
-          debugPrint('   ❌ Failed to cancel alarm ID $newId (${_getDayName(day)} slot $i): $e');
-        }
-        if (i < 10) {
-          final legacyId = baseId * 10 + i;
+    int cancelled = 0;
+    try {
+      final pending = await _notifications.pendingNotificationRequests();
+      for (final p in pending) {
+        if (possibleIds.contains(p.id)) {
           try {
-            await _notifications.cancel(legacyId);
-            _scheduledAlarms.remove(legacyId);
+            await _notifications.cancel(p.id);
+            _scheduledAlarms.remove(p.id);
+            cancelled++;
           } catch (_) {}
         }
       }
+    } catch (e) {
+      debugPrint('   notification cancel sweep failed: $e');
     }
-    
-    // Verify cancellation at OS level
-    final pendingAfter = await _notifications.pendingNotificationRequests();
-    final relevantAfter = pendingAfter.where((n) => habitAlarmIds.contains(n.id)).toList();
-    
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('📊 Cancellation Summary for habit: $habitId');
-    debugPrint('   ✅ Successfully cancelled: $successCount');
-    debugPrint('   ❌ Failed to cancel: $failCount');
-    debugPrint('   📋 Pending BEFORE: ${relevantBefore.length}');
-    debugPrint('   📋 Pending AFTER: ${relevantAfter.length}');
-    debugPrint('   ${relevantAfter.isEmpty ? "✅ All alarms verified cancelled!" : "⚠️ WARNING: ${relevantAfter.length} alarms still pending!"}');
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // Do NOT throw when verification finds stragglers. Historically
-    // this bubbled out of cancelAlarm and killed the wrapping try in
-    // scheduleAlarm, so a single leftover pending notification meant
-    // NO alarm got scheduled — silent failure the user sees as "the
-    // shark isn't ringing anymore." A stray notification is at worst
-    // a duplicate; the fresh schedule below is what matters, and
-    // it's idempotent per-id anyway.
-    if (relevantAfter.isNotEmpty) {
-      debugPrint('   ⚠️ Continuing anyway — pending stragglers are non-fatal.');
-    }
+    debugPrint('   🔕 notifications: cancelled $cancelled pending');
   }
 
   /// Cancel all alarms
@@ -710,17 +695,31 @@ class AlarmService {
   /// notification needs to disappear before it can nag a user who
   /// already did the work.
   static Future<void> cancelWakeEscalations(String habitId) async {
-    int cancelled = 0;
+    // Only cancel escalation pings that are ACTUALLY pending — one
+    // pendingNotificationRequests() call and ≤64 cancels, instead of
+    // the old 7×97 blind cancel() loop that stalled the completion
+    // flow for seconds.
+    final possibleIds = <int>{};
     for (int day = 0; day < 7; day++) {
       final baseId = _getAlarmId(habitId, day);
       for (int i = _escalationStart; i < 100; i++) {
-        try {
-          await _notifications.cancel(baseId * 100 + i);
-          _scheduledAlarms.remove(baseId * 100 + i);
-          cancelled++;
-        } catch (_) {}
+        possibleIds.add(baseId * 100 + i);
+        if (i < 10) possibleIds.add(baseId * 10 + i); // legacy scheme
       }
     }
+    int cancelled = 0;
+    try {
+      final pending = await _notifications.pendingNotificationRequests();
+      for (final p in pending) {
+        if (possibleIds.contains(p.id)) {
+          try {
+            await _notifications.cancel(p.id);
+            _scheduledAlarms.remove(p.id);
+            cancelled++;
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
     // Also cancel any AlarmKit retries queued for the next fire.
     try {
       await cancelWakeAlarmKitRetries(habitId);
@@ -741,16 +740,32 @@ class AlarmService {
   static Future<void> cancelWakeAlarmKitRetries(String habitId) async {
     final now = DateTime.now();
     final today = now.weekday == 7 ? 0 : now.weekday;
-    final baseAlarmId = _getAlarmId(habitId, today);
-    // Sweep 200 slots to also flush any historical cascade orphans
-    // (see cancelAlarm for the same reasoning).
-    for (int r = 0; r < 200; r++) {
-      final uuid = _uuidFromInt(baseAlarmId * 100 + r);
-      try {
-        await AlarmKitService.cancel(uuid);
-      } catch (_) {}
+    // Cancel only TODAY's registered cascade entries — the registry
+    // knows exactly which UUIDs exist, so this is ≤ pings-per-day
+    // cancels instead of a 200-slot blind sweep.
+    int cancelled = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _akRegKey(habitId);
+      final entries = prefs.getStringList(key) ?? const [];
+      final remaining = <String>[];
+      for (final e in entries) {
+        final parts = e.split('|');
+        if (parts.length == 3 && int.tryParse(parts[0]) == today) {
+          try {
+            await AlarmKitService.cancel(parts[2]);
+            cancelled++;
+          } catch (_) {}
+        } else {
+          remaining.add(e);
+        }
+      }
+      await prefs.setStringList(key, remaining);
+    } catch (e) {
+      debugPrint('cancelWakeAlarmKitRetries registry read failed: $e');
     }
-    debugPrint('🛑 Cancelled today\'s AlarmKit cascade for $habitId (day=$today)');
+    debugPrint(
+        '🛑 Cancelled $cancelled of today\'s AlarmKit cascade for $habitId (day=$today)');
   }
 
   /// Re-schedule the wake-alarm pings + AlarmKit retries for every
@@ -758,7 +773,29 @@ class AlarmService {
   /// always covers the NEXT upcoming fire (escalation is one-shot to
   /// stay under the 64-slot pending-notification cap; without a periodic
   /// re-schedule the third day's wake would have no escalation).
-  static Future<void> rescheduleWakeAlarms(Iterable<Habit> habits) async {
+  /// Serialization queue so overlapping reschedule triggers (foreground
+  /// event + habit save + workout completion) run one after another
+  /// instead of stampeding the notification/AlarmKit queues in
+  /// parallel. Each caller still awaits ITS OWN run's completion.
+  static Future<void> _rescheduleQueue = Future.value();
+
+  static Future<void> rescheduleWakeAlarms(Iterable<Habit> habits) {
+    final snapshot = habits.toList();
+    final run = _rescheduleQueue.then((_) => _rescheduleNow(snapshot));
+    _rescheduleQueue = run.catchError((_) {});
+    return run;
+  }
+
+  static Future<void> _rescheduleNow(List<Habit> habits) async {
+    // ONE native call clears every AlarmKit alarm — current IDs plus
+    // any orphans from historical ID schemes. This replaces the old
+    // Dart-side 200-slot × 7-day × N-habit blind sweep (thousands of
+    // sequential channel calls) that froze the UI on every edit and
+    // delayed fresh schedules past their own fire time.
+    try {
+      final swept = await AlarmKitService.cancelAll();
+      if (swept > 0) debugPrint('🧹 AlarmKit cancelAll: swept $swept');
+    } catch (_) {}
     for (final h in habits) {
       if (h.reminderOn && h.time.isNotEmpty) {
         try {

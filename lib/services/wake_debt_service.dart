@@ -64,9 +64,17 @@ class WakeDebtService {
     debugPrint('WakeDebt: cleared');
   }
 
-  /// Find any wake habit whose scheduled fire happened in the last 30
-  /// minutes AND that isn't marked done today. If one exists, the app
-  /// should be in punishment mode — no matter what tab the user was on.
+  /// How long after fire time the app keeps hunting the user — any
+  /// entry into the app within this window forces the wake screen.
+  /// The lock-screen cascade (notifications + AlarmKit) covers the
+  /// first minutes; this window is what makes "open the app to check
+  /// Instagram an hour late" still cost them the workout.
+  static const Duration dueWindow = Duration(minutes: 60);
+
+  /// Find any wake habit whose scheduled fire happened within
+  /// [dueWindow] AND that isn't marked done today. If one exists, the
+  /// app should be in punishment mode — no matter what tab the user
+  /// was on.
   static Habit? findDueWakeHabit() {
     final now = DateTime.now();
     final today = now.weekday == 7 ? 0 : now.weekday;
@@ -82,9 +90,9 @@ class WakeDebtService {
         final fire = DateTime(now.year, now.month, now.day,
             int.parse(parts[0]), int.parse(parts[1]));
         final diff = now.difference(fire);
-        // Fire happened within the last 30 min (or is happening RIGHT
+        // Fire happened within the due window (or is happening RIGHT
         // now — small negative diff, up to 5s before, catches races).
-        if (diff.inSeconds >= -5 && diff.inMinutes <= 30) return h;
+        if (diff.inSeconds >= -5 && diff <= dueWindow) return h;
       } catch (_) {}
     }
     return null;
