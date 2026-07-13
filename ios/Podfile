@@ -50,6 +50,18 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       config.build_settings['SWIFT_VERSION'] = '5.0'
 
+      # permission_handler compiles each permission behind these
+      # macros. Without them the permission code is COMPILED OUT and
+      # request() returns denied instantly WITHOUT showing the iOS
+      # popup. This block was missing — which is why the notification
+      # permission dialog never appeared from onboarding.
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_NOTIFICATIONS=1',
+        'PERMISSION_CAMERA=1',
+        'PERMISSION_MICROPHONE=1',
+      ]
+
       # Disable strict concurrency checking for Firebase pods
       if target.name.start_with?('Firebase')
         config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)']

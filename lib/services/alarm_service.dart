@@ -123,6 +123,35 @@ class AlarmService {
     }
   }
 
+  /// Show the OS notification-permission popup. Goes straight through
+  /// flutter_local_notifications → UNUserNotificationCenter, NOT
+  /// permission_handler — so it works regardless of the Podfile
+  /// PERMISSION_* macro setup that silently killed the popup before.
+  /// Returns true if the user granted.
+  static Future<bool> requestNotificationPermission() async {
+    try {
+      if (Platform.isIOS) {
+        final ios = _notifications.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+        final granted = await ios?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        debugPrint('🔔 iOS notification permission granted: $granted');
+        return granted ?? false;
+      }
+      final android = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final granted = await android?.requestNotificationsPermission();
+      debugPrint('🔔 Android notification permission granted: $granted');
+      return granted ?? false;
+    } catch (e) {
+      debugPrint('requestNotificationPermission failed: $e');
+      return false;
+    }
+  }
+
   /// Where MainScreen picks up a fresh alarm tap (habitId + tap time).
   static const String _kLastAlarmHabit = 'last_alarm_tapped_habit';
   static const String _kLastAlarmAt = 'last_alarm_tapped_at';
