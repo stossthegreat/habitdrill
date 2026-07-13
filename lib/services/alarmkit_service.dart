@@ -77,4 +77,18 @@ class AlarmKitService {
       return false;
     }
   }
+
+  /// Stops EVERY AlarmKit alarm this app has scheduled — including
+  /// orphans left behind by any historical ID scheme — in a single
+  /// method-channel round trip. Returns how many were stopped.
+  static Future<int> cancelAll() async {
+    if (!Platform.isIOS) return 0;
+    try {
+      final res = await _channel.invokeMethod<int>('cancelAll');
+      return res ?? 0;
+    } catch (e) {
+      debugPrint('AlarmKit cancelAll error: $e');
+      return 0;
+    }
+  }
 }

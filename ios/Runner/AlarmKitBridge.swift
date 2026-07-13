@@ -103,6 +103,29 @@ import AppIntents
       } else {
         result(true)
       }
+    case "cancelAll":
+      // Enumerate what's ACTUALLY scheduled and stop each — one
+      // method-channel round trip from Dart no matter how many
+      // alarms exist. Replaces the old Dart-side blind sweep of
+      // 200 slots × 7 days × N habits (thousands of channel calls,
+      // froze the UI for minutes and got the app watchdog-killed).
+      if #available(iOS 26.0, *) {
+        Task {
+          var stopped = 0
+          do {
+            let alarms = try AlarmManager.shared.alarms
+            for alarm in alarms {
+              try? await AlarmManager.shared.stop(id: alarm.id)
+              stopped += 1
+            }
+          } catch {
+            NSLog("AlarmKit cancelAll failed: \(error)")
+          }
+          result(stopped)
+        }
+      } else {
+        result(0)
+      }
     default:
       result(FlutterMethodNotImplemented)
     }
